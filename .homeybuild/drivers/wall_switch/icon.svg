@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Wall Switch">
+  <rect width="256" height="256" rx="48" fill="#107c10"/>
+  <rect x="72" y="48" width="112" height="160" rx="20" fill="#ffffff" opacity="0.95"/>
+  <rect x="104" y="72" width="48" height="56" rx="8" fill="#107c10"/>
+  <rect x="104" y="136" width="48" height="56" rx="8" fill="#107c10"/>
+</svg>

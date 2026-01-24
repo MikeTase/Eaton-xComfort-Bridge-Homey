@@ -1,0 +1,78 @@
+{
+  "id": "com.eaton.xcomfort",
+  "name": {
+    "en": "Eaton xComfort"
+  },
+  "description": {
+    "en": "Control your Eaton xComfort devices via the xComfort Bridge."
+  },
+  "version": "1.0.0",
+  "author": {
+    "name": "Mikey"
+  },
+  "compatibility": ">=10.0.0",
+  "sdk": 3,
+  "permissions": [
+    "homey:manager:api"
+  ],
+  "flow": {
+    "triggers": [
+      {
+        "id": "wall_switch_pressed",
+        "title": {
+          "en": "Wall switch pressed"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "event",
+            "type": "string",
+            "title": {
+              "en": "Event"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  
+  "drivers": [
+    {
+      "id": "actuator",
+      "name": {
+        "en": "Actuator / Dimmer"
+      },
+      "class": "light",
+      "capabilities": [
+        "onoff",
+        "dim"
+      ],
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select actuators/dimmers"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    }
+  ]
+}
+
