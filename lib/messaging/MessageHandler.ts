@@ -143,10 +143,15 @@ export class MessageHandler {
 
     // Handle NACK
     if (msg.type_int === MESSAGE_TYPES.NACK) {
-      this.logger(`[MessageHandler-ERROR] Received NACK for message ref: ${msg.ref}`);
-      if (msg.payload) {
-        this.logger(`[MessageHandler-ERROR] NACK details: ${JSON.stringify(msg.payload)}`);
+      if (JSON.stringify(msg.payload || '').includes('no client-connection available')) {
+         this.logger('[MessageHandler-CRITICAL] Bridge reports NO CLIENT CONNECTIONS AVAILABLE. Please restart the Bridge or disconnect other apps.');
+      } else {
+         this.logger(`[MessageHandler-ERROR] Received NACK for message ref: ${msg.ref}`);
+         if (msg.payload) {
+           this.logger(`[MessageHandler-ERROR] NACK details: ${JSON.stringify(msg.payload)}`);
+         }
       }
+      
       if (msg.ref) {
         this.onNackReceived?.(msg.ref);
       }

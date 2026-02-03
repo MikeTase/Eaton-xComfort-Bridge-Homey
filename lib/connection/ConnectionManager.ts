@@ -31,7 +31,7 @@ export interface RetryConfig {
 
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxRetries: 3,    // Updated to match reference implementation
-  ackTimeout: 5000, // 5 seconds
+  ackTimeout: 2000, // Reduced from 5000ms to 2000ms for responsiveness
   retryDelay: 500,  // Reduced to 500ms for faster recovery
 };
 
@@ -72,7 +72,7 @@ export class ConnectionManager {
   // Retry mechanism: Map of mc -> resolve function for pending ACKs
   private pendingAcks: Map<number, (acked: boolean) => void> = new Map();
   private retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG;
-  private txSemaphore = new Semaphore(1); // Concurrency 1 to prevent bridge flooding (optimization)
+  private txSemaphore = new Semaphore(5); // Increased concurrency to 5 to prevent queue blocking
 
   constructor(bridgeIp: string, logger?: LoggerFunction) {
     this.bridgeIp = bridgeIp;
@@ -372,12 +372,17 @@ export class ConnectionManager {
     return new Promise((resolve, reject) => {
       let retries = 0;
       let ackTimeoutTimer: NodeJS.Timeout | null = null;
+      let retryTimer: NodeJS.Timeout | null = null;
       let releaseSemaphore: (() => void) | null = null;
 
       const cleanup = () => {
         if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
+        if (retryTimer) clearTimeout(retryTimer);
         this.pendingAcks.delete(mc);
-        if (releaseSemaphore) releaseSemaphore();
+        if (releaseSemaphore) {
+             releaseSemaphore();
+             releaseSemaphore = null; // Ensure only called once
+        }
       };
 
       const sendAttempt = async () => {
@@ -416,11 +421,12 @@ export class ConnectionManager {
             retries++;
             this.logger(`[ConnectionManager] Retry ${retries}/${this.retryConfig.maxRetries} for mc=${mc}`);
             if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
-            setTimeout(() => {
+            
+            retryTimer = setTimeout(() => {
                sendAttempt();
             }, this.retryConfig.retryDelay);
          } else {
-            this.logger(`[ConnectionManager] Max retries reached for mc=${mc}`);
+            this.logger(`[ConnectionManager] Max retries reached for mc=${mc} after ${retries} retries`);
             cleanup();
             reject(new Error(`Max retries reached`));
          }

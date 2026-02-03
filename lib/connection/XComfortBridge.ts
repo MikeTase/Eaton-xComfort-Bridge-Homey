@@ -270,6 +270,14 @@ export class XComfortBridge extends EventEmitter {
     // Try JSON first (unencrypted handshake)
     try {
       const msg = JSON.parse(rawStr) as ProtocolMessage;
+      
+      // Handle generic connection errors
+      if (msg.type_int === MESSAGE_TYPES.CONNECTION_DECLINED) {
+         this.logger(`[XComfortBridge] Connection Declined: ${JSON.stringify(msg.payload)}`);
+         this.disconnect(); // Force disconnect to trigger clean reconnection logic
+         return;
+      }
+
       if (this.authenticator.handleUnencryptedMessage(msg)) {
         // Update encryption context after key exchange
         const ctx = this.authenticator.getEncryptionContext();
