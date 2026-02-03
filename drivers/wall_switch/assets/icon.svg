@@ -1,6 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Wall Switch">
-  <rect width="256" height="256" rx="48" fill="#107c10"/>
-  <rect x="72" y="48" width="112" height="160" rx="20" fill="#ffffff" opacity="0.95"/>
-  <rect x="104" y="72" width="48" height="56" rx="8" fill="#107c10"/>
-  <rect x="104" y="136" width="48" height="56" rx="8" fill="#107c10"/>
+<svg width="960" height="960" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <rect x="12" y="8" width="40" height="48" rx="4" fill="none" stroke="#000" stroke-width="4"/>
+  <rect x="22" y="18" width="20" height="28" fill="none" stroke="#000" stroke-width="3"/>
+  <path d="M22 32h20" stroke="#000" stroke-width="2"/>
 </svg>

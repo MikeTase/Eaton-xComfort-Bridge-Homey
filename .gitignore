@@ -2,4 +2,5 @@ node_modules
 
 
 # Added by Homey CLI
-/.homeybuild/.DS_Store
+/.homeybuild
+.DS_Store
