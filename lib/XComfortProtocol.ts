@@ -44,6 +44,9 @@ export const MESSAGE_TYPES = {
   ROOM_DIM: 283,
   ROOM_SWITCH: 284,
   ACTIVATE_SCENE: 285,
+  SET_HEATING_STATE: 353,
+  SET_DEVICE_SHADING_STATE: 355,
+  SET_ROOM_HEATING_STATE: 363,
 
   // Response/Data Messages
   SET_ALL_DATA: 300,
@@ -77,10 +80,18 @@ export type ConnectionState =
  * Device Types (based on devType field)
  */
 export const DEVICE_TYPES = {
-  DIMMING_ACTUATOR: 101,
   SWITCHING_ACTUATOR: 100,
+  DIMMING_ACTUATOR: 101,
+  
+  // Shading
+  SHADING_ACTUATOR: 102,
+  
+  // Heating / Sensors
   TEMPERATURE_SENSOR: 200,
-  // Add more as discovered
+  HEATING_ACTUATOR: 440,
+  HEATING_VALVE: 441,
+  RC_TOUCH: 450,
+  TEMP_HUMIDITY_SENSOR: 451,
 } as const;
 
 export type DeviceType = (typeof DEVICE_TYPES)[keyof typeof DEVICE_TYPES];

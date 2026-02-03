@@ -60,6 +60,10 @@ export class XComfortBridge extends EventEmitter {
   // Debouncers
   private dimDebouncers = new Map<string, CommandDebouncer>();
 
+  public getConnectionManager(): ConnectionManager {
+    return this.connectionManager;
+  }
+
   constructor(bridgeIp: string, authKey: string) {
     super(); // Initialize EventEmitter
     this.bridgeIp = bridgeIp;

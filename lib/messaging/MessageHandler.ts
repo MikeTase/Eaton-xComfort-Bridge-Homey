@@ -301,12 +301,23 @@ export class MessageHandler {
 
             if (
               item.switch !== undefined ||
-              item.dimmvalue !== undefined
+              item.dimmvalue !== undefined ||
+              item.setpoint !== undefined ||
+              item.shadsClosed !== undefined ||
+              item.shSafety !== undefined
             ) {
               deviceUpdate.switch = item.switch;
               deviceUpdate.dimmvalue = item.dimmvalue;
               deviceUpdate.power = item.power;
               deviceUpdate.curstate = item.curstate;
+              
+              // New mappings
+              if (item.shadsClosed !== undefined) deviceUpdate.shadsClosed = item.shadsClosed;
+              if (item.shSafety !== undefined) deviceUpdate.shSafety = item.shSafety;
+              if (item.setpoint !== undefined) deviceUpdate.setpoint = item.setpoint;
+              if (item.operationMode !== undefined) deviceUpdate.operationMode = item.operationMode;
+              if (item.tempState !== undefined) deviceUpdate.tempState = item.tempState;
+
             } else if (item.info && Array.isArray(item.info)) {
               const metadata = this.deviceStateManager.parseInfoMetadata(item.info);
               if (Object.keys(metadata).length > 0) {

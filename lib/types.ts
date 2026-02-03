@@ -83,6 +83,36 @@ export interface ConnectionEvents {
 // =============================================================================
 
 /**
+ * Climate/Heating Modes
+ */
+export enum ClimateMode {
+  FrostProtection = 1,
+  Eco = 2,
+  Comfort = 3
+}
+
+/**
+ * Climate/Heating States
+ */
+export enum ClimateState {
+  Off = 0,
+  HeatingAuto = 1,
+  HeatingManual = 2
+}
+
+/**
+ * Shading Actions
+ */
+export enum ShadingAction {
+  OPEN = 0,
+  CLOSE = 1,
+  STOP = 2,
+  STEP_OPEN = 3,
+  STEP_CLOSE = 4,
+  GO_TO = 5
+}
+
+/**
  * Device from xComfort Bridge
  */
 export interface XComfortDevice {
@@ -91,6 +121,15 @@ export interface XComfortDevice {
   dimmable?: boolean;
   devType?: number;
   info?: InfoEntry[];
+  
+  // Shading specific
+  shRuntime?: number;
+  shSafety?: number;
+  
+  // Heating specific
+  setpoint?: number;
+  operationMode?: number;
+  
   [key: string]: unknown;
 }
 
@@ -110,6 +149,16 @@ export interface DeviceStateUpdate {
   dimmvalue?: number;
   power?: number;
   curstate?: unknown;
+
+  // Shading
+  shadsClosed?: number; 
+  shSafety?: number;
+
+  // Heating
+  setpoint?: number;
+  operationMode?: number | ClimateMode;
+  tempState?: number | ClimateState;
+
   metadata?: DeviceMetadata;
 }
 
@@ -211,7 +260,16 @@ export interface StateUpdateItem {
   windowsOpen?: number;
   doorsOpen?: number;
   presence?: number;
+  
+  // Shading specific
   shadsClosed?: number;
+  shSafety?: number;
+
+  // Heating specific
+  setpoint?: number;
+  operationMode?: number | ClimateMode;
+  tempState?: number | ClimateState;
+  
   errorState?: unknown;
 }
 

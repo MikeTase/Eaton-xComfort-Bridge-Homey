@@ -74,6 +74,66 @@
       ]
     },
     {
+      "id": "thermostat",
+      "name": {
+        "en": "Thermostat / Heating"
+      },
+      "class": "thermostat",
+      "capabilities": [
+        "measure_temperature",
+        "target_temperature"
+      ],
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select thermostats"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "shading",
+      "name": {
+        "en": "Shading / Blinds"
+      },
+      "class": "windowcoverings",
+      "capabilities": [
+        "windowcoverings_state",
+        "windowcoverings_set"
+      ],
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select shading devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
       "id": "wall_switch",
       "name": {
         "en": "Wall Switch"
