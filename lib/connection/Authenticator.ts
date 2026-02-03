@@ -12,9 +12,8 @@
  */
 
 import crypto from 'crypto';
-import forge from 'node-forge';
 import { MESSAGE_TYPES, CLIENT_CONFIG, PROTOCOL_CONFIG } from '../XComfortProtocol';
-import { authHash, generateSalt } from '../crypto/Hash';
+import { Encryption } from '../crypto/Encryption';
 import type { ProtocolMessage, AuthState, EncryptionContext, LoggerFunction } from '../types';
 
 // Re-export types for module consumers
@@ -45,7 +44,7 @@ export class Authenticator {
   private logger: LoggerFunction;
   private deviceId: string | null = null;
   private connectionId: string | null = null;
-  private publicKey: forge.pki.rsa.PublicKey | null = null;
+  private publicKey: string | null = null;
   private encryptionContext: EncryptionContext | null = null;
   private token: string | null = null;
   private state: AuthState = 'idle';
@@ -163,7 +162,7 @@ export class Authenticator {
 
     if (msg.type_int === MESSAGE_TYPES.PUBLIC_KEY_RESPONSE) {
       const payload = msg.payload as { public_key: string };
-      this.publicKey = forge.pki.publicKeyFromPem(payload.public_key);
+      this.publicKey = payload.public_key;
       this.logger('[Authenticator] Received public key');
 
       // Generate AES key and IV
@@ -172,16 +171,12 @@ export class Authenticator {
         iv: crypto.randomBytes(PROTOCOL_CONFIG.ENCRYPTION.IV_SIZE),
       };
 
-      const secretStr =
-        this.encryptionContext.key.toString('hex') +
-        ':::' +
-        this.encryptionContext.iv.toString('hex');
-
-      const encrypted = this.publicKey.encrypt(
-        secretStr,
-        PROTOCOL_CONFIG.ENCRYPTION.RSA_SCHEME
+      const encrypted = Encryption.encryptSessionKeys(
+        this.encryptionContext.key,
+        this.encryptionContext.iv,
+        this.publicKey
       );
-      const secret = Buffer.from(encrypted, 'binary').toString('base64');
+      const secret = encrypted.toString('base64');
 
       const secretMsg = {
         type_int: MESSAGE_TYPES.SECRET_EXCHANGE,
@@ -203,8 +198,8 @@ export class Authenticator {
    */
   handleEncryptedMessage(msg: ProtocolMessage): boolean {
     if (msg.type_int === MESSAGE_TYPES.SECRET_EXCHANGE_ACK) {
-      const salt = generateSalt(PROTOCOL_CONFIG.LIMITS.SALT_LENGTH);
-      const password = authHash(this.deviceId!, this.authKey, salt);
+      const salt = Encryption.generateSalt(PROTOCOL_CONFIG.LIMITS.SALT_LENGTH);
+      const password = Encryption.calculateAuthHash(this.deviceId!, this.authKey, salt);
 
       const loginMsg = {
         type_int: MESSAGE_TYPES.LOGIN_REQUEST,

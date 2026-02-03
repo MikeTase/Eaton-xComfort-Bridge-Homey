@@ -1,4 +1,4 @@
-import Homey from 'homey';
+import * as Homey from 'homey';
 import { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { MESSAGE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate, ShadingAction } from '../../lib/types';
