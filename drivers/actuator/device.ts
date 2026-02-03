@@ -47,6 +47,7 @@ module.exports = class ActuatorDevice extends Homey.Device {
         // Debounce/Race-condition handling
         let pendingSwitchState: boolean | null = null;
         let pendingSwitchTimestamp: number = 0;
+        let safetyTimer: NodeJS.Timeout | null = null;
         const STATE_UPDATE_GRACE_PERIOD = 3000; // ms
 
         this.onDeviceUpdate = (deviceId: string, state: DeviceStateUpdate) => {
@@ -65,7 +66,12 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     let shouldUpdate = true;
                     if (pendingSwitchState !== null) {
                         if (state.switch === pendingSwitchState) {
-                             // State confirmed
+                             // State confirmed - Cancel safety check
+                             if (safetyTimer) {
+                                 clearTimeout(safetyTimer);
+                                 safetyTimer = null;
+                             }
+
                              // Don't clear pendingSwitchState yet to protect against subsequent ghost echoes
                              if (now - pendingSwitchTimestamp >= STATE_UPDATE_GRACE_PERIOD) {
                                 pendingSwitchState = null;
@@ -124,19 +130,6 @@ module.exports = class ActuatorDevice extends Homey.Device {
                 lastSwitchCommandAt = Date.now();
                 lastBridgeSendAt = null;
                 
-                // Safety: Verify state after delay if no confirmation received
-                const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500; // 3.5s
-                setTimeout(() => {
-                    if (pendingSwitchState === value) {
-                        // Still pending? We might have lost the packet or the update.
-                        // Force a refresh of device states to verify.
-                        // console.log('[Actuator] State verification timed out, requesting bridge sync...');
-                        if (this.bridge && this.bridge.requestDeviceStates) {
-                            this.bridge.requestDeviceStates().catch(() => {});
-                        }
-                    }
-                }, safetyDelay);
-
                 // switchDevice uses the 1/0 logic internally now
                 await this.bridge.switchDevice(resolveDeviceId(), value, (sendTime?: number) => {
                     lastBridgeSendAt = sendTime || Date.now();
@@ -145,6 +138,19 @@ module.exports = class ActuatorDevice extends Homey.Device {
                         // console.log(`[Actuator] Bridge send delay: ${delta}ms for ${this.getName()} (${this.getData().deviceId})`);
                     }
                 });
+
+                // Safety: Verify state after delay if no confirmation received
+                if (safetyTimer) clearTimeout(safetyTimer);
+                const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500; // 3.5s
+                safetyTimer = setTimeout(() => {
+                    if (pendingSwitchState === value) {
+                        // Still pending? We might have lost the packet or the update.
+                        if (this.bridge && this.bridge.requestDeviceStates) {
+                            this.bridge.requestDeviceStates().catch(() => {});
+                        }
+                    }
+                    safetyTimer = null;
+                }, safetyDelay);
             } catch (err) {
                 console.error(`[Actuator] Error sending onoff command for ${this.getData().deviceId}:`, err);
                 pendingSwitchState = null; // Reset on error
@@ -163,15 +169,6 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     pendingSwitchState = false;
                     pendingSwitchTimestamp = Date.now();
                     
-                    const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
-                    setTimeout(() => {
-                         if (pendingSwitchState === false) {
-                            if (this.bridge && this.bridge.requestDeviceStates) {
-                                this.bridge.requestDeviceStates().catch(() => {});
-                            }
-                         }
-                    }, safetyDelay);
-
                     lastSwitchCommandAt = Date.now();
                     lastBridgeSendAt = null;
                     // console.log(`[Actuator] Command: switchDevice(${resolveDeviceId()}, false) at ${lastSwitchCommandAt}`);
@@ -183,6 +180,17 @@ module.exports = class ActuatorDevice extends Homey.Device {
                             // console.log(`[Actuator] Bridge send delay: ${delta}ms for ${this.getName()} (${this.getData().deviceId})`);
                         }
                     });
+
+                    if (safetyTimer) clearTimeout(safetyTimer);
+                    const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
+                    safetyTimer = setTimeout(() => {
+                         if (pendingSwitchState === false) {
+                            if (this.bridge && this.bridge.requestDeviceStates) {
+                                this.bridge.requestDeviceStates().catch(() => {});
+                            }
+                         }
+                         safetyTimer = null;
+                    }, safetyDelay);
                 } else {
                     const dimValue = Math.max(1, Math.round(value * 99));
                     this.setCapabilityValue('onoff', true).catch(() => {});
@@ -190,15 +198,6 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     // Set pending state (dim > 0 -> on)
                     pendingSwitchState = true;
                     pendingSwitchTimestamp = Date.now();
-
-                    const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
-                    setTimeout(() => {
-                         if (pendingSwitchState === true) {
-                            if (this.bridge && this.bridge.requestDeviceStates) {
-                                this.bridge.requestDeviceStates().catch(() => {});
-                            }
-                         }
-                    }, safetyDelay);
 
                     lastSwitchCommandAt = Date.now();
                     lastBridgeSendAt = null;
@@ -210,6 +209,17 @@ module.exports = class ActuatorDevice extends Homey.Device {
                             const delta = lastBridgeSendAt - lastSwitchCommandAt;
                         }
                     });
+
+                    if (safetyTimer) clearTimeout(safetyTimer);
+                    const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
+                    safetyTimer = setTimeout(() => {
+                         if (pendingSwitchState === true) {
+                            if (this.bridge && this.bridge.requestDeviceStates) {
+                                this.bridge.requestDeviceStates().catch(() => {});
+                            }
+                         }
+                         safetyTimer = null;
+                    }, safetyDelay);
                 }
             } catch (err) {
                 this.error(`[Actuator] Error sending dim command for ${this.getData().deviceId}:`, err);

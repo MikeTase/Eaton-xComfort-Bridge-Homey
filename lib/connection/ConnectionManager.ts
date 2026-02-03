@@ -30,9 +30,9 @@ export interface RetryConfig {
 }
 
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 3,    // Updated to match reference implementation
-  ackTimeout: 2000, // Reduced from 5000ms to 2000ms for responsiveness
-  retryDelay: 500,  // Reduced to 500ms for faster recovery
+  maxRetries: 5,    // Increased retry count for reliability
+  ackTimeout: 1000, // Reduced from 2000ms to 1000ms for responsiveness
+  retryDelay: 250,  // Reduced to 250ms for faster recovery
 };
 
 // ============================================================================
