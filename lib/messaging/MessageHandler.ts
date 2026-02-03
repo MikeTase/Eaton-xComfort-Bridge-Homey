@@ -347,7 +347,7 @@ export class MessageHandler {
             const deviceUpdate = deviceUpdates.get(item.deviceId)!;
             
             // Log raw item for debugging missing properties
-            console.log(`[MessageHandler] Raw item for device ${item.deviceId}:`, JSON.stringify(item));
+            // console.log(`[MessageHandler] Raw item for device ${item.deviceId}:`, JSON.stringify(item));
 
             if (
               item.switch !== undefined ||

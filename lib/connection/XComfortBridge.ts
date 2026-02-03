@@ -160,7 +160,7 @@ export class XComfortBridge extends EventEmitter {
 
     this.messageHandler.setOnScenesReceived((scenes) => {
       this.detailedScenes = scenes;
-      this.logger(`[XComfortBridge] Stored ${scenes.length} scenes`);
+      // this.logger(`[XComfortBridge] Stored ${scenes.length} scenes`);
       this.emit('scenes_loaded', scenes);
     });
 
