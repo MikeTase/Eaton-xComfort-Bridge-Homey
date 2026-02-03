@@ -50,7 +50,6 @@ export class XComfortBridge extends EventEmitter {
   private connectionState: BridgeConnectionState = 'disconnected';
   private deviceListReceived: boolean = false;
   private detailedScenes: XComfortScene[] = [];
-  private lastStateRequestAt: number = 0;  // Throttle timestamp
 
   // Timeouts
   private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -528,13 +527,6 @@ this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
       // this.logger('[XComfortBridge] Cannot request states - not connected');
       return false;
     }
-
-    const now = Date.now();
-    if (now - this.lastStateRequestAt < 5000) {
-        // this.logger('[XComfortBridge] Skipping requestDeviceStates (throttled)');
-        return true;
-    }
-    this.lastStateRequestAt = now;
 
     try {
       await this.connectionManager.sendWithRetry({
