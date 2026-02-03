@@ -408,7 +408,7 @@ this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
   async switchDevice(deviceId: string | number, switchState: boolean, onSend?: (timestamp: number) => void): Promise<boolean> {
     const payload = { 
         deviceId: this.parseId(String(deviceId)), 
-        switch: switchState ? 1 : 0 // Use 1/0 instead of boolean to prevent bridge 1006 disconnects
+        switch: switchState // Use native boolean as per HA implementation
     };
 
     const ts = Date.now();
@@ -487,12 +487,10 @@ this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
     value: boolean | number | null = null
   ): Promise<boolean> {
     if (action === 'switch') {
-      // Ensure strict 1/0 integer for switch to prevent disconnects
-      const switchVal = (value === true || value === 1) ? 1 : 0;
       const msg = {
         type_int: MESSAGE_TYPES.ROOM_SWITCH,
         mc: this.connectionManager.nextMc(),
-        payload: { roomId: this.parseId(roomId), switch: switchVal },
+        payload: { roomId: this.parseId(roomId), switch: !!value },
       };
       return this.connectionManager.sendEncrypted(msg);
     } else if (action === 'dimm' && value !== null) {
