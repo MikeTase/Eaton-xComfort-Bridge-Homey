@@ -47,7 +47,7 @@ module.exports = class ActuatorDevice extends Homey.Device {
         // Debounce/Race-condition handling
         let pendingSwitchState: boolean | null = null;
         let pendingSwitchTimestamp: number = 0;
-        const STATE_UPDATE_GRACE_PERIOD = 2000; // ms
+        const STATE_UPDATE_GRACE_PERIOD = 3000; // ms
 
         this.onDeviceUpdate = (deviceId: string, state: DeviceStateUpdate) => {
             try {
@@ -66,7 +66,10 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     if (pendingSwitchState !== null) {
                         if (state.switch === pendingSwitchState) {
                              // State confirmed
-                             pendingSwitchState = null;
+                             // Don't clear pendingSwitchState yet to protect against subsequent ghost echoes
+                             if (now - pendingSwitchTimestamp >= STATE_UPDATE_GRACE_PERIOD) {
+                                pendingSwitchState = null;
+                             }
                         } else {
                             if (now - pendingSwitchTimestamp < STATE_UPDATE_GRACE_PERIOD) {
                                 // Ignore update, it contradicts our recent command and is likely old state
