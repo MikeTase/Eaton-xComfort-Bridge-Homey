@@ -13,28 +13,32 @@ module.exports = class WallSwitchDevice extends homey_1.default.Device {
         var _a;
         this.log('WallSwitchDevice init:', this.getName());
         const app = this.homey.app;
-        // Dependency injection: allow bridge to be passed in for testing or advanced use
         this.bridge = ((_a = app.getBridge) === null || _a === void 0 ? void 0 : _a.call(app)) || app.bridge;
         if (!this.bridge) {
             this.setUnavailable('Bridge not connected');
             return;
         }
         // Register Flow Trigger
-        // Ensure you define this in app.json if you want it visible, 
-        // or use standard capability triggers if capabilities are used.
-        // For now we assume a custom trigger 'switch_pressed'.
         this.triggerPressed = this.homey.flow.getDeviceTriggerCard('wall_switch_pressed');
-        this.bridge.on('state_update', (items) => {
-            const updates = Array.isArray(items) ? items : [items];
-            const update = updates.find((d) => String(d.deviceId) === String(this.getData().deviceId));
-            if (update) {
-                this.log('Switch Event:', update);
-                // Trigger flow
+        this.onDeviceUpdate = (deviceId, state) => {
+            // Only verify this update belongs to this device (redundant with listener registration but safe)
+            if (String(deviceId) === String(this.getData().deviceId)) {
+                this.log('Switch Event:', state);
                 if (this.triggerPressed) {
-                    this.triggerPressed.trigger(this, {}, { event: JSON.stringify(update) })
+                    // Determine what data to pass to tokens.
+                    // Assuming tokens might be { state: boolean } or similar based on driver.json
+                    this.triggerPressed.trigger(this, {}, { event: JSON.stringify(state) })
                         .catch(this.error);
                 }
             }
-        });
+        };
+        // Register listener for this specific device
+        this.bridge.addDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
+    }
+    onDeleted() {
+        if (this.bridge && this.onDeviceUpdate) {
+            this.bridge.removeDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
+            this.log('WallSwitchDevice listener removed');
+        }
     }
 };

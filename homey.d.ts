@@ -11,7 +11,11 @@ declare module 'homey' {
         error(...args: any[]): void;
         onInit(): void | Promise<void>;
         getData(): any;
+        getSettings(): any;
         getName(): string;
+        hasCapability(capabilityId: string): boolean;
+        addCapability(capabilityId: string): Promise<void>;
+        removeCapability(capabilityId: string): Promise<void>;
         setUnavailable(message?: string): void;
         setAvailable(): void;
         registerCapabilityListener(capabilityId: string, listener: (value: any, opts: any) => Promise<any> | any): void;

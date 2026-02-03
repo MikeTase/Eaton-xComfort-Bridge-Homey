@@ -8,7 +8,6 @@ module.exports = class WallSwitchDriver extends homey_1.default.Driver {
     async listUnpairedDevices() {
         var _a, _b, _c;
         const app = this.homey.app;
-        // Dependency injection: allow bridge to be passed in for testing or advanced use
         const bridge = ((_a = app.getBridge) === null || _a === void 0 ? void 0 : _a.call(app)) || app.bridge;
         if (!bridge) {
             throw new Error('Bridge not connected.');
@@ -31,8 +30,8 @@ module.exports = class WallSwitchDriver extends homey_1.default.Driver {
                 }, 15000);
                 bridge.once('devices_loaded', onLoaded);
                 if (!bridge.isAuthenticated()) {
-                    bridge.once('authenticated', () => {
-                        // wait for devices_loaded; fallback via timeout
+                    bridge.once('connected', () => {
+                        // wait
                     });
                 }
             });

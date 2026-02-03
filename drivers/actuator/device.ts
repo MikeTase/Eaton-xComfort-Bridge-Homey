@@ -1,17 +1,31 @@
 import Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/Bridge';
-import { DeviceState } from '../../lib/types';
+import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { DeviceStateUpdate } from '../../lib/types';
 
 module.exports = class ActuatorDevice extends Homey.Device {
     private bridge!: XComfortBridge;
+    private onDeviceUpdate!: (deviceId: string, state: DeviceStateUpdate) => void;
 
     async onInit() {
         this.log('ActuatorDevice init:', this.getName());
-        const app = this.homey.app as any;
-        // Dependency injection: allow bridge to be passed in for testing or advanced use
-        this.bridge = app.getBridge?.() || app.bridge;
 
-        // Helper to check if device has a capability
+        // Check dimmable setting and remove dim capability if not applicable
+        const settings = this.getSettings();
+        // Check explicit flag OR check deviceType (100 = switch, 101 = dim)
+        // If deviceType is 100, force non-dimmable even if settings said true previously
+        let isDimmable = settings.dimmable !== false;
+        if (settings.deviceType === 100) {
+            isDimmable = false;
+        }
+        
+        if (!isDimmable && this.hasCapability('dim')) {
+            this.log('Device is not dimmable, removing dim capability');
+            await this.removeCapability('dim').catch(this.error);
+        }
+
+        const app = this.homey.app as any;
+        this.bridge = app.bridge;
+
         const hasCapability = (cap: string) => {
             return Array.isArray((this as any).capabilities) && (this as any).capabilities.includes(cap);
         };
@@ -27,12 +41,10 @@ module.exports = class ActuatorDevice extends Homey.Device {
             return Number.isNaN(numericId) ? String(rawId) : numericId;
         };
 
-        // Timestamp tracking for latency measurement
         let lastSwitchCommandAt: number | null = null;
         let lastBridgeSendAt: number | null = null;
 
-        // Listen for deviceUpdate events from bridge
-        const updateDeviceState = (state: DeviceState) => {
+        this.onDeviceUpdate = (deviceId: string, state: DeviceStateUpdate) => {
             try {
                 const now = Date.now();
                 if (lastSwitchCommandAt) {
@@ -45,39 +57,34 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     lastSwitchCommandAt = null;
                     lastBridgeSendAt = null;
                 }
-                // Use switch and dimmvalue from DeviceState
                 if (typeof state.switch === 'boolean') {
-                    this.setCapabilityValue('onoff', state.switch);
+                    this.setCapabilityValue('onoff', state.switch).catch(console.error);
                     console.log(`[Actuator] State update: onoff=${state.switch} for ${this.getName()} (${this.getData().deviceId})`);
                 }
                 if (typeof state.dimmvalue === 'number' && hasCapability('dim')) {
                     const homeyDim = Math.max(0, Math.min(1, state.dimmvalue / 99));
-                    this.setCapabilityValue('dim', homeyDim);
+                    this.setCapabilityValue('dim', homeyDim).catch(console.error);
                     console.log(`[Actuator] State update: dim=${homeyDim} for ${this.getName()} (${this.getData().deviceId})`);
                 }
             } catch (err) {
-                console.error(`[Actuator] Error handling deviceUpdate:`, err);
+                console.error(`[Actuator] Error handling deviceUpdate for ${this.getData().deviceId}:`, err);
             }
         };
 
-        this.bridge.on('deviceUpdate', ({ deviceId, state }: { deviceId: string | number, state: DeviceState }) => {
-            if (String(deviceId) === String(this.getData().deviceId)) {
-                updateDeviceState(state);
-            }
-        });
+        this.bridge.addDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
 
-        // Capability listeners: send commands to bridge immediately
         this.registerCapabilityListener('onoff', async (value) => {
             if (!this.bridge) return;
             try {
-                // Update Homey state immediately for UI responsiveness
-                this.setCapabilityValue('onoff', value);
+                // Optimistic UI update
+                this.setCapabilityValue('onoff', value).catch(() => {});
                 if (!value && hasCapability('dim')) {
-                    this.setCapabilityValue('dim', 0);
+                    this.setCapabilityValue('dim', 0).catch(() => {});
                 }
                 lastSwitchCommandAt = Date.now();
                 lastBridgeSendAt = null;
-                // Send switchDevice command without awaiting for faster response
+                
+                // switchDevice uses the 1/0 logic internally now
                 this.bridge.switchDevice(resolveDeviceId(), value, (sendTime?: number) => {
                     lastBridgeSendAt = sendTime || Date.now();
                     if (lastSwitchCommandAt) {
@@ -86,7 +93,7 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     }
                 });
             } catch (err) {
-                console.error(`[Actuator] Error sending onoff command:`, err);
+                console.error(`[Actuator] Error sending onoff command for ${this.getData().deviceId}:`, err);
             }
         });
 
@@ -95,10 +102,11 @@ module.exports = class ActuatorDevice extends Homey.Device {
             if (!hasCapability('dim')) return;
             try {
                 if (value === 0) {
-                    this.setCapabilityValue('onoff', false);
+                    this.setCapabilityValue('onoff', false).catch(() => {});
                     lastSwitchCommandAt = Date.now();
                     lastBridgeSendAt = null;
                     console.log(`[Actuator] Command: switchDevice(${resolveDeviceId()}, false) at ${lastSwitchCommandAt}`);
+                    
                     await this.bridge.switchDevice(resolveDeviceId(), false, (sendTime?: number) => {
                         lastBridgeSendAt = sendTime || Date.now();
                         if (lastSwitchCommandAt) {
@@ -108,10 +116,11 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     });
                 } else {
                     const dimValue = Math.max(1, Math.round(value * 99));
-                    this.setCapabilityValue('onoff', true);
+                    this.setCapabilityValue('onoff', true).catch(() => {});
                     lastSwitchCommandAt = Date.now();
                     lastBridgeSendAt = null;
                     console.log(`[Actuator] Command: dimDevice(${resolveDeviceId()}, ${dimValue}) at ${lastSwitchCommandAt}`);
+                    
                     await this.bridge.dimDevice(resolveDeviceId(), dimValue, (sendTime?: number) => {
                         lastBridgeSendAt = sendTime || Date.now();
                         if (lastSwitchCommandAt) {
@@ -121,8 +130,15 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     });
                 }
             } catch (err) {
-                console.error(`[Actuator] Error sending dim command:`, err);
+                console.error(`[Actuator] Error sending dim command for ${this.getData().deviceId}:`, err);
             }
         });
+    }
+
+    onDeleted() {
+        if (this.bridge && this.onDeviceUpdate) {
+            this.bridge.removeDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
+            this.log('ActuatorDevice listener removed');
+        }
     }
 }

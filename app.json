@@ -72,6 +72,33 @@
       "platforms": [
         "local"
       ]
+    },
+    {
+      "id": "wall_switch",
+      "name": {
+        "en": "Wall Switch"
+      },
+      "class": "sensor",
+      "capabilities": [],
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select wall switches"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
     }
   ]
 }

@@ -6,67 +6,68 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const homey_1 = __importDefault(require("homey"));
 module.exports = class ActuatorDriver extends homey_1.default.Driver {
     async listUnpairedDevices() {
-        var _a, _b, _c;
+        var _a, _b;
         const app = this.homey.app;
-        // Dependency injection: allow bridge to be passed in for testing or advanced use
-        const bridge = ((_a = app.getBridge) === null || _a === void 0 ? void 0 : _a.call(app)) || app.bridge;
+        const bridge = app.bridge;
         if (!bridge) {
             throw new Error('Bridge not connected. Please configure settings first.');
         }
         let devices = bridge.getDevices();
         if (!devices || devices.length === 0) {
             devices = await new Promise((resolve) => {
-                let resolved = false;
+                let isResolved = false;
+                let timeoutTimer;
+                const cleanup = () => {
+                    if (timeoutTimer)
+                        clearTimeout(timeoutTimer);
+                    bridge.removeListener('devices_loaded', onLoaded);
+                };
                 const finish = (loaded) => {
-                    if (resolved)
+                    if (isResolved)
                         return;
-                    resolved = true;
-                    clearTimeout(timeout);
-                    bridge.off('devices_loaded', onLoaded);
+                    isResolved = true;
+                    cleanup();
                     resolve(loaded || bridge.getDevices() || []);
                 };
                 const onLoaded = (loadedDevices) => finish(loadedDevices);
-                const timeout = setTimeout(() => {
+                bridge.once('devices_loaded', onLoaded);
+                // If not authenticated yet, we might need to wait for connection first
+                // We set a safety timeout.
+                timeoutTimer = setTimeout(() => {
                     finish(bridge.getDevices() || []);
                 }, 15000);
-                bridge.once('devices_loaded', onLoaded);
-                if (!bridge.isAuthenticated()) {
-                    bridge.once('authenticated', () => {
-                        // wait for devices_loaded; fallback via timeout
-                    });
-                }
             });
         }
-        const pairedDevices = this.getPairedDevices(devices);
-        (_c = (_b = this.homey.app) === null || _b === void 0 ? void 0 : _b.log) === null || _c === void 0 ? void 0 : _c.call(_b, `[ActuatorDriver] Returning ${pairedDevices.length} dimmable devices for pairing`);
-        return pairedDevices;
+        const formattedDevices = this.formatForPairing(devices);
+        (_b = (_a = this.homey.app) === null || _a === void 0 ? void 0 : _a.log) === null || _b === void 0 ? void 0 : _b.call(_a, `[ActuatorDriver] Returning ${formattedDevices.length} dimmable/switching devices for pairing`);
+        return formattedDevices;
     }
-    getPairedDevices(devices) {
+    formatForPairing(devices) {
         // Only include actuators / loads with valid, unique deviceId
         const seenIds = new Set();
+        // Filter for Switching (100) and Dimming (101) Actuators
         const filtered = devices.filter((device) => {
-            var _a, _b;
-            const devType = Number((_b = (_a = device.devType) !== null && _a !== void 0 ? _a : device.deviceType) !== null && _b !== void 0 ? _b : device.type);
+            var _a;
+            // Prioritize explicit devType, fallback to checking other props if needed
+            // XComfortDevice interface defines devType as optional number
+            const devType = (_a = device.devType) !== null && _a !== void 0 ? _a : 0;
             const id = device.deviceId;
             if (!id || seenIds.has(id))
                 return false;
             seenIds.add(id);
             return devType === 100 || devType === 101;
         });
-        const source = filtered.length ? filtered : devices.filter((device) => {
-            const id = device.deviceId;
-            if (!id || seenIds.has(id))
-                return false;
-            seenIds.add(id);
-            return true;
-        });
-        return source.map((device) => {
-            var _a, _b, _c;
-            const baseName = device.name || device.deviceName || device.label || `Device ${device.deviceId}`;
-            const displayName = device.roomName ? `${device.roomName} - ${baseName}` : baseName;
+        return filtered.map((device) => {
+            var _a;
+            const baseName = device.name || `Device ${device.deviceId}`;
+            // Use room name if available (not in XComfortDevice type explicitly but might exist in runtime)
+            const roomName = device.roomName;
+            const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
             const deviceId = device.deviceId;
-            const deviceType = (_c = (_b = (_a = device.devType) !== null && _a !== void 0 ? _a : device.deviceType) !== null && _b !== void 0 ? _b : device.type) !== null && _c !== void 0 ? _c : 'unknown';
-            const dimmable = device.dimmable === true || typeof device.dimmvalue === 'number';
+            const deviceType = (_a = device.devType) !== null && _a !== void 0 ? _a : 0;
+            // devType 100 = Switching, 101 = Dimming
+            // Only trust 'dimmable' flag or specific type
+            const dimmable = device.dimmable === true || deviceType === 101;
             return {
                 name: displayName,
                 data: {

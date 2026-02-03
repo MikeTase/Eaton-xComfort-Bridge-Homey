@@ -1,18 +1,17 @@
 import Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/Bridge';
-import { DeviceState } from '../../lib/types';
+import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { XComfortDevice } from '../../lib/types';
 
 module.exports = class WallSwitchDriver extends Homey.Driver {
   private async listUnpairedDevices() {
     const app = this.homey.app as any;
-    // Dependency injection: allow bridge to be passed in for testing or advanced use
     const bridge: XComfortBridge = app.getBridge?.() || app.bridge;
 
     if (!bridge) {
       throw new Error('Bridge not connected.');
     }
 
-    let devices: DeviceState[] = bridge.getDevices();
+    let devices: XComfortDevice[] = bridge.getDevices();
 
     if (!devices || devices.length === 0) {
       devices = await new Promise((resolve) => {
@@ -34,8 +33,8 @@ module.exports = class WallSwitchDriver extends Homey.Driver {
         bridge.once('devices_loaded', onLoaded);
 
         if (!bridge.isAuthenticated()) {
-          bridge.once('authenticated', () => {
-            // wait for devices_loaded; fallback via timeout
+          bridge.once('connected', () => {
+             // wait
           });
         }
       });

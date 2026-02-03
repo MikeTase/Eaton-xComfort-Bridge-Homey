@@ -1,11 +1,11 @@
 import Homey from 'homey';
+import { XComfortBridge } from './lib/connection/XComfortBridge';
 
 // Log when the app starts
 console.log('[App] Homey app.ts loaded at', new Date().toISOString());
-import { XComfortBridge } from './lib/connection/Bridge';
 
 class XComfortApp extends Homey.App {
-  private bridge: XComfortBridge | null = null;
+  public bridge: XComfortBridge | null = null; // Public for drivers to access via app.bridge
 
   async onInit() {
     this.log('Eaton xComfort App has been initialized');
@@ -32,43 +32,36 @@ class XComfortApp extends Homey.App {
     });
   }
 
-  initBridge(ip: string, authKey: string) {
+  async initBridge(ip: string, authKey: string) {
     if (this.bridge) {
       this.bridge.disconnect();
+      this.bridge = null;
     }
 
     // Sanitize inputs
-    ip = ip.trim();
-    authKey = authKey.trim();
+    const cleanIp = ip.trim();
+    const cleanKey = authKey.trim();
 
-    this.log(`Connecting to Bridge at '${ip}'...`);
+    this.log(`Initializing Bridge at '${cleanIp}'...`);
     
-    // Generate or retrieve a persistent Device ID
-    let deviceId = this.homey.settings.get('client_device_id');
-    if (!deviceId) {
-        deviceId = "homey_" + Math.random().toString(36).substring(2, 10);
-        this.homey.settings.set('client_device_id', deviceId);
+    this.bridge = new XComfortBridge(cleanIp, cleanKey);
+    
+    // Subscribe to events for logging
+    this.bridge.on('connected', () => this.log('Bridge: Connected'));
+    this.bridge.on('disconnected', () => this.log('Bridge: Disconnected'));
+    this.bridge.on('reconnecting', () => this.log('Bridge: Reconnecting...'));
+    
+    try {
+        await this.bridge.init();
+        this.log('Bridge: Initialization started');
+    } catch (err) {
+        this.error('Bridge: Initialization failed', err);
     }
-    
-    this.bridge = new XComfortBridge(ip, authKey, deviceId);
-    
-    this.bridge.on('connected', () => {
-        this.log('Bridge Connected!');
-    });
-
-    this.bridge.on('disconnected', () => {
-        this.log('Bridge Disconnected');
-    });
-    
-    this.bridge.on('error', (err: Error) => {
-        this.error('Bridge Error:', err);
-    });
-
-    this.bridge.connect();
   }
-
+  
+  // Helper for drivers
   getBridge(): XComfortBridge | null {
-    return this.bridge;
+      return this.bridge;
   }
 }
 

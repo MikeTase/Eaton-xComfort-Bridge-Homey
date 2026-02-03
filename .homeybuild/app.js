@@ -4,13 +4,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 const homey_1 = __importDefault(require("homey"));
+const XComfortBridge_1 = require("./lib/connection/XComfortBridge");
 // Log when the app starts
 console.log('[App] Homey app.ts loaded at', new Date().toISOString());
-const Bridge_1 = require("./lib/connection/Bridge");
 class XComfortApp extends homey_1.default.App {
     constructor() {
         super(...arguments);
-        this.bridge = null;
+        this.bridge = null; // Public for drivers to access via app.bridge
     }
     async onInit() {
         this.log('Eaton xComfort App has been initialized');
@@ -34,32 +34,29 @@ class XComfortApp extends homey_1.default.App {
             }
         });
     }
-    initBridge(ip, authKey) {
+    async initBridge(ip, authKey) {
         if (this.bridge) {
             this.bridge.disconnect();
+            this.bridge = null;
         }
         // Sanitize inputs
-        ip = ip.trim();
-        authKey = authKey.trim();
-        this.log(`Connecting to Bridge at '${ip}'...`);
-        // Generate or retrieve a persistent Device ID
-        let deviceId = this.homey.settings.get('client_device_id');
-        if (!deviceId) {
-            deviceId = "homey_" + Math.random().toString(36).substring(2, 10);
-            this.homey.settings.set('client_device_id', deviceId);
+        const cleanIp = ip.trim();
+        const cleanKey = authKey.trim();
+        this.log(`Initializing Bridge at '${cleanIp}'...`);
+        this.bridge = new XComfortBridge_1.XComfortBridge(cleanIp, cleanKey);
+        // Subscribe to events for logging
+        this.bridge.on('connected', () => this.log('Bridge: Connected'));
+        this.bridge.on('disconnected', () => this.log('Bridge: Disconnected'));
+        this.bridge.on('reconnecting', () => this.log('Bridge: Reconnecting...'));
+        try {
+            await this.bridge.init();
+            this.log('Bridge: Initialization started');
         }
-        this.bridge = new Bridge_1.XComfortBridge(ip, authKey, deviceId);
-        this.bridge.on('connected', () => {
-            this.log('Bridge Connected!');
-        });
-        this.bridge.on('disconnected', () => {
-            this.log('Bridge Disconnected');
-        });
-        this.bridge.on('error', (err) => {
-            this.error('Bridge Error:', err);
-        });
-        this.bridge.connect();
+        catch (err) {
+            this.error('Bridge: Initialization failed', err);
+        }
     }
+    // Helper for drivers
     getBridge() {
         return this.bridge;
     }
