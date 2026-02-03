@@ -251,7 +251,9 @@
         "en": "Wall Switch"
       },
       "class": "sensor",
-      "capabilities": [],
+      "capabilities": [
+        "onoff"
+      ],
       "pair": [
         {
           "id": "list_devices",

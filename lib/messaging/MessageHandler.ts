@@ -340,18 +340,30 @@ export class MessageHandler {
               deviceUpdates.set(item.deviceId, {});
             }
             const deviceUpdate = deviceUpdates.get(item.deviceId)!;
+            
+            // Log raw item for debugging missing properties
+            console.log(`[MessageHandler] Raw item for device ${item.deviceId}:`, JSON.stringify(item));
 
             if (
               item.switch !== undefined ||
               item.dimmvalue !== undefined ||
               item.setpoint !== undefined ||
               item.shadsClosed !== undefined ||
-              item.shSafety !== undefined
+              item.shSafety !== undefined ||
+              item.curstate !== undefined ||
+              item.power !== undefined
             ) {
-              deviceUpdate.switch = item.switch;
-              deviceUpdate.dimmvalue = item.dimmvalue;
-              deviceUpdate.power = item.power;
-              deviceUpdate.curstate = item.curstate;
+              if (item.switch !== undefined) {
+                  // Ensure switch is boolean (bridge often sends 1/0)
+                  deviceUpdate.switch = (item.switch === true || item.switch === 1);
+              } else if (item.curstate !== undefined && (item.curstate === 0 || item.curstate === 1)) {
+                  // Fallback: map curstate 0/1 to switch boolean if switch is missing
+                  deviceUpdate.switch = (item.curstate === 1);
+              }
+
+              if (item.dimmvalue !== undefined) deviceUpdate.dimmvalue = item.dimmvalue;
+              if (item.power !== undefined) deviceUpdate.power = item.power;
+              if (item.curstate !== undefined) deviceUpdate.curstate = item.curstate;
               
               // New mappings
               if (item.shadsClosed !== undefined) deviceUpdate.shadsClosed = item.shadsClosed;
@@ -368,7 +380,7 @@ export class MessageHandler {
             }
           } else if (item.roomId) {
             roomUpdates.set(item.roomId, {
-              switch: item.switch,
+              switch: item.switch !== undefined ? (item.switch === true || item.switch === 1) : undefined,
               dimmvalue: item.dimmvalue,
               lightsOn: item.lightsOn,
               loadsOn: item.loadsOn,

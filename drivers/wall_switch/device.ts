@@ -17,7 +17,19 @@ module.exports = class WallSwitchDevice extends Homey.Device {
       this.setUnavailable('Bridge not connected');
       return;
     }
+
+    if (!this.hasCapability('onoff')) {
+      await this.addCapability('onoff').catch(this.error);
+    }
     
+    // Allow UI interaction to update state (or handle errors if strictly read-only)
+    this.registerCapabilityListener('onoff', async (value) => {
+        // Since wall switches are input devices, we mainly track state. 
+        // Allowing this listener removes the "missing capability listener" error
+        // and allows the user to manually correct the state in the app if needed.
+        this.log('Wall switch state manually set to:', value);
+    });
+
     // Register Flow Trigger
     this.triggerPressed = this.homey.flow.getDeviceTriggerCard('wall_switch_pressed');
     const triggerUp = this.homey.flow.getDeviceTriggerCard('wall_switch_up');
@@ -28,6 +40,10 @@ module.exports = class WallSwitchDevice extends Homey.Device {
         if (String(deviceId) === String(this.getData().deviceId)) {
             this.log('Switch Event:', state);
             
+            if (typeof state.switch === 'boolean') {
+                this.setCapabilityValue('onoff', state.switch).catch(this.error);
+            }
+
             // Trigger specific direction events
             if (state.switch === true) {
                  triggerUp.trigger(this, {}, {}).catch(this.error);
@@ -37,9 +53,10 @@ module.exports = class WallSwitchDevice extends Homey.Device {
 
             if (this.triggerPressed) {
                 // Determine what data to pass to tokens.
-                // Assuming tokens might be { state: boolean } or similar based on driver.json
-                this.triggerPressed.trigger(this, {}, { event: JSON.stringify(state) })
-                    .catch(this.error);
+                if (Object.keys(state).length > 0) {
+                     this.triggerPressed.trigger(this, { event: JSON.stringify(state) }, {})
+                        .catch(this.error);
+                }
             }
         }
     };
