@@ -1,6 +1,6 @@
 {
   "name": "com.eaton.xcomfort",
-  "version": "1.0.0",
+  "version": "1.0.4",
   "description": "Eaton xComfort implementation for Homey",
   "main": "app.js",
   "scripts": {
@@ -18,10 +18,15 @@
     "@types/node": "^18.0.0",
     "@types/node-forge": "^1.3.14",
     "@types/ws": "^8.5.0",
-    "homey": "^3.0.0",
+    "homey": "^3.12.2",
     "typescript": "^5.9.3"
   },
   "engines": {
-    "node": ">=16.0.0"
+    "node": ">=22.0.0"
+  },
+  "xcomfort": {
+    "clientType": "shl-app",
+    "clientId": "c956e43f999f8004",
+    "clientVersion": "3.0.0"
   }
 }

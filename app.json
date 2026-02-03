@@ -6,11 +6,19 @@
   "description": {
     "en": "Control your Eaton xComfort devices via the xComfort Bridge."
   },
-  "version": "1.0.0",
+  "version": "1.0.4",
+  "category": [
+    "lights"
+  ],
+  "brandColor": "#005EB8",
+  "images": {
+    "large": "assets/images/large.png",
+    "small": "assets/images/small.png"
+  },
   "author": {
     "name": "Mikey"
   },
-  "compatibility": ">=10.0.0",
+  "compatibility": ">=12.0.1",
   "sdk": 3,
   "permissions": [
     "homey:manager:api"
