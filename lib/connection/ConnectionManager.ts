@@ -11,9 +11,9 @@
  */
 
 import WebSocket from 'ws';
-import crypto from 'crypto';
 import { PROTOCOL_CONFIG } from '../XComfortProtocol';
 import { Semaphore } from '../utils/Semaphore';
+import { Encryption } from '../crypto/Encryption';
 import type { ConnectionState, EncryptionContext, LoggerFunction } from '../types';
 
 // Re-export types for module consumers
@@ -322,35 +322,11 @@ export class ConnectionManager {
     try {
       const payloadStr = JSON.stringify(msg);
 
-      // Null Byte Padding (Zero Padding) per reference implementation
-      // Convert to Buffer first to handle UTF-8 length correctly
-      const payloadBuf = Buffer.from(payloadStr, 'utf8');
-      const blockSize = PROTOCOL_CONFIG.ENCRYPTION.BLOCK_SIZE;
-      
-      // Calculate start of next block
-      // Reference: const pad = blockSize - (buf.length % blockSize);
-      const remainder = payloadBuf.length % blockSize;
-      const padLength = blockSize - remainder;
-      
-      // Alloc buffer with extra space for padding (filled with 0s)
-      const dataToEncrypt = Buffer.alloc(payloadBuf.length + padLength, 0);
-      payloadBuf.copy(dataToEncrypt);
-
-      const cipher = crypto.createCipheriv(
-        PROTOCOL_CONFIG.ENCRYPTION.ALGORITHM,
+      const encrypted = Encryption.encryptMessage(
+        payloadStr,
         this.encryptionContext.key,
         this.encryptionContext.iv
       );
-      cipher.setAutoPadding(false);
-
-      // Update with buffer -> output base64
-      let encrypted = Buffer.concat([
-          cipher.update(dataToEncrypt),
-          cipher.final()
-      ]).toString('base64');
-      
-      // Append EOT delimiter per protocol reference
-      encrypted += '\u0004';
 
       this.ws.send(encrypted);
       return true;
@@ -369,32 +345,11 @@ export class ConnectionManager {
     }
 
     try {
-      const decipher = crypto.createDecipheriv(
-        PROTOCOL_CONFIG.ENCRYPTION.ALGORITHM,
+      return Encryption.decryptMessage(
+        encryptedBase64,
         this.encryptionContext.key,
         this.encryptionContext.iv
       );
-      decipher.setAutoPadding(false);
-
-      // Pad input if necessary (should be multiple of 16)
-      let encryptedBuf = Buffer.from(encryptedBase64, 'base64');
-      const blockSize = PROTOCOL_CONFIG.ENCRYPTION.BLOCK_SIZE;
-      if (encryptedBuf.length % blockSize !== 0) {
-           const newLen = Math.ceil(encryptedBuf.length / blockSize) * blockSize;
-           const newBuf = Buffer.alloc(newLen, 0);
-           encryptedBuf.copy(newBuf);
-           encryptedBuf = newBuf;
-      }
-
-      let decryptedBuf = Buffer.concat([
-          decipher.update(encryptedBuf),
-          decipher.final()
-      ]);
-
-      // Strip Null Byte padding from end (and any other potential garbage if we are generous)
-      // Reference uses: .replace(/\x00+$/, '')
-      const clean = decryptedBuf.toString('utf8').replace(/\x00+$/, '');
-      return clean;
     } catch (error) {
       throw new Error(`Decryption failed: ${(error as Error).message}`);
     }

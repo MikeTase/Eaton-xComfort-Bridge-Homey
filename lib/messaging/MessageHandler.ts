@@ -169,7 +169,7 @@ export class MessageHandler {
 
     //this.logger_HOME_DATA
     if (msg.type_int === MESSAGE_TYPES.SET_HOME_DATA) {
-      this.logger('[MessageHandler] Received SET_HOME_DATA');
+      // this.logger('[MessageHandler] Received SET_HOME_DATA');
       if (msg.payload) {
         this.processHomeData(msg.payload);
       }
