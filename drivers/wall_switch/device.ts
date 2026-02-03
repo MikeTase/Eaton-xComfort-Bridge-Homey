@@ -20,11 +20,21 @@ module.exports = class WallSwitchDevice extends Homey.Device {
     
     // Register Flow Trigger
     this.triggerPressed = this.homey.flow.getDeviceTriggerCard('wall_switch_pressed');
+    const triggerUp = this.homey.flow.getDeviceTriggerCard('wall_switch_up');
+    const triggerDown = this.homey.flow.getDeviceTriggerCard('wall_switch_down');
 
     this.onDeviceUpdate = (deviceId: string, state: DeviceStateUpdate) => {
         // Only verify this update belongs to this device (redundant with listener registration but safe)
         if (String(deviceId) === String(this.getData().deviceId)) {
             this.log('Switch Event:', state);
+            
+            // Trigger specific direction events
+            if (state.switch === true) {
+                 triggerUp.trigger(this, {}, {}).catch(this.error);
+            } else if (state.switch === false) {
+                 triggerDown.trigger(this, {}, {}).catch(this.error);
+            }
+
             if (this.triggerPressed) {
                 // Determine what data to pass to tokens.
                 // Assuming tokens might be { state: boolean } or similar based on driver.json

@@ -227,9 +227,9 @@ export class ConnectionManager {
 
         this.ws.on('message', (data: Buffer) => {
           const rawRecvTime = Date.now();
-          console.log(
-            `[ConnectionManager] RAW MSG at ${rawRecvTime}, size=${data.length}`
-          );
+          // console.log(
+          //   `[ConnectionManager] RAW MSG at ${rawRecvTime}, size=${data.length}`
+          // );
           this.onRawMessage?.(data, rawRecvTime);
         });
 

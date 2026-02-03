@@ -142,6 +142,18 @@ export interface InfoEntry {
 }
 
 /**
+ * Bridge Status Payload (Message 364)
+ */
+export interface BridgeStatus {
+  tempOutside?: number;
+  power?: number;
+  heatingOn?: number;
+  windowsOpen?: number;
+  doorsOpen?: number;
+  [key: string]: unknown;
+}
+
+/**
  * Device state update payload
  */
 export interface DeviceStateUpdate {

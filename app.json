@@ -38,11 +38,106 @@
             }
           }
         ]
+      },
+      {
+        "id": "wall_switch_up",
+        "title": {
+          "en": "Wall switch pressed UP/ON"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ]
+      },
+      {
+        "id": "wall_switch_down",
+        "title": {
+          "en": "Wall switch pressed DOWN/OFF"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ]
+      },
+      {
+        "id": "thermostat_button_on",
+        "title": {
+          "en": "Thermostat Button ON (Right)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ]
+      },
+      {
+        "id": "thermostat_button_off",
+        "title": {
+          "en": "Thermostat Button OFF (Left)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ]
       }
     ]
   },
   
   "drivers": [
+    {
+      "id": "bridge",
+      "name": {
+        "en": "xComfort Bridge"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature.outside",
+        "measure_power",
+        "alarm_contact"
+      ],
+      "capabilitiesOptions": {
+        "measure_temperature.outside": {
+          "title": {
+            "en": "Outside Temperature"
+          }
+        },
+        "alarm_contact": {
+          "title": {
+            "en": "Windows Open"
+          }
+        }
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select Bridge"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
     {
       "id": "actuator",
       "name": {

@@ -49,22 +49,22 @@ module.exports = class ActuatorDevice extends Homey.Device {
                 const now = Date.now();
                 if (lastSwitchCommandAt) {
                     const latency = now - lastSwitchCommandAt;
-                    console.log(`[Actuator] Latency: ${latency}ms from switch command to state update for ${this.getName()} (${this.getData().deviceId})`);
+                    // console.log(`[Actuator] Latency: ${latency}ms from switch command to state update for ${this.getName()} (${this.getData().deviceId})`);
                 }
                 if (lastBridgeSendAt) {
                     const bridgeToUpdate = now - lastBridgeSendAt;
-                    console.log(`[Actuator] Bridge-to-update delay: ${bridgeToUpdate}ms for ${this.getName()} (${this.getData().deviceId})`);
+                    // console.log(`[Actuator] Bridge-to-update delay: ${bridgeToUpdate}ms for ${this.getName()} (${this.getData().deviceId})`);
                     lastSwitchCommandAt = null;
                     lastBridgeSendAt = null;
                 }
                 if (typeof state.switch === 'boolean') {
                     this.setCapabilityValue('onoff', state.switch).catch(console.error);
-                    console.log(`[Actuator] State update: onoff=${state.switch} for ${this.getName()} (${this.getData().deviceId})`);
+                    // console.log(`[Actuator] State update: onoff=${state.switch} for ${this.getName()} (${this.getData().deviceId})`);
                 }
                 if (typeof state.dimmvalue === 'number' && hasCapability('dim')) {
                     const homeyDim = Math.max(0, Math.min(1, state.dimmvalue / 99));
                     this.setCapabilityValue('dim', homeyDim).catch(console.error);
-                    console.log(`[Actuator] State update: dim=${homeyDim} for ${this.getName()} (${this.getData().deviceId})`);
+                    // console.log(`[Actuator] State update: dim=${homeyDim} for ${this.getName()} (${this.getData().deviceId})`);
                 }
             } catch (err) {
                 console.error(`[Actuator] Error handling deviceUpdate for ${this.getData().deviceId}:`, err);
@@ -89,7 +89,7 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     lastBridgeSendAt = sendTime || Date.now();
                     if (lastSwitchCommandAt) {
                         const delta = lastBridgeSendAt - lastSwitchCommandAt;
-                        console.log(`[Actuator] Bridge send delay: ${delta}ms for ${this.getName()} (${this.getData().deviceId})`);
+                        // console.log(`[Actuator] Bridge send delay: ${delta}ms for ${this.getName()} (${this.getData().deviceId})`);
                     }
                 });
             } catch (err) {
@@ -105,13 +105,13 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     this.setCapabilityValue('onoff', false).catch(() => {});
                     lastSwitchCommandAt = Date.now();
                     lastBridgeSendAt = null;
-                    console.log(`[Actuator] Command: switchDevice(${resolveDeviceId()}, false) at ${lastSwitchCommandAt}`);
+                    // console.log(`[Actuator] Command: switchDevice(${resolveDeviceId()}, false) at ${lastSwitchCommandAt}`);
                     
                     await this.bridge.switchDevice(resolveDeviceId(), false, (sendTime?: number) => {
                         lastBridgeSendAt = sendTime || Date.now();
                         if (lastSwitchCommandAt) {
                             const delta = lastBridgeSendAt - lastSwitchCommandAt;
-                            console.log(`[Actuator] Bridge send delay: ${delta}ms for ${this.getName()} (${this.getData().deviceId})`);
+                            // console.log(`[Actuator] Bridge send delay: ${delta}ms for ${this.getName()} (${this.getData().deviceId})`);
                         }
                     });
                 } else {
@@ -119,13 +119,13 @@ module.exports = class ActuatorDevice extends Homey.Device {
                     this.setCapabilityValue('onoff', true).catch(() => {});
                     lastSwitchCommandAt = Date.now();
                     lastBridgeSendAt = null;
-                    console.log(`[Actuator] Command: dimDevice(${resolveDeviceId()}, ${dimValue}) at ${lastSwitchCommandAt}`);
+                    // console.log(`[Actuator] Command: dimDevice(${resolveDeviceId()}, ${dimValue}) at ${lastSwitchCommandAt}`);
                     
                     await this.bridge.dimDevice(resolveDeviceId(), dimValue, (sendTime?: number) => {
                         lastBridgeSendAt = sendTime || Date.now();
                         if (lastSwitchCommandAt) {
                             const delta = lastBridgeSendAt - lastSwitchCommandAt;
-                            console.log(`[Actuator] Bridge send delay: ${delta}ms for ${this.getName()} (${this.getData().deviceId})`);
+                            // console.log(`[Actuator] Bridge send delay: ${delta}ms for ${this.getName()} (${this.getData().deviceId})`);
                         }
                     });
                 }

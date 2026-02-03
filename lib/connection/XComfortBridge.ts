@@ -148,6 +148,11 @@ export class XComfortBridge extends EventEmitter {
       this.emit('devices_loaded', this.getDevices());
     });
 
+    this.messageHandler.setOnBridgeStatusUpdate((status) => {
+      // console.log('[XComfortBridge] Bridge status update:', status);
+      this.emit('bridge_status', status);
+    });
+
     this.messageHandler.setOnScenesReceived((scenes) => {
       this.detailedScenes = scenes;
       console.log(`[XComfortBridge] Stored ${scenes.length} scenes`);
@@ -305,11 +310,11 @@ export class XComfortBridge extends EventEmitter {
       if (msg.ref !== undefined) {
         ackMsg.ref = msg.ref;
       }
-      console.log(`[XComfortBridge] Replying to PING (ref=${msg.ref}) with ACK`);
+      // console.log(`[XComfortBridge] Replying to PING (ref=${msg.ref}) with ACK`);
       this.connectionManager.sendEncrypted(ackMsg as Record<string, unknown>);
     } else if (msg.type_int === MESSAGE_TYPES.HEARTBEAT) {
         // Handle HEARTBEAT (2) which some firmwares might expect ACK for
-        console.log(`[XComfortBridge] Received HEARTBEAT`);
+        // console.log(`[XComfortBridge] Received HEARTBEAT`);
         const ackMsg = { 
           type_int: MESSAGE_TYPES.ACK, 
           ref: msg.mc ?? -1
@@ -317,9 +322,9 @@ export class XComfortBridge extends EventEmitter {
         this.connectionManager.sendEncrypted(ackMsg);
     }
 
-    console.log(
-      `[XComfortBridge] << RECV type=${msg.type_int}${msg.mc !== undefined ? ` mc=${msg.mc}` : ''}`
-    );
+    // console.log(
+    //   `[XComfortBridge] << RECV type=${msg.type_int}${msg.mc !== undefined ? ` mc=${msg.mc}` : ''}`
+    // );
 
     // Try authenticator first (for auth flow messages)
     if (this.authenticator.handleEncryptedMessage(msg)) {

@@ -15,6 +15,7 @@ import type {
   XComfortScene,
   DeviceStateUpdate,
   RoomStateUpdate,
+  BridgeStatus,
 } from '../types';
 
 // Re-export types for module consumers
@@ -39,6 +40,9 @@ export type OnAckReceivedFn = (ref: number) => void;
 /** Callback when NACK received */
 export type OnNackReceivedFn = (ref: number) => void;
 
+/** Callback when Bridge Status is received */
+export type OnBridgeStatusUpdateFn = (status: BridgeStatus) => void;
+
 // ============================================================================
 // MessageHandler Class
 // ============================================================================
@@ -52,6 +56,7 @@ export class MessageHandler {
   private onScenesReceived?: OnScenesReceivedFn;
   private onAckReceived?: OnAckReceivedFn;
   private onNackReceived?: OnNackReceivedFn;
+  private onBridgeStatusUpdate?: OnBridgeStatusUpdateFn;
 
   constructor(
     deviceStateManager: DeviceStateManager,
@@ -90,6 +95,13 @@ export class MessageHandler {
   }
 
   /**
+   * Set callback for Bridge Status updates
+   */
+  setOnBridgeStatusUpdate(callback: OnBridgeStatusUpdateFn): void {
+    this.onBridgeStatusUpdate = callback;
+  }
+
+  /**
    * Track a pending ACK
    */
   trackAck(mc: number): void {
@@ -118,7 +130,7 @@ export class MessageHandler {
     // Handle incoming ACK messages
     if (msg.type_int === MESSAGE_TYPES.ACK) {
       if (msg.ref) {
-        console.log(`[MessageHandler] Received ACK for message ref: ${msg.ref}`);
+        // console.log(`[MessageHandler] Received ACK for message ref: ${msg.ref}`);
         this.clearAck(msg.ref);
         this.onAckReceived?.(msg.ref);
       }
@@ -139,15 +151,15 @@ export class MessageHandler {
 
     // Handle HEARTBEAT responses
     if (msg.type_int === MESSAGE_TYPES.HEARTBEAT) {
-      console.log('[MessageHandler] Heartbeat response received');
+      // console.log('[MessageHandler] Heartbeat response received');
       return true;
     }
 
     // Handle PING messages
     if (msg.type_int === MESSAGE_TYPES.PING) {
-      console.log(
-        `[MessageHandler] PING received - mc=${msg.mc} ref=${msg.ref} (already ACK'd if has mc)`
-      );
+      // console.log(
+      //   `[MessageHandler] PING received - mc=${msg.mc} ref=${msg.ref} (already ACK'd if has mc)`
+      // );
       return true;
     }
 
@@ -162,24 +174,23 @@ export class MessageHandler {
 
     // Handle SET_BRIDGE_STATE
     if (msg.type_int === MESSAGE_TYPES.SET_BRIDGE_STATE) {
+      if (msg.payload && this.onBridgeStatusUpdate) {
+        this.onBridgeStatusUpdate(msg.payload as BridgeStatus);
+      }
       return true;
     }
 
     // Handle SET_ALL_DATA
     if (msg.type_int === MESSAGE_TYPES.SET_ALL_DATA) {
       console.log('[MessageHandler] Received SET_ALL_DATA');
-      console.log(
-        `[MessageHandler] SET_ALL_DATA PAYLOAD: ${JSON.stringify(
-          msg.payload
-        )}`
-      );
+      // console.log(`[MessageHandler] SET_ALL_DATA PAYLOAD: ${JSON.stringify(msg.payload)}`);
       this.processDeviceData(msg.payload as Record<string, unknown>);
       return true;
     }
 
     // Handle STATE_UPDATE
     if (msg.type_int === MESSAGE_TYPES.STATE_UPDATE) {
-      console.log('[MessageHandler] Device state update');
+      // console.log('[MessageHandler] Device state update');
       this.processStateUpdate(msg.payload as { item?: StateUpdateItem[] }, {
         typeInt: msg.type_int,
         mc: msg.mc,
@@ -275,8 +286,8 @@ export class MessageHandler {
   ): void {
     try {
       const itemCount = payload?.item?.length ?? 0;
-      console.log(`[MessageHandler] Processing state update with ${itemCount} items`);
-      console.log(`[MessageHandler] STATE PAYLOAD: ${JSON.stringify(payload)}`);
+      // console.log(`[MessageHandler] Processing state update with ${itemCount} items`);
+      // console.log(`[MessageHandler] STATE PAYLOAD: ${JSON.stringify(payload)}`);
 
       if (payload?.item) {
         const deviceUpdates = new Map<string, DeviceStateUpdate>();
@@ -286,12 +297,12 @@ export class MessageHandler {
           if (item.deviceId) {
             const device = this.deviceStateManager.getDevice(String(item.deviceId));
             if (device?.devType === 220) {
-              console.log(
-                `[MessageHandler] Input event raw item: ${JSON.stringify(item)}`
-              );
-              console.log(
-                `[MessageHandler] Input event meta: deviceId=${item.deviceId}, type=${msgMeta?.typeInt ?? 'n/a'}, mc=${msgMeta?.mc ?? 'n/a'}, ref=${msgMeta?.ref ?? 'n/a'}, ts=${Date.now()}`
-              );
+              // console.log(
+              //   `[MessageHandler] Input event raw item: ${JSON.stringify(item)}`
+              // );
+              // console.log(
+              //   `[MessageHandler] Input event meta: deviceId=${item.deviceId}, type=${msgMeta?.typeInt ?? 'n/a'}, mc=${msgMeta?.mc ?? 'n/a'}, ref=${msgMeta?.ref ?? 'n/a'}, ts=${Date.now()}`
+              // );
             }
 
             if (!deviceUpdates.has(item.deviceId)) {
@@ -354,11 +365,11 @@ export class MessageHandler {
             const switchState = updateData.switch;
             
             if (room && Array.isArray(room.devices)) {
-              console.log(
-                `[MessageHandler] Room ${roomId} switched ${switchState ? 'ON' : 'OFF'}. Propagating to devices: ${JSON.stringify(
-                  room.devices
-                )}`
-              );
+              // console.log(
+              //   `[MessageHandler] Room ${roomId} switched ${switchState ? 'ON' : 'OFF'}. Propagating to devices: ${JSON.stringify(
+              //     room.devices
+              //   )}`
+              // );
               room.devices.forEach((devId) => {
                 const deviceId = String(devId);
                 // Only trigger if we didn't receive a specific device update in this payload

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type="text/javascript" src="/homey.js" data-origin="pair"></script>
+    </head>
+    <body>
+        <p data-i18n="settings.pair.intro">Select the bridge to add.</p>
+        <ul id="device-list"></ul>
+    </body>
+    <script type="text/javascript">
+        Homey.setTitle(Homey.__('pair.title'));
+    
+        Homey.emit('list_devices', null, function(err, devices) {
+            if (err) return Homey.alert(err);
+    
+            var list = document.getElementById('device-list');
+            devices.forEach(function(device) {
+                var item = document.createElement('li');
+                item.innerText = device.name;
+                item.onclick = function() {
+                    Homey.createDevice(device, function(err, result) {
+                        if (err) return Homey.alert(err);
+                        Homey.done();
+                    });
+                };
+                list.appendChild(item);
+            });
+        });
+    </script>
+</html>

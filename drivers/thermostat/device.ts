@@ -1,6 +1,6 @@
 import Homey from 'homey';
 import { XComfortBridge } from '../../lib/connection/XComfortBridge';
-import { MESSAGE_TYPES } from '../../lib/XComfortProtocol';
+import { MESSAGE_TYPES, DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate, ClimateMode, ClimateState } from '../../lib/types';
 
 interface XComfortApp extends Homey.App {
@@ -10,6 +10,7 @@ interface XComfortApp extends Homey.App {
 module.exports = class ThermostatDevice extends Homey.Device {
   private bridge: XComfortBridge | null = null;
   private deviceId: string = '';
+  private onVirtualUpdate: ((data: DeviceStateUpdate) => void) | null = null;
 
   async onInit() {
     this.bridge = (this.homey.app as XComfortApp).bridge;
@@ -34,6 +35,27 @@ module.exports = class ThermostatDevice extends Homey.Device {
     this.bridge.on(`device_update_${this.deviceId}`, (data: DeviceStateUpdate) => {
         this.updateState(data);
     });
+
+    // Virtual Rocker Logic for RC Touch
+    const device = this.bridge.getDevice(this.deviceId);
+    if (device && device.devType === DEVICE_TYPES.RC_TOUCH) {
+        const virtualId = parseInt(this.deviceId) + 1;
+        this.log(`Device is RC_TOUCH, listening to virtual rocker ${virtualId}`);
+
+        const triggerOn = this.homey.flow.getDeviceTriggerCard('thermostat_button_on');
+        const triggerOff = this.homey.flow.getDeviceTriggerCard('thermostat_button_off');
+
+        this.onVirtualUpdate = (data: DeviceStateUpdate) => {
+            this.log(`Virtual Rocker update:`, data);
+            if (data.switch === true) {
+                 triggerOn?.trigger(this, {}, {}).catch(this.error);
+            } else if (data.switch === false) {
+                 triggerOff?.trigger(this, {}, {}).catch(this.error);
+            }
+        };
+
+        this.bridge.on(`device_update_${virtualId}`, this.onVirtualUpdate);
+    }
   }
   
   private updateState(data: DeviceStateUpdate) {
@@ -71,6 +93,11 @@ module.exports = class ThermostatDevice extends Homey.Device {
   onDeleted() {
       if (this.bridge) {
           this.bridge.removeAllListeners(`device_update_${this.deviceId}`);
+          
+          if (this.onVirtualUpdate) {
+             const virtualId = parseInt(this.deviceId) + 1;
+             this.bridge.removeListener(`device_update_${virtualId}`, this.onVirtualUpdate);
+          }
       }
   }
 };
