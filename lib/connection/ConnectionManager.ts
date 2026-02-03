@@ -14,7 +14,7 @@ import WebSocket from 'ws';
 import crypto from 'crypto';
 import { PROTOCOL_CONFIG } from '../XComfortProtocol';
 import { Semaphore } from '../utils/Semaphore';
-import type { ConnectionState, EncryptionContext } from '../types';
+import type { ConnectionState, EncryptionContext, LoggerFunction } from '../types';
 
 // Re-export types for module consumers
 export type { ConnectionState, EncryptionContext };
@@ -55,6 +55,7 @@ export type OnCloseFn = (code: number, reason: string, shouldReconnect: boolean)
 export class ConnectionManager {
   private bridgeIp: string;
   private ws: WebSocket | null = null;
+  private logger: LoggerFunction;
   private encryptionContext: EncryptionContext | null = null;
   private state: ConnectionState = 'disconnected';
   private connectionEstablished: boolean = false;
@@ -73,8 +74,9 @@ export class ConnectionManager {
   private retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG;
   private txSemaphore = new Semaphore(1); // Concurrency 1 to prevent bridge flooding (optimization)
 
-  constructor(bridgeIp: string) {
+  constructor(bridgeIp: string, logger?: LoggerFunction) {
     this.bridgeIp = bridgeIp;
+    this.logger = logger || console.log;
   }
 
   /**
@@ -186,7 +188,7 @@ export class ConnectionManager {
    */
   private clearPendingAcks(): void {
     if (this.pendingAcks.size > 0) {
-      console.log(`[ConnectionManager] Clearing ${this.pendingAcks.size} pending ACKs due to disconnect`);
+      this.logger(`[ConnectionManager] Clearing ${this.pendingAcks.size} pending ACKs due to disconnect`);
       for (const [_mc, resolve] of this.pendingAcks) {
         resolve(false);
       }
@@ -215,7 +217,7 @@ export class ConnectionManager {
         });
 
         this.ws.on('open', () => {
-          console.log('[ConnectionManager] WebSocket connected, awaiting handshake...');
+          this.logger('[ConnectionManager] WebSocket connected, awaiting handshake...');
 
           // Set TCP_NODELAY
           // Type assertion to access private socket property safely
@@ -227,20 +229,20 @@ export class ConnectionManager {
 
         this.ws.on('message', (data: Buffer) => {
           const rawRecvTime = Date.now();
-          // console.log(
+          // this.logger(
           //   `[ConnectionManager] RAW MSG at ${rawRecvTime}, size=${data.length}`
           // );
           this.onRawMessage?.(data, rawRecvTime);
         });
 
         this.ws.on('error', (err: Error) => {
-          console.error('[ConnectionManager] WebSocket error:', err);
+          this.logger(`[ConnectionManager] WebSocket error: ${err.message}`);
           reject(err);
         });
 
         this.ws.on('close', (code: number, reason: Buffer) => {
           const reasonStr = reason.toString() || 'No reason';
-          console.log(
+          this.logger(
             `[ConnectionManager] Connection closed. Code: ${code}, Reason: ${reasonStr}`
           );
 
@@ -298,7 +300,7 @@ export class ConnectionManager {
    */
   sendRaw(data: string): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('[ConnectionManager] Cannot send - WebSocket not open');
+      this.logger('[ConnectionManager] Cannot send - WebSocket not open');
       return;
     }
     this.ws.send(data);
@@ -309,11 +311,11 @@ export class ConnectionManager {
    */
   async sendEncrypted(msg: Record<string, unknown>): Promise<boolean> {
     if (!this.encryptionContext) {
-      console.error('[ConnectionManager] Cannot send encrypted - no context');
+      this.logger('[ConnectionManager] Cannot send encrypted - no context');
       return false;
     }
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('[ConnectionManager] Cannot send encrypted - socket closed');
+      this.logger('[ConnectionManager] Cannot send encrypted - socket closed');
       return false;
     }
 
@@ -353,7 +355,7 @@ export class ConnectionManager {
       this.ws.send(encrypted);
       return true;
     } catch (error) {
-      console.error('[ConnectionManager] Encryption error:', error);
+      this.logger(`[ConnectionManager] Encryption error: ${error}`);
       return false;
     }
   }
@@ -457,13 +459,13 @@ export class ConnectionManager {
       const handleFailure = () => {
          if (retries < this.retryConfig.maxRetries) {
             retries++;
-            console.log(`[ConnectionManager] Retry ${retries}/${this.retryConfig.maxRetries} for mc=${mc}`);
+            this.logger(`[ConnectionManager] Retry ${retries}/${this.retryConfig.maxRetries} for mc=${mc}`);
             if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
             setTimeout(() => {
                sendAttempt();
             }, this.retryConfig.retryDelay);
          } else {
-            console.error(`[ConnectionManager] Max retries reached for mc=${mc}`);
+            this.logger(`[ConnectionManager] Max retries reached for mc=${mc}`);
             cleanup();
             reject(new Error(`Max retries reached`));
          }

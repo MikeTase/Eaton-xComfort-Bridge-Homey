@@ -16,6 +16,7 @@ import type {
   DeviceStateUpdate,
   RoomStateUpdate,
   BridgeStatus,
+  LoggerFunction
 } from '../types';
 
 // Re-export types for module consumers
@@ -50,6 +51,7 @@ export type OnBridgeStatusUpdateFn = (status: BridgeStatus) => void;
 export class MessageHandler {
   private deviceStateManager: DeviceStateManager;
   private roomStateManager: RoomStateManager;
+  private logger: LoggerFunction;
   private pendingAcks: Map<number, boolean> = new Map();
   private homeData: HomeData | null = null;
   private onDeviceListComplete?: OnDeviceListCompleteFn;
@@ -60,10 +62,12 @@ export class MessageHandler {
 
   constructor(
     deviceStateManager: DeviceStateManager,
-    roomStateManager: RoomStateManager
+    roomStateManager: RoomStateManager,
+    logger?: LoggerFunction
   ) {
     this.deviceStateManager = deviceStateManager;
     this.roomStateManager = roomStateManager;
+    this.logger = logger || console.log;
   }
 
   /**
@@ -139,9 +143,9 @@ export class MessageHandler {
 
     // Handle NACK
     if (msg.type_int === MESSAGE_TYPES.NACK) {
-      console.error(`[MessageHandler] Received NACK for message ref: ${msg.ref}`);
+      this.logger(`[MessageHandler-ERROR] Received NACK for message ref: ${msg.ref}`);
       if (msg.payload) {
-        console.error(`[MessageHandler] NACK details:`, JSON.stringify(msg.payload));
+        this.logger(`[MessageHandler-ERROR] NACK details: ${JSON.stringify(msg.payload)}`);
       }
       if (msg.ref) {
         this.onNackReceived?.(msg.ref);
@@ -163,9 +167,9 @@ export class MessageHandler {
       return true;
     }
 
-    // Handle SET_HOME_DATA
+    //this.logger_HOME_DATA
     if (msg.type_int === MESSAGE_TYPES.SET_HOME_DATA) {
-      console.log('[MessageHandler] Received SET_HOME_DATA');
+      this.logger('[MessageHandler] Received SET_HOME_DATA');
       if (msg.payload) {
         this.processHomeData(msg.payload);
       }
@@ -182,8 +186,7 @@ export class MessageHandler {
 
     // Handle SET_ALL_DATA
     if (msg.type_int === MESSAGE_TYPES.SET_ALL_DATA) {
-      console.log('[MessageHandler] Received SET_ALL_DATA');
-      // console.log(`[MessageHandler] SET_ALL_DATA PAYLOAD: ${JSON.stringify(msg.payload)}`);
+      // this.logger('[MessageHandler] Received SET_ALL_DATA');
       this.processDeviceData(msg.payload as Record<string, unknown>);
       return true;
     }
@@ -202,7 +205,7 @@ export class MessageHandler {
     // Handle ERROR_INFO
     if (msg.type_int === MESSAGE_TYPES.ERROR_INFO) {
       const payload = msg.payload as { info?: string };
-      console.log(`[MessageHandler] Error/Info response: ${payload?.info}`);
+      this.logger(`[MessageHandler] Error/Info response: ${payload?.info}`);
       return true;
     }
 
@@ -216,7 +219,7 @@ export class MessageHandler {
   private processHomeData(payload: Record<string, unknown>): void {
     if (payload.home) {
       this.homeData = payload.home as HomeData;
-      console.log(
+      this.logger(
         `[MessageHandler] Home data stored: ${this.homeData.name || 'unnamed'}`
       );
     }
@@ -242,9 +245,42 @@ export class MessageHandler {
         name: string;
         [key: string]: unknown;
       }>;
-      console.log(`[MessageHandler] Discovered ${devices.length} devices`);
+      // this.logger(`[MessageHandler] Discovered ${devices.length} devices`);
       devices.forEach((device) => {
         this.deviceStateManager.setDevice(device);
+        
+        // Trigger listeners with current state from discovery/sync
+        const update: DeviceStateUpdate = {};
+        let hasUpdate = false;
+
+        if (device.switch !== undefined) {
+          update.switch = device.switch === true || device.switch === 1;
+          hasUpdate = true;
+        }
+        if (typeof device.dimmvalue === 'number') {
+          update.dimmvalue = device.dimmvalue;
+          hasUpdate = true;
+        }
+        if (typeof device.power === 'number') {
+          update.power = device.power;
+          hasUpdate = true;
+        }
+        if (typeof device.setpoint === 'number') {
+          update.setpoint = device.setpoint;
+          hasUpdate = true;
+        }
+        if (typeof device.shadsClosed === 'number') {
+          update.shadsClosed = device.shadsClosed;
+          hasUpdate = true;
+        }
+        // Add other state fields as needed based on types.ts
+
+        if (hasUpdate) {
+          // Use setImmediate to ensure the device is fully registered before firing
+          setImmediate(() => {
+             this.deviceStateManager.triggerListeners(device.deviceId, update);
+          });
+        }
       });
     }
 
@@ -254,7 +290,7 @@ export class MessageHandler {
         name: string;
         [key: string]: unknown;
       }>;
-      console.log(`[MessageHandler] Discovered ${rooms.length} rooms`);
+      // this.logger(`[MessageHandler] Discovered ${rooms.length} rooms`);
       rooms.forEach((room) => {
         this.roomStateManager.setRoom(room);
       });
@@ -262,17 +298,12 @@ export class MessageHandler {
 
     if (payload.scenes) {
       const scenes = payload.scenes as XComfortScene[];
-      console.log(
-        `[MessageHandler] Found ${scenes.length} scenes from bridge data`
-      );
+      // this.logger(`[MessageHandler] Found ${scenes.length} scenes from bridge data`);
       this.onScenesReceived?.(scenes);
     }
 
     if (payload.lastItem) {
-      console.log('[MessageHandler] Device discovery complete!');
-      console.log(
-        '[MessageHandler] Waiting for device state changes to populate current states...'
-      );
+      // this.logger('[MessageHandler] Device discovery complete!');
       this.onDeviceListComplete?.();
     }
   }

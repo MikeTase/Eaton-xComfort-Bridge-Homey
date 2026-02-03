@@ -6,7 +6,7 @@ module.exports = class BridgeDriver extends Homey.Driver {
   private bridge!: XComfortBridge;
 
   async onInit() {
-    console.log('[BridgeDriver] initialized');
+    this.log('[BridgeDriver] initialized');
     const app = this.homey.app as any;
     this.bridge = app.bridge;
   }

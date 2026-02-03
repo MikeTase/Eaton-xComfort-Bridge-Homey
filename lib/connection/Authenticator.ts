@@ -15,7 +15,7 @@ import crypto from 'crypto';
 import forge from 'node-forge';
 import { MESSAGE_TYPES, CLIENT_CONFIG, PROTOCOL_CONFIG } from '../XComfortProtocol';
 import { authHash, generateSalt } from '../crypto/Hash';
-import type { ProtocolMessage, AuthState, EncryptionContext } from '../types';
+import type { ProtocolMessage, AuthState, EncryptionContext, LoggerFunction } from '../types';
 
 // Re-export types for module consumers
 export type { AuthState, EncryptionContext };
@@ -42,6 +42,7 @@ export type GetMcFn = () => number;
 
 export class Authenticator {
   private authKey: string;
+  private logger: LoggerFunction;
   private deviceId: string | null = null;
   private connectionId: string | null = null;
   private publicKey: forge.pki.rsa.PublicKey | null = null;
@@ -59,12 +60,14 @@ export class Authenticator {
     authKey: string,
     sendRaw: SendRawFn,
     sendEncrypted: SendEncryptedFn,
-    getMc: GetMcFn
+    getMc: GetMcFn,
+    logger?: LoggerFunction
   ) {
     this.authKey = authKey;
     this.sendRaw = sendRaw;
     this.sendEncrypted = sendEncrypted;
     this.getMc = getMc;
+    this.logger = logger || console.log;
   }
 
   /**
@@ -125,7 +128,7 @@ export class Authenticator {
       this.deviceId = payload.device_id;
       this.connectionId = payload.connection_id;
       this.state = 'awaiting_public_key';
-      console.log(
+      this.logger(
         `[Authenticator] CONNECTION_START received. deviceId=${this.deviceId}`
       );
 
@@ -140,28 +143,28 @@ export class Authenticator {
         },
       };
       this.sendRaw(JSON.stringify(confirmMsg));
-      console.log('[Authenticator] Sent CONNECTION_CONFIRM');
+      this.logger('[Authenticator] Sent CONNECTION_CONFIRM');
       return true;
     }
 
     if (msg.type_int === MESSAGE_TYPES.SC_INIT_RESPONSE) {
       const initMsg = { type_int: MESSAGE_TYPES.SC_INIT_REQUEST, mc: this.getMc() };
       this.sendRaw(JSON.stringify(initMsg));
-      console.log('[Authenticator] Sent SC_INIT');
+      this.logger('[Authenticator] Sent SC_INIT');
       return true;
     }
 
     if (msg.type_int === MESSAGE_TYPES.SC_INIT_REQUEST) {
       const initMsg = { type_int: MESSAGE_TYPES.SC_INIT_REQUEST, mc: this.getMc() };
       this.sendRaw(JSON.stringify(initMsg));
-      console.log('[Authenticator] Requested public key');
+      this.logger('[Authenticator] Requested public key');
       return true;
     }
 
     if (msg.type_int === MESSAGE_TYPES.PUBLIC_KEY_RESPONSE) {
       const payload = msg.payload as { public_key: string };
       this.publicKey = forge.pki.publicKeyFromPem(payload.public_key);
-      console.log('[Authenticator] Received public key');
+      this.logger('[Authenticator] Received public key');
 
       // Generate AES key and IV
       this.encryptionContext = {
@@ -187,7 +190,7 @@ export class Authenticator {
       };
       this.sendRaw(JSON.stringify(secretMsg));
       this.state = 'awaiting_secret_ack';
-      console.log('[Authenticator] Sent encrypted AES keys');
+      this.logger('[Authenticator] Sent encrypted AES keys');
       return true;
     }
 
@@ -214,14 +217,14 @@ export class Authenticator {
       };
       this.sendEncrypted(loginMsg);
       this.state = 'awaiting_login_response';
-      console.log('[Authenticator] Sent login');
+      this.logger('[Authenticator] Sent login');
       return true;
     }
 
     if (msg.type_int === MESSAGE_TYPES.LOGIN_RESPONSE) {
       const payload = msg.payload as { token: string };
       this.token = payload.token;
-      console.log('[Authenticator] Login successful, received token');
+      this.logger('[Authenticator] Login successful, received token');
 
       const applyTokenMsg = {
         type_int: MESSAGE_TYPES.TOKEN_APPLY,
@@ -235,7 +238,7 @@ export class Authenticator {
 
     if (msg.type_int === MESSAGE_TYPES.TOKEN_APPLY_ACK) {
       if (!this.isRenewing) {
-        console.log('[Authenticator] Token applied, renewing token...');
+        this.logger('[Authenticator] Token applied, renewing token...');
         this.isRenewing = true;
 
         const renewTokenMsg = {
@@ -246,7 +249,7 @@ export class Authenticator {
         this.sendEncrypted(renewTokenMsg);
         this.state = 'awaiting_token_renew';
       } else {
-        console.log('[Authenticator] Fully authenticated with renewed token!');
+        this.logger('[Authenticator] Fully authenticated with renewed token!');
         this.state = 'authenticated';
         this.isRenewing = false;
         this.onAuthenticated?.();
@@ -257,7 +260,7 @@ export class Authenticator {
     if (msg.type_int === MESSAGE_TYPES.TOKEN_RENEW_RESPONSE) {
       const payload = msg.payload as { token: string };
       this.token = payload.token;
-      console.log('[Authenticator] Token renewed, applying new token...');
+      this.logger('[Authenticator] Token renewed, applying new token...');
 
       const applyNewTokenMsg = {
         type_int: MESSAGE_TYPES.TOKEN_APPLY,

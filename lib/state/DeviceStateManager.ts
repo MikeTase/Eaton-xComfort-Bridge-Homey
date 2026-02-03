@@ -29,14 +29,14 @@ export class DeviceStateManager {
    * Add a device to the state manager
    */
   setDevice(device: XComfortDevice): void {
-    this.devices.set(device.deviceId, device);
+    this.devices.set(String(device.deviceId), device);
   }
 
   /**
    * Get a device by ID
    */
-  getDevice(deviceId: string): XComfortDevice | undefined {
-    return this.devices.get(deviceId);
+  getDevice(deviceId: string | number): XComfortDevice | undefined {
+    return this.devices.get(String(deviceId));
   }
 
   /**
@@ -63,19 +63,21 @@ export class DeviceStateManager {
   /**
    * Add a state listener for a specific device
    */
-  addListener(deviceId: string, callback: DeviceStateCallback): void {
-    if (!this.listeners.has(deviceId)) {
-      this.listeners.set(deviceId, []);
+  addListener(deviceId: string | number, callback: DeviceStateCallback): void {
+    const id = String(deviceId);
+    if (!this.listeners.has(id)) {
+      this.listeners.set(id, []);
     }
-    this.listeners.get(deviceId)!.push(callback);
-    console.log(`[DeviceStateManager] Added state listener for device ${deviceId}`);
+    this.listeners.get(id)!.push(callback);
+    // console.log(`[DeviceStateManager] Added state listener for device ${id}`);
   }
 
   /**
    * Remove a state listener for a specific device
    */
-  removeListener(deviceId: string, callback: DeviceStateCallback): boolean {
-    const deviceListeners = this.listeners.get(deviceId);
+  removeListener(deviceId: string | number, callback: DeviceStateCallback): boolean {
+    const id = String(deviceId);
+    const deviceListeners = this.listeners.get(id);
     if (!deviceListeners) return false;
 
     const index = deviceListeners.indexOf(callback);
@@ -83,7 +85,7 @@ export class DeviceStateManager {
 
     deviceListeners.splice(index, 1);
     if (deviceListeners.length === 0) {
-      this.listeners.delete(deviceId);
+      this.listeners.delete(id);
     }
     return true;
   }
@@ -91,24 +93,25 @@ export class DeviceStateManager {
   /**
    * Remove all listeners for a specific device
    */
-  removeAllListeners(deviceId: string): void {
-    this.listeners.delete(deviceId);
+  removeAllListeners(deviceId: string | number): void {
+    this.listeners.delete(String(deviceId));
   }
 
   /**
    * Trigger state listeners for a device (non-blocking via setImmediate)
    */
-  triggerListeners(deviceId: string, stateData: DeviceStateUpdate): void {
-    const deviceListeners = this.listeners.get(deviceId);
+  triggerListeners(deviceId: string | number, stateData: DeviceStateUpdate): void {
+    const id = String(deviceId);
+    const deviceListeners = this.listeners.get(id);
     if (!deviceListeners) return;
 
     deviceListeners.forEach((callback) => {
       setImmediate(() => {
         try {
-          callback(deviceId, stateData);
+          callback(id, stateData);
         } catch (error) {
           console.error(
-            `[DeviceStateManager] Error in state listener for device ${deviceId}:`,
+            `[DeviceStateManager] Error in state listener for device ${id}:`,
             error
           );
         }

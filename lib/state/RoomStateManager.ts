@@ -9,6 +9,7 @@ import type {
   XComfortRoom,
   RoomStateUpdate,
   RoomStateCallback,
+  LoggerFunction
 } from '../types';
 
 // Re-export types for module consumers
@@ -19,8 +20,13 @@ export type { XComfortRoom, RoomStateUpdate, RoomStateCallback };
 // ============================================================================
 
 export class RoomStateManager {
+  private logger: LoggerFunction;
   private rooms: Map<string, XComfortRoom> = new Map();
   private listeners: Map<string, RoomStateCallback[]> = new Map();
+
+  constructor(logger?: LoggerFunction) {
+    this.logger = logger || console.log;
+  }
 
   /**
    * Add a room to the state manager
@@ -65,7 +71,7 @@ export class RoomStateManager {
       this.listeners.set(roomId, []);
     }
     this.listeners.get(roomId)!.push(callback);
-    console.log(`[RoomStateManager] Added state listener for room ${roomId}`);
+    this.logger(`[RoomStateManager] Added state listener for room ${roomId}`);
   }
 
   /**

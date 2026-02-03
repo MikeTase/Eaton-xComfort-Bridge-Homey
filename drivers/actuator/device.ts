@@ -44,30 +44,62 @@ module.exports = class ActuatorDevice extends Homey.Device {
         let lastSwitchCommandAt: number | null = null;
         let lastBridgeSendAt: number | null = null;
 
+        // Debounce/Race-condition handling
+        let pendingSwitchState: boolean | null = null;
+        let pendingSwitchTimestamp: number = 0;
+        const STATE_UPDATE_GRACE_PERIOD = 2000; // ms
+
         this.onDeviceUpdate = (deviceId: string, state: DeviceStateUpdate) => {
             try {
                 const now = Date.now();
                 if (lastSwitchCommandAt) {
                     const latency = now - lastSwitchCommandAt;
-                    // console.log(`[Actuator] Latency: ${latency}ms from switch command to state update for ${this.getName()} (${this.getData().deviceId})`);
                 }
                 if (lastBridgeSendAt) {
                     const bridgeToUpdate = now - lastBridgeSendAt;
-                    // console.log(`[Actuator] Bridge-to-update delay: ${bridgeToUpdate}ms for ${this.getName()} (${this.getData().deviceId})`);
                     lastSwitchCommandAt = null;
                     lastBridgeSendAt = null;
                 }
+                
                 if (typeof state.switch === 'boolean') {
-                    this.setCapabilityValue('onoff', state.switch).catch(console.error);
-                    // console.log(`[Actuator] State update: onoff=${state.switch} for ${this.getName()} (${this.getData().deviceId})`);
+                    let shouldUpdate = true;
+                    if (pendingSwitchState !== null) {
+                        if (state.switch === pendingSwitchState) {
+                             // State confirmed
+                             pendingSwitchState = null;
+                        } else {
+                            if (now - pendingSwitchTimestamp < STATE_UPDATE_GRACE_PERIOD) {
+                                // Ignore update, it contradicts our recent command and is likely old state
+                                shouldUpdate = false;
+                            } else {
+                                // Timeout expired, accept valid external change
+                                pendingSwitchState = null;
+                            }
+                        }
+                    }
+
+                    if (shouldUpdate) {
+                        this.setCapabilityValue('onoff', state.switch).catch(console.error);
+                    }
                 }
+
                 if (typeof state.dimmvalue === 'number' && hasCapability('dim')) {
+                    let shouldUpdateDim = true;
                     const homeyDim = Math.max(0, Math.min(1, state.dimmvalue / 99));
-                    this.setCapabilityValue('dim', homeyDim).catch(console.error);
-                    // console.log(`[Actuator] State update: dim=${homeyDim} for ${this.getName()} (${this.getData().deviceId})`);
+
+                    // If we are expecting ON, and we get dim=0, this is likely an echo of the previous OFF state
+                    if (pendingSwitchState === true && homeyDim === 0) {
+                        if (now - pendingSwitchTimestamp < STATE_UPDATE_GRACE_PERIOD) {
+                            shouldUpdateDim = false;
+                        }
+                    }
+                    
+                    if (shouldUpdateDim) {
+                        this.setCapabilityValue('dim', homeyDim).catch(console.error);
+                    }
                 }
             } catch (err) {
-                console.error(`[Actuator] Error handling deviceUpdate for ${this.getData().deviceId}:`, err);
+                this.error(`[Actuator] Error handling deviceUpdate for ${this.getData().deviceId}:`, err);
             }
         };
 
@@ -78,14 +110,32 @@ module.exports = class ActuatorDevice extends Homey.Device {
             try {
                 // Optimistic UI update
                 this.setCapabilityValue('onoff', value).catch(() => {});
+                
+                // Set pending state to prevent race conditions
+                pendingSwitchState = value;
+                pendingSwitchTimestamp = Date.now();
+
                 if (!value && hasCapability('dim')) {
                     this.setCapabilityValue('dim', 0).catch(() => {});
                 }
                 lastSwitchCommandAt = Date.now();
                 lastBridgeSendAt = null;
                 
+                // Safety: Verify state after delay if no confirmation received
+                const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500; // 3.5s
+                setTimeout(() => {
+                    if (pendingSwitchState === value) {
+                        // Still pending? We might have lost the packet or the update.
+                        // Force a refresh of device states to verify.
+                        // console.log('[Actuator] State verification timed out, requesting bridge sync...');
+                        if (this.bridge && this.bridge.requestDeviceStates) {
+                            this.bridge.requestDeviceStates().catch(() => {});
+                        }
+                    }
+                }, safetyDelay);
+
                 // switchDevice uses the 1/0 logic internally now
-                this.bridge.switchDevice(resolveDeviceId(), value, (sendTime?: number) => {
+                await this.bridge.switchDevice(resolveDeviceId(), value, (sendTime?: number) => {
                     lastBridgeSendAt = sendTime || Date.now();
                     if (lastSwitchCommandAt) {
                         const delta = lastBridgeSendAt - lastSwitchCommandAt;
@@ -94,6 +144,8 @@ module.exports = class ActuatorDevice extends Homey.Device {
                 });
             } catch (err) {
                 console.error(`[Actuator] Error sending onoff command for ${this.getData().deviceId}:`, err);
+                pendingSwitchState = null; // Reset on error
+                this.setCapabilityValue('onoff', !value).catch(() => {}); // Revert UI
             }
         });
 
@@ -103,6 +155,20 @@ module.exports = class ActuatorDevice extends Homey.Device {
             try {
                 if (value === 0) {
                     this.setCapabilityValue('onoff', false).catch(() => {});
+                    
+                     // Set pending state (dim 0 -> off)
+                    pendingSwitchState = false;
+                    pendingSwitchTimestamp = Date.now();
+                    
+                    const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
+                    setTimeout(() => {
+                         if (pendingSwitchState === false) {
+                            if (this.bridge && this.bridge.requestDeviceStates) {
+                                this.bridge.requestDeviceStates().catch(() => {});
+                            }
+                         }
+                    }, safetyDelay);
+
                     lastSwitchCommandAt = Date.now();
                     lastBridgeSendAt = null;
                     // console.log(`[Actuator] Command: switchDevice(${resolveDeviceId()}, false) at ${lastSwitchCommandAt}`);
@@ -117,6 +183,20 @@ module.exports = class ActuatorDevice extends Homey.Device {
                 } else {
                     const dimValue = Math.max(1, Math.round(value * 99));
                     this.setCapabilityValue('onoff', true).catch(() => {});
+
+                    // Set pending state (dim > 0 -> on)
+                    pendingSwitchState = true;
+                    pendingSwitchTimestamp = Date.now();
+
+                    const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
+                    setTimeout(() => {
+                         if (pendingSwitchState === true) {
+                            if (this.bridge && this.bridge.requestDeviceStates) {
+                                this.bridge.requestDeviceStates().catch(() => {});
+                            }
+                         }
+                    }, safetyDelay);
+
                     lastSwitchCommandAt = Date.now();
                     lastBridgeSendAt = null;
                     // console.log(`[Actuator] Command: dimDevice(${resolveDeviceId()}, ${dimValue}) at ${lastSwitchCommandAt}`);
@@ -125,12 +205,14 @@ module.exports = class ActuatorDevice extends Homey.Device {
                         lastBridgeSendAt = sendTime || Date.now();
                         if (lastSwitchCommandAt) {
                             const delta = lastBridgeSendAt - lastSwitchCommandAt;
-                            // console.log(`[Actuator] Bridge send delay: ${delta}ms for ${this.getName()} (${this.getData().deviceId})`);
                         }
                     });
                 }
             } catch (err) {
-                console.error(`[Actuator] Error sending dim command for ${this.getData().deviceId}:`, err);
+                this.error(`[Actuator] Error sending dim command for ${this.getData().deviceId}:`, err);
+                pendingSwitchState = null;
+                // Revert is harder for dimming (need previous value), but we can try reverting onoff if that was the intent
+                if (value === 0) this.setCapabilityValue('onoff', true).catch(() => {});
             }
         });
     }

@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Actuator">
-  <rect width="256" height="256" rx="48" fill="#2b579a"/>
-  <circle cx="128" cy="128" r="76" fill="#ffffff" opacity="0.9"/>
-  <circle cx="128" cy="128" r="52" fill="#2b579a"/>
-  <rect x="120" y="64" width="16" height="48" rx="8" fill="#ffffff"/>
-  <rect x="120" y="144" width="16" height="48" rx="8" fill="#ffffff"/>
-</svg>

@@ -11,7 +11,7 @@ module.exports = class WallSwitchDevice extends Homey.Device {
     this.log('WallSwitchDevice init:', this.getName());
     
     const app = this.homey.app as any;
-    this.bridge = app.getBridge?.() || app.bridge;
+    this.bridge = app.bridge;
 
     if (!this.bridge) {
       this.setUnavailable('Bridge not connected');

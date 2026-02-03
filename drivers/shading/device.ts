@@ -11,6 +11,7 @@ module.exports = class ShadingDevice extends Homey.Device {
   private bridge: XComfortBridge | null = null;
   private deviceId: string = '';
   private safetyActive: boolean = false;
+  private onDeviceUpdate: ((deviceId: string | number, state: DeviceStateUpdate) => void) | null = null;
 
   async onInit() {
     this.bridge = (this.homey.app as XComfortApp).bridge;
@@ -34,9 +35,11 @@ module.exports = class ShadingDevice extends Homey.Device {
 
   private registerStateListener() {
     if (!this.bridge) return;
-    this.bridge.on(`device_update_${this.deviceId}`, (data: DeviceStateUpdate) => {
+    
+    this.onDeviceUpdate = (_id, data) => {
         this.updateState(data);
-    });
+    };
+    this.bridge.addDeviceStateListener(this.deviceId, this.onDeviceUpdate);
   }
   
   private updateState(data: DeviceStateUpdate) {
@@ -102,8 +105,8 @@ module.exports = class ShadingDevice extends Homey.Device {
   }
   
   onDeleted() {
-      if (this.bridge) {
-          this.bridge.removeAllListeners(`device_update_${this.deviceId}`);
+      if (this.bridge && this.onDeviceUpdate) {
+          this.bridge.removeDeviceStateListener(this.deviceId, this.onDeviceUpdate);
       }
   }
 };

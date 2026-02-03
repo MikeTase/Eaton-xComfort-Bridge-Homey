@@ -24,6 +24,7 @@ import type {
   XComfortScene,
   DeviceStateCallback,
   RoomStateCallback,
+  LoggerFunction
 } from '../types';
 
 // Re-export ConnectionState as BridgeConnectionState for external consumers
@@ -36,6 +37,7 @@ export type BridgeConnectionState = ConnectionState;
 export class XComfortBridge extends EventEmitter {
   private bridgeIp: string;
   private authKey: string;
+  private logger: LoggerFunction;
 
   // Modules
   private connectionManager: ConnectionManager;
@@ -60,22 +62,20 @@ export class XComfortBridge extends EventEmitter {
   // Debouncers
   private dimDebouncers = new Map<string, CommandDebouncer>();
 
-  public getConnectionManager(): ConnectionManager {
-    return this.connectionManager;
-  }
-
-  constructor(bridgeIp: string, authKey: string) {
+  constructor(bridgeIp: string, authKey: string, logger?: LoggerFunction) {
     super(); // Initialize EventEmitter
     this.bridgeIp = bridgeIp;
     this.authKey = authKey;
+    this.logger = logger || console.log;
 
     // Initialize modules
-    this.connectionManager = new ConnectionManager(bridgeIp);
+    this.connectionManager = new ConnectionManager(bridgeIp, this.logger);
     this.deviceStateManager = new DeviceStateManager();
-    this.roomStateManager = new RoomStateManager();
+    this.roomStateManager = new RoomStateManager(this.logger);
     this.messageHandler = new MessageHandler(
       this.deviceStateManager,
-      this.roomStateManager
+      this.roomStateManager,
+      this.logger
     );
 
     // Authenticator needs send functions - will be set up during connect
@@ -83,10 +83,15 @@ export class XComfortBridge extends EventEmitter {
       authKey,
       (msg) => this.connectionManager.sendRaw(msg),
       (msg) => this.connectionManager.sendEncrypted(msg),
-      () => this.connectionManager.nextMc()
+      () => this.connectionManager.nextMc(),
+      this.logger
     );
 
     this.setupCallbacks();
+  }
+
+  public getConnectionManager(): ConnectionManager {
+    return this.connectionManager;
   }
 
   private setupCallbacks(): void {
@@ -98,7 +103,7 @@ export class XComfortBridge extends EventEmitter {
     this.connectionManager.setOnClose((code, reason, shouldReconnect) => {
       this.connectionState = 'disconnected';
       this.lastCloseCode = code;
-      console.log(`[XComfortBridge] Connection closed: ${code} - ${reason}`);
+      this.logger(`[XComfortBridge] Connection closed: ${code} - ${reason}`);
       this.emit('disconnected');
 
       if (shouldReconnect) {
@@ -110,7 +115,7 @@ export class XComfortBridge extends EventEmitter {
     // Authenticator callback
     this.authenticator.setOnAuthenticated(() => {
       this.connectionState = 'connected';
-      console.log('[XComfortBridge] Authenticated - requesting device list');
+      this.logger('[XComfortBridge] Authenticated - requesting device list');
       this.emit('connected');
 
       // Request initial data
@@ -144,7 +149,7 @@ export class XComfortBridge extends EventEmitter {
     // Message handler callbacks
     this.messageHandler.setOnDeviceListComplete(() => {
       this.deviceListReceived = true;
-      console.log('[XComfortBridge] Device discovery complete!');
+      // this.logger('[XComfortBridge] Device discovery complete!');
       this.emit('devices_loaded', this.getDevices());
     });
 
@@ -155,7 +160,7 @@ export class XComfortBridge extends EventEmitter {
 
     this.messageHandler.setOnScenesReceived((scenes) => {
       this.detailedScenes = scenes;
-      console.log(`[XComfortBridge] Stored ${scenes.length} scenes`);
+      this.logger(`[XComfortBridge] Stored ${scenes.length} scenes`);
       this.emit('scenes_loaded', scenes);
     });
 
@@ -177,7 +182,7 @@ export class XComfortBridge extends EventEmitter {
       throw new Error('Bridge IP and auth key are required');
     }
 
-    console.log(`[XComfortBridge] Connecting to bridge at ${this.bridgeIp}`);
+    this.logger(`[XComfortBridge] Connecting to bridge at ${this.bridgeIp}`);
     return this.connect();
   }
 
@@ -208,7 +213,7 @@ export class XComfortBridge extends EventEmitter {
       // Connection timeout
       this.connectionTimeout = setTimeout(() => {
         this.clearConnectionTimers();
-        console.log('[XComfortBridge] Connection timeout');
+        this.logger('[XComfortBridge] Connection timeout');
         this.connectionManager.cleanup();
         reject(new Error('Connection timeout - device list not received'));
       }, PROTOCOL_CONFIG.TIMEOUTS.CONNECTION);
@@ -241,7 +246,7 @@ export class XComfortBridge extends EventEmitter {
       60000
     );
 
-    console.log(`[XComfortBridge] Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempt}, code ${this.lastCloseCode})`);
+    this.logger(`[XComfortBridge] Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempt}, code ${this.lastCloseCode})`);
 
     setTimeout(() => {
       this.connectionManager.setReconnecting(false);
@@ -251,7 +256,7 @@ export class XComfortBridge extends EventEmitter {
           this.reconnectAttempt = 0;
         })
         .catch((err) => {
-          console.error(`[XComfortBridge] Reconnection failed: ${err.message}`);
+          this.logger(`[XComfortBridge-ERROR] Reconnection failed: ${err.message}`);
           // Schedule another attempt
           this.scheduleReconnect();
         });
@@ -285,7 +290,7 @@ export class XComfortBridge extends EventEmitter {
         const msg = JSON.parse(decrypted) as ProtocolMessage;
         this.handleEncryptedMessage(msg, timestamp);
       } catch (e) {
-        console.error('[XComfortBridge] Failed to decrypt/parse:', e);
+this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
       }
     }
   }
@@ -398,10 +403,8 @@ export class XComfortBridge extends EventEmitter {
         switch: switchState ? 1 : 0 // Use 1/0 instead of boolean to prevent bridge 1006 disconnects
     };
 
-    console.log(`[XComfortBridge] Sending DEVICE_SWITCH (281) to ${deviceId} payload=${JSON.stringify(payload)}`);
+    // this.logger(`[XComfortBridge] Sending DEVICE_SWITCH (281) to ${deviceId} payload=${JSON.stringify(payload)}`);
     
-    // Call onSend callback immediately before sending (or after?)
-    // Old implementation called it after sending
     const ts = Date.now();
     if (onSend) onSend(ts);
 
@@ -455,10 +458,7 @@ export class XComfortBridge extends EventEmitter {
     });
   }
   
-  // Compatibility with old API: setDimmerValue
-  async setDimmerValue(deviceId: string | number, dimmValue: number): Promise<boolean> {
-      return this.dimDevice(deviceId, dimmValue);
-  }
+
 
   async controlShade(deviceId: string, operation: number): Promise<boolean> {
     const msg = {
@@ -516,7 +516,7 @@ export class XComfortBridge extends EventEmitter {
 
   async requestDeviceStates(): Promise<boolean> {
     if (!this.connectionManager.isConnected()) {
-      console.log('[XComfortBridge] Cannot request states - not connected');
+      // this.logger('[XComfortBridge] Cannot request states - not connected');
       return false;
     }
 
@@ -557,10 +557,7 @@ export class XComfortBridge extends EventEmitter {
     return this.connectionState;
   }
   
-  // Compatibility with old Bridge
-  isAuthenticated(): boolean {
-      return this.authenticator.isAuthenticated();
-  }
+
 
   cleanup(): void {
     this.clearConnectionTimers();

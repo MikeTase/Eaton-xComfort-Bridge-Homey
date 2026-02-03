@@ -23,6 +23,9 @@ declare module 'homey' {
     }
     export class Driver {
         homey: any;
+        log(...args: any[]): void;
+        error(...args: any[]): void;
+        onInit(): void | Promise<void>;
         onPair(session: any): void;
     }
     export interface PairSession {
