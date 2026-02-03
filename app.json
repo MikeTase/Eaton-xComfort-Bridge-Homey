@@ -104,25 +104,33 @@
   
   "drivers": [
     {
-      "id": "bridge",
+      "id": "room",
       "name": {
-        "en": "xComfort Bridge"
+        "en": "Room"
       },
-      "class": "sensor",
+      "class": "light",
       "capabilities": [
-        "measure_temperature.outside",
-        "measure_power",
-        "alarm_contact"
+        "onoff",
+        "dim",
+        "meter_power",
+        "alarm_contact.windows",
+        "alarm_contact.doors",
+        "alarm_motion"
       ],
       "capabilitiesOptions": {
-        "measure_temperature.outside": {
+        "alarm_contact.windows": {
           "title": {
-            "en": "Outside Temperature"
+            "en": "Windows"
           }
         },
-        "alarm_contact": {
+        "alarm_contact.doors": {
           "title": {
-            "en": "Windows Open"
+            "en": "Doors"
+          }
+        },
+        "alarm_motion": {
+          "title": {
+            "en": "Presence"
           }
         }
       },
@@ -132,9 +140,6 @@
           "template": "list_devices",
           "navigation": {
             "next": "add_devices"
-          },
-          "title": {
-            "en": "Select Bridge"
           }
         },
         {
@@ -144,7 +149,11 @@
       ],
       "platforms": [
         "local"
-      ]
+      ],
+      "images": {
+        "large": "drivers/room/assets/images/large.png",
+        "small": "drivers/room/assets/images/small.png"
+      }
     },
     {
       "id": "actuator",
