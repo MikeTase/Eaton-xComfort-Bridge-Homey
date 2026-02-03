@@ -408,7 +408,7 @@ this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
   async switchDevice(deviceId: string | number, switchState: boolean, onSend?: (timestamp: number) => void): Promise<boolean> {
     const payload = { 
         deviceId: this.parseId(String(deviceId)), 
-        switch: switchState // Use native boolean as per HA implementation
+        switch: switchState ? 1 : 0 // Use 1/0 as strictly required by some firmwares
     };
 
     const ts = Date.now();
@@ -490,7 +490,7 @@ this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
       const msg = {
         type_int: MESSAGE_TYPES.ROOM_SWITCH,
         mc: this.connectionManager.nextMc(),
-        payload: { roomId: this.parseId(roomId), switch: !!value },
+        payload: { roomId: this.parseId(roomId), switch: (value === true || value === 1) ? 1 : 0 },
       };
       return this.connectionManager.sendEncrypted(msg);
     } else if (action === 'dimm' && value !== null) {
