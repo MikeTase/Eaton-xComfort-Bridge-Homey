@@ -4,4 +4,4 @@
 .github/
 **/*.ts
 tsconfig.json
-drivers/actuator/assets/images/**
+
