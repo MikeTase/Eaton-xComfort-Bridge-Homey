@@ -5,6 +5,8 @@ import { RoomStateUpdate } from '../../lib/types';
 module.exports = class RoomDevice extends Homey.Device {
     private bridge!: XComfortBridge;
     private onRoomUpdateListener?: (roomId: string, state: RoomStateUpdate) => void;
+    private onDevicesLoadedListener?: () => void;
+    private supportsDim: boolean = true;
 
     async onInit() {
         this.log('RoomDevice init:', this.getName());
@@ -17,6 +19,12 @@ module.exports = class RoomDevice extends Homey.Device {
         }
 
         const roomId = String(this.getData().roomId);
+        this.updateDimSupport(roomId);
+
+        this.onDevicesLoadedListener = () => {
+            this.updateDimSupport(roomId);
+        };
+        this.bridge.on('devices_loaded', this.onDevicesLoadedListener);
 
         // Register capability listeners
         this.registerCapabilityListener('onoff', async (value) => {
@@ -35,6 +43,10 @@ module.exports = class RoomDevice extends Homey.Device {
 
         this.registerCapabilityListener('dim', async (value) => {
             if (!this.bridge) return;
+            if (!this.supportsDim) {
+                this.log(`Room ${roomId} does not support dimming`);
+                return;
+            }
             try {
                 // Dim 0 usually means off in UI logic, but let's pass it
                 // Logic: 0 sends switch OFF usually, but controlRoom handles 'dimm'
@@ -64,7 +76,7 @@ module.exports = class RoomDevice extends Homey.Device {
         if (typeof state.switch === 'boolean') {
             this.setCapabilityValue('onoff', state.switch).catch(() => {});
         }
-        if (typeof state.dimmvalue === 'number') {
+        if (typeof state.dimmvalue === 'number' && this.hasCapability('dim')) {
             const dim = Math.max(0, Math.min(1, state.dimmvalue / 99));
             this.setCapabilityValue('dim', dim).catch(() => {});
         }
@@ -89,6 +101,28 @@ module.exports = class RoomDevice extends Homey.Device {
                 this.bridge.removeRoomStateListener(roomId, this.onRoomUpdateListener);
                 this.onRoomUpdateListener = undefined;
             }
+            if (this.onDevicesLoadedListener) {
+                this.bridge.removeListener('devices_loaded', this.onDevicesLoadedListener);
+                this.onDevicesLoadedListener = undefined;
+            }
+        }
+    }
+
+    private updateDimSupport(roomId: string) {
+        const room = this.bridge.getRoom(roomId);
+        if (!room || !Array.isArray(room.devices)) {
+            return;
+        }
+
+        const supports = room.devices.some((devId) => {
+            const device = this.bridge.getDevice(String(devId));
+            return device?.dimmable === true || device?.devType === 101;
+        });
+
+        this.supportsDim = supports;
+
+        if (!supports && this.hasCapability('dim')) {
+            this.removeCapability('dim').catch(this.error);
         }
     }
 }

@@ -497,6 +497,10 @@ export class XComfortBridge extends EventEmitter {
         payload: { roomId: this.parseId(roomId), switch: switchVal },
       });
     } else if (action === 'dimm' && value !== null) {
+      if (!this.isRoomDimmable(roomId)) {
+        this.logger(`[XComfortBridge] Room ${roomId} does not support dimming`);
+        return false;
+      }
       const dimmValue = Math.max(
         PROTOCOL_CONFIG.LIMITS.DIM_MIN,
         Math.min(PROTOCOL_CONFIG.LIMITS.DIM_MAX, value as number)
@@ -586,5 +590,21 @@ export class XComfortBridge extends EventEmitter {
   private parseId(id: string): string | number {
     const num = parseInt(id, 10);
     return isNaN(num) ? id : num;
+  }
+
+  private isRoomDimmable(roomId: string): boolean {
+    const room = this.roomStateManager.getRoom(roomId);
+    if (!room || !Array.isArray(room.devices) || room.devices.length === 0) {
+      return false;
+    }
+
+    for (const devId of room.devices) {
+      const device = this.deviceStateManager.getDevice(String(devId));
+      if (device?.dimmable === true || device?.devType === 101) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }
