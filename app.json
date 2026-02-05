@@ -4,7 +4,7 @@
     "en": "Eaton xComfort"
   },
   "description": {
-    "en": "Control your Eaton xComfort devices via the xComfort Bridge."
+    "en": "Control Eaton xComfort devices via the xComfort Bridge (actuators, rooms, shading, thermostats, wall switches)."
   },
   "version": "1.0.4",
   "category": [
@@ -28,7 +28,7 @@
       {
         "id": "wall_switch_pressed",
         "title": {
-          "en": "Wall switch pressed"
+          "en": "Wall switch pressed (any)"
         },
         "args": [
           {
@@ -50,7 +50,7 @@
       {
         "id": "wall_switch_up",
         "title": {
-          "en": "Wall switch pressed UP/ON"
+          "en": "Wall switch pressed (up/on)"
         },
         "args": [
           {
@@ -63,7 +63,7 @@
       {
         "id": "wall_switch_down",
         "title": {
-          "en": "Wall switch pressed DOWN/OFF"
+          "en": "Wall switch pressed (down/off)"
         },
         "args": [
           {
@@ -76,7 +76,7 @@
       {
         "id": "thermostat_button_on",
         "title": {
-          "en": "Thermostat Button ON (Right)"
+          "en": "Thermostat button pressed (right/on)"
         },
         "args": [
           {
@@ -89,7 +89,7 @@
       {
         "id": "thermostat_button_off",
         "title": {
-          "en": "Thermostat Button OFF (Left)"
+          "en": "Thermostat button pressed (left/off)"
         },
         "args": [
           {
@@ -106,7 +106,7 @@
     {
       "id": "room",
       "name": {
-        "en": "Room"
+        "en": "Room (xComfort)"
       },
       "class": "light",
       "capabilities": [
@@ -140,6 +140,9 @@
           "template": "list_devices",
           "navigation": {
             "next": "add_devices"
+          },
+          "title": {
+            "en": "Select rooms"
           }
         },
         {
@@ -173,7 +176,7 @@
             "next": "add_devices"
           },
           "title": {
-            "en": "Select actuators/dimmers"
+            "en": "Select actuators and dimmers"
           }
         },
         {
@@ -276,4 +279,3 @@
     }
   ]
 }
-

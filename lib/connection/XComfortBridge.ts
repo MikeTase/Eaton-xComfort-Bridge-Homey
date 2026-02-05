@@ -160,7 +160,7 @@ export class XComfortBridge extends EventEmitter {
 
     this.messageHandler.setOnScenesReceived((scenes) => {
       this.detailedScenes = scenes;
-      // this.logger(`[XComfortBridge] Stored ${scenes.length} scenes`);
+      this.logger(`[XComfortBridge] Stored ${scenes.length} scenes`);
       this.emit('scenes_loaded', scenes);
     });
 
@@ -199,7 +199,10 @@ export class XComfortBridge extends EventEmitter {
       this.authenticator.reset();
       this.connectionManager.resetMc();
 
-      this.connectionManager.connect().catch(reject);
+      this.connectionManager.connect().catch((err) => {
+        this.clearConnectionTimers();
+        reject(err);
+      });
 
       // Check for device list received
       this.connectionCheckInterval = setInterval(() => {
@@ -298,7 +301,7 @@ export class XComfortBridge extends EventEmitter {
         const msg = JSON.parse(decrypted) as ProtocolMessage;
         this.handleEncryptedMessage(msg, timestamp);
       } catch (e) {
-this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
+        this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
       }
     }
   }
@@ -408,20 +411,19 @@ this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
   async switchDevice(deviceId: string | number, switchState: boolean, onSend?: (timestamp: number) => void): Promise<boolean> {
     const payload = { 
         deviceId: this.parseId(String(deviceId)), 
-        switch: switchState ? 1 : 0 // Use 1/0 as strictly required by some firmwares
+        switch: switchState ? 1 : 0 // Use 1/0 instead of boolean to prevent bridge 1006 disconnects
     };
 
+    // this.logger(`[XComfortBridge] Sending DEVICE_SWITCH (281) to ${deviceId} payload=${JSON.stringify(payload)}`);
+    
     const ts = Date.now();
     if (onSend) onSend(ts);
 
-    // PERFORMANCE: Fire-and-forget (matches ha-xcomfort-bridge)
-    // We do not wait for ACK to ensure maximum throughput for "All Off" scenarios.
-    const msg = {
+    return this.connectionManager.sendWithRetry({
       type_int: MESSAGE_TYPES.DEVICE_SWITCH,
       mc: this.connectionManager.nextMc(),
       payload,
-    };
-    return this.connectionManager.sendEncrypted(msg);
+    });
   }
 
   async dimDevice(deviceId: string | number, dimmValue: number, onSend?: (timestamp: number) => void): Promise<boolean> {
@@ -462,8 +464,8 @@ this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
         const ts = Date.now();
         if (onSend) onSend(ts);
 
-        // PERFORMANCE: Fire-and-forget
-        return this.connectionManager.sendEncrypted(msg);
+        // Use sendWithRetry regardless of old implementation, to ensure delivery
+        return this.connectionManager.sendWithRetry(msg);
     });
   }
   
@@ -487,23 +489,23 @@ this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
     value: boolean | number | null = null
   ): Promise<boolean> {
     if (action === 'switch') {
-      const msg = {
+      // Ensure strict 1/0 integer for switch to prevent disconnects
+      const switchVal = (value === true || value === 1) ? 1 : 0;
+      return this.connectionManager.sendWithRetry({
         type_int: MESSAGE_TYPES.ROOM_SWITCH,
         mc: this.connectionManager.nextMc(),
-        payload: { roomId: this.parseId(roomId), switch: (value === true || value === 1) ? 1 : 0 },
-      };
-      return this.connectionManager.sendEncrypted(msg);
+        payload: { roomId: this.parseId(roomId), switch: switchVal },
+      });
     } else if (action === 'dimm' && value !== null) {
       const dimmValue = Math.max(
         PROTOCOL_CONFIG.LIMITS.DIM_MIN,
         Math.min(PROTOCOL_CONFIG.LIMITS.DIM_MAX, value as number)
       );
-      const msg = {
+      return this.connectionManager.sendWithRetry({
         type_int: MESSAGE_TYPES.ROOM_DIM,
         mc: this.connectionManager.nextMc(),
         payload: { roomId: this.parseId(roomId), dimmvalue: dimmValue },
-      };
-      return this.connectionManager.sendEncrypted(msg);
+      });
     }
 
     throw new Error(`Invalid room action: ${action}`);
@@ -512,13 +514,11 @@ this.logger(`[XComfortBridge-ERROR] Failed to decrypt/parse: ${e}`);
   async activateScene(sceneId: number): Promise<boolean> {
     this.requireConnection();
 
-    // PERFORMANCE: Fire-and-forget for scenes
-    const msg = {
+    return this.connectionManager.sendWithRetry({
       type_int: MESSAGE_TYPES.ACTIVATE_SCENE,
       mc: this.connectionManager.nextMc(),
       payload: { sceneId },
-    };
-    return this.connectionManager.sendEncrypted(msg);
+    });
   }
 
   // ===========================================================================

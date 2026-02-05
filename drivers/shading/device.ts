@@ -20,8 +20,8 @@ module.exports = class ShadingDevice extends Homey.Device {
     const settings = this.getSettings();
     const supportsPosition = settings.shRuntime !== undefined && settings.shRuntime > 0;
 
-    if (!supportsPosition) {
-        await this.removeCapability("windowcoverings_set");
+    if (!supportsPosition && this.hasCapability('windowcoverings_set')) {
+        await this.removeCapability('windowcoverings_set').catch(this.error);
     }
 
     if (!this.bridge) {
@@ -53,17 +53,12 @@ module.exports = class ShadingDevice extends Homey.Device {
           }
       }
       
-      if (data.shadsClosed !== undefined) {
-          // shadsClosed is likely 0-1 (float) or 0-100. Assuming 0-1 for Homey.
-          // If protocol sends 0-100, divide by 100.
-          // Based on observations, usually 0.0 to 1.0.
-          // If existing logic suggests differently, adjust.
-          // Python repo says: 0=Open, 100=Closed?
-          // Let's assume 0.0-1.0 to meet Homey standard. 
-          // If 'dimmvalue' is used for position:
-          let pos = data.dimmvalue;
-          if (pos !== undefined) {
-              if (pos > 1) pos = pos / 100; // Auto-detect scale
+      if (data.shadsClosed !== undefined || data.dimmvalue !== undefined) {
+          // shadsClosed is likely 0-1 or 0-100. Fallback to dimmvalue if present.
+          let pos = data.shadsClosed ?? data.dimmvalue;
+          if (pos !== undefined && this.hasCapability('windowcoverings_set')) {
+              if (pos > 1) pos = pos / 100; // Auto-detect 0-100 scale
+              pos = Math.max(0, Math.min(1, pos));
               this.setCapabilityValue('windowcoverings_set', pos).catch(this.error);
           }
       }
@@ -71,19 +66,21 @@ module.exports = class ShadingDevice extends Homey.Device {
 
   private registerCapabilityListeners() {
       // Position Set
-      this.registerCapabilityListener('windowcoverings_set', async (value) => {
-          if (this.safetyActive) throw new Error('Safety lock active');
-          
-          await this.bridge?.getConnectionManager().sendWithRetry({
-              type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
-              mc: this.bridge.getConnectionManager().nextMc(),
-              payload: {
-                  deviceId: parseInt(this.deviceId),
-                  action: ShadingAction.GO_TO,
-                  value: value * 100 // Protocol likely expects 0-100
-              }
+      if (this.hasCapability('windowcoverings_set')) {
+          this.registerCapabilityListener('windowcoverings_set', async (value) => {
+              if (this.safetyActive) throw new Error('Safety lock active');
+              
+              await this.bridge?.getConnectionManager().sendWithRetry({
+                  type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
+                  mc: this.bridge.getConnectionManager().nextMc(),
+                  payload: {
+                      deviceId: parseInt(this.deviceId),
+                      action: ShadingAction.GO_TO,
+                      value: value * 100 // Protocol likely expects 0-100
+                  }
+              });
           });
-      });
+      }
       
       // State (Up/Down/Idle)
       this.registerCapabilityListener('windowcoverings_state', async (value) => {

@@ -62,6 +62,8 @@ export class ConnectionManager {
   private reconnecting: boolean = false;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private mc: number = 0;
+  private connectResolve?: () => void;
+  private connectReject?: (error: Error) => void;
 
   private onRawMessage?: OnRawMessageFn;
   private onStateChange?: OnStateChangeFn;
@@ -262,8 +264,8 @@ export class ConnectionManager {
 
         // Resolve is called externally when auth completes
         // Store resolve/reject for external completion
-        (this as any)._connectResolve = resolve;
-        (this as any)._connectReject = reject;
+        this.connectResolve = resolve;
+        this.connectReject = reject;
 
       } catch (error) {
         reject(error);
@@ -275,12 +277,11 @@ export class ConnectionManager {
    * Resolve the connection promise (called when auth completes)
    */
   resolveConnection(): void {
-    const resolve = (this as any)._connectResolve;
-    if (resolve) {
+    if (this.connectResolve) {
       this.state = 'connected';
       this.onStateChange?.(this.state);
-      resolve();
-      delete (this as any)._connectResolve;
+      this.connectResolve();
+      this.connectResolve = undefined;
     }
   }
 
@@ -288,10 +289,9 @@ export class ConnectionManager {
    * Reject the connection promise
    */
   rejectConnection(error: Error): void {
-    const reject = (this as any)._connectReject;
-    if (reject) {
-      reject(error);
-      delete (this as any)._connectReject;
+    if (this.connectReject) {
+      this.connectReject(error);
+      this.connectReject = undefined;
     }
   }
 

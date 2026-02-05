@@ -52,6 +52,7 @@ export class MessageHandler {
   private deviceStateManager: DeviceStateManager;
   private roomStateManager: RoomStateManager;
   private logger: LoggerFunction;
+  private debugStateItems: boolean = false;
   private pendingAcks: Map<number, boolean> = new Map();
   private homeData: HomeData | null = null;
   private onDeviceListComplete?: OnDeviceListCompleteFn;
@@ -68,6 +69,7 @@ export class MessageHandler {
     this.deviceStateManager = deviceStateManager;
     this.roomStateManager = roomStateManager;
     this.logger = logger || console.log;
+    this.debugStateItems = process.env.XCOMFORT_DEBUG === '1';
   }
 
   /**
@@ -330,8 +332,9 @@ export class MessageHandler {
         const roomUpdates = new Map<string, RoomStateUpdate>();
 
         payload.item.forEach((item) => {
-          if (item.deviceId) {
-            const device = this.deviceStateManager.getDevice(String(item.deviceId));
+          if (item.deviceId !== undefined && item.deviceId !== null) {
+            const deviceId = String(item.deviceId);
+            const device = this.deviceStateManager.getDevice(deviceId);
             if (device?.devType === 220) {
               // console.log(
               //   `[MessageHandler] Input event raw item: ${JSON.stringify(item)}`
@@ -341,13 +344,17 @@ export class MessageHandler {
               // );
             }
 
-            if (!deviceUpdates.has(item.deviceId)) {
-              deviceUpdates.set(item.deviceId, {});
+            if (!deviceUpdates.has(deviceId)) {
+              deviceUpdates.set(deviceId, {});
             }
-            const deviceUpdate = deviceUpdates.get(item.deviceId)!;
+            const deviceUpdate = deviceUpdates.get(deviceId)!;
             
             // Log raw item for debugging missing properties
-            // console.log(`[MessageHandler] Raw item for device ${item.deviceId}:`, JSON.stringify(item));
+            if (this.debugStateItems) {
+              this.logger(
+                `[MessageHandler] Raw item for device ${deviceId}: ${JSON.stringify(item)}`
+              );
+            }
 
             if (
               item.switch !== undefined ||
@@ -383,8 +390,9 @@ export class MessageHandler {
                 deviceUpdate.metadata = metadata;
               }
             }
-          } else if (item.roomId) {
-            roomUpdates.set(item.roomId, {
+          } else if (item.roomId !== undefined && item.roomId !== null) {
+            const roomId = String(item.roomId);
+            roomUpdates.set(roomId, {
               switch: item.switch !== undefined ? (item.switch === true || item.switch === 1) : undefined,
               dimmvalue: item.dimmvalue,
               lightsOn: item.lightsOn,

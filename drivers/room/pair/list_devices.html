@@ -17,10 +17,10 @@
   </style>
 </head>
 <body>
-  <h1>Select wall switches</h1>
+  <h1>Select rooms</h1>
   <ul id="device-list" class="list"></ul>
-  <div id="empty" class="empty" style="display:none;">No devices found.</div>
-  <div id="status" class="status">Loading devices…</div>
+  <div id="empty" class="empty" style="display:none;">No rooms found with devices.</div>
+  <div id="status" class="status">Loading rooms…</div>
   <div class="actions">
     <button id="add-btn" disabled>Add selected</button>
   </div>
@@ -38,7 +38,7 @@
         if (!devices.length) {
           emptyEl.style.display = 'block';
           addBtn.disabled = true;
-          statusEl.textContent = 'No devices found.';
+          statusEl.textContent = 'No rooms found with devices.';
           return;
         }
         emptyEl.style.display = 'none';
@@ -85,7 +85,7 @@
       });
 
       function loadDevices(attempt = 0) {
-        statusEl.textContent = attempt === 0 ? 'Loading devices…' : 'Still loading…';
+        statusEl.textContent = attempt === 0 ? 'Loading rooms…' : 'Still loading…';
         Homey.emit('list_devices')
           .then((result) => {
             devices = Array.isArray(result) ? result : [];
@@ -95,7 +95,7 @@
             }
           })
           .catch((err) => {
-            statusEl.textContent = 'Unable to load devices.';
+            statusEl.textContent = 'Unable to load rooms.';
             Homey.alert((err && err.message) || String(err));
           });
       }

@@ -6,9 +6,11 @@ module.exports = class WallSwitchDevice extends Homey.Device {
   private bridge!: XComfortBridge;
   private triggerPressed: Homey.FlowCardTriggerDevice | null = null;
   private onDeviceUpdate!: (deviceId: string, state: DeviceStateUpdate) => void;
+  private debug: boolean = false;
 
   async onInit() {
     this.log('WallSwitchDevice init:', this.getName());
+    this.debug = process.env.XCOMFORT_DEBUG === '1';
     
     const app = this.homey.app as any;
     this.bridge = app.bridge;
@@ -27,7 +29,9 @@ module.exports = class WallSwitchDevice extends Homey.Device {
         // Since wall switches are input devices, we mainly track state. 
         // Allowing this listener removes the "missing capability listener" error
         // and allows the user to manually correct the state in the app if needed.
-        this.log('Wall switch state manually set to:', value);
+        if (this.debug) {
+          this.log('Wall switch state manually set to:', value);
+        }
     });
 
     // Register Flow Trigger
@@ -38,7 +42,9 @@ module.exports = class WallSwitchDevice extends Homey.Device {
     this.onDeviceUpdate = (deviceId: string, state: DeviceStateUpdate) => {
         // Only verify this update belongs to this device (redundant with listener registration but safe)
         if (String(deviceId) === String(this.getData().deviceId)) {
-            this.log('Switch Event:', state);
+            if (this.debug) {
+              this.log('Switch Event:', state);
+            }
             
             if (typeof state.switch === 'boolean') {
                 this.setCapabilityValue('onoff', state.switch).catch(this.error);

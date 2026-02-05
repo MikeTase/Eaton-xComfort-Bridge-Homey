@@ -4,6 +4,7 @@ import { RoomStateUpdate } from '../../lib/types';
 
 module.exports = class RoomDevice extends Homey.Device {
     private bridge!: XComfortBridge;
+    private onRoomUpdateListener?: (roomId: string, state: RoomStateUpdate) => void;
 
     async onInit() {
         this.log('RoomDevice init:', this.getName());
@@ -53,12 +54,10 @@ module.exports = class RoomDevice extends Homey.Device {
         });
 
         // Listen for state updates
-        this.bridge.addRoomStateListener(roomId, (rid, state: RoomStateUpdate) => {
-             this.onRoomUpdate(rid, state);
-        });
-        
-        // Initial Refresh
-        this.updateFromBridge(roomId);
+        this.onRoomUpdateListener = (rid, state: RoomStateUpdate) => {
+            this.onRoomUpdate(rid, state);
+        };
+        this.bridge.addRoomStateListener(roomId, this.onRoomUpdateListener);
     }
 
     onRoomUpdate(roomId: string, state: RoomStateUpdate) {
@@ -83,33 +82,13 @@ module.exports = class RoomDevice extends Homey.Device {
         }
     }
 
-    updateFromBridge(roomId: string) {
-        const room = this.bridge.getRoom(roomId);
-        if (room) {
-            // We can construct a partial state update from the known room data if available
-            // but roomStateManager stores the latest room object. 
-            // Currently roomStateManager doesn't emit immediately on listener add? 
-            // Manually sync properties we have.
-            // Actually getRoom() returns the last known state object.
-            // But XComfortRoom type might not have all 'switch'/'dimmvalue' directly if they are computed?
-            // Let's check XComfortRoom definition.
-            
-            // XComfortRoom usually has structure from REQUEST_ROOMS response. 
-            // It might not have real-time 'switch' state unless tracked.
-            // However, RoomStateManager merges updates into it?
-            // Assuming roomStateManager updates the room object cache.
-        }
-    }
-
     async onDeleted() {
         if (this.bridge) {
             const roomId = String(this.getData().roomId);
-            // We can't easily remove anonymous listener without storing the ref
-            // But usually this instance is destroyed.
-            // Fix: store the bound listener
-            // Ideally addRoomStateListener should accept the listener.
-            // Since we use an arrow function in onInit, we can't remove it easily.
-            // Better to make onRoomUpdate a bound method and pass it directly.
+            if (this.onRoomUpdateListener) {
+                this.bridge.removeRoomStateListener(roomId, this.onRoomUpdateListener);
+                this.onRoomUpdateListener = undefined;
+            }
         }
     }
 }

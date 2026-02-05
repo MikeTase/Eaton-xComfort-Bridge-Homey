@@ -13,12 +13,14 @@
     button { background: #0078d4; color: #fff; border: 0; padding: 10px 14px; border-radius: 6px; font-size: 14px; }
     button:disabled { background: #9aa0a6; }
     .empty { color: #666; }
+    .status { color: #666; margin: 8px 0 0; min-height: 18px; }
   </style>
 </head>
 <body>
-  <h1>Select thermostats to add</h1>
+  <h1>Select thermostats</h1>
   <ul id="device-list" class="list"></ul>
-  <div id="empty" class="empty" style="display:none;">No thermostat devices found.</div>
+  <div id="empty" class="empty" style="display:none;">No devices found.</div>
+  <div id="status" class="status">Loading devices…</div>
   <div class="actions">
     <button id="add-btn" disabled>Add selected</button>
   </div>
@@ -28,6 +30,7 @@
       const listEl = document.getElementById('device-list');
       const emptyEl = document.getElementById('empty');
       const addBtn = document.getElementById('add-btn');
+      const statusEl = document.getElementById('status');
       let devices = [];
 
       function render() {
@@ -35,9 +38,11 @@
         if (!devices.length) {
           emptyEl.style.display = 'block';
           addBtn.disabled = true;
+          statusEl.textContent = 'No devices found.';
           return;
         }
         emptyEl.style.display = 'none';
+        statusEl.textContent = '';
         devices.forEach((device, idx) => {
           const li = document.createElement('li');
           li.className = 'item';
@@ -80,6 +85,7 @@
       });
 
       function loadDevices(attempt = 0) {
+        statusEl.textContent = attempt === 0 ? 'Loading devices…' : 'Still loading…';
         Homey.emit('list_devices')
           .then((result) => {
             devices = Array.isArray(result) ? result : [];
@@ -88,7 +94,10 @@
               setTimeout(() => loadDevices(attempt + 1), 1000);
             }
           })
-          .catch((err) => Homey.alert((err && err.message) || String(err)));
+          .catch((err) => {
+            statusEl.textContent = 'Unable to load devices.';
+            Homey.alert((err && err.message) || String(err));
+          });
       }
 
       loadDevices();

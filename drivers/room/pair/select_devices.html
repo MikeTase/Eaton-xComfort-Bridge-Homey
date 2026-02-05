@@ -17,19 +17,19 @@
   </style>
 </head>
 <body>
-  <h1>Select wall switches</h1>
+  <h1>Select rooms</h1>
   <ul id="device-list" class="list"></ul>
-  <div id="empty" class="empty" style="display:none;">No devices found.</div>
-  <div id="status" class="status">Loading devices…</div>
+  <div id="empty" class="empty" style="display:none;">No rooms found with devices.</div>
+  <div id="status" class="status">Loading rooms…</div>
   <div class="actions">
     <button id="add-btn" disabled>Add selected</button>
   </div>
 
   <script>
-    const statusEl = document.getElementById('status');
     const listEl = document.getElementById('device-list');
     const emptyEl = document.getElementById('empty');
     const addBtn = document.getElementById('add-btn');
+    const statusEl = document.getElementById('status');
     let devices = [];
 
     function render() {
@@ -37,7 +37,7 @@
       if (!devices.length) {
         emptyEl.style.display = 'block';
         addBtn.disabled = true;
-        statusEl.textContent = 'No devices found.';
+        statusEl.textContent = 'No rooms found with devices.';
         return;
       }
       emptyEl.style.display = 'none';
@@ -79,16 +79,17 @@
       if (!selected.length) return;
       Homey.emit('add_devices', selected, (err) => {
         if (err) {
-          Homey.alert(err.message || String(err));
-          return;
-        }
-        Homey.done();
-      });
+        statusEl.textContent = 'Unable to add rooms.';
+        Homey.alert(err.message || String(err));
+        return;
+      }
+      Homey.done();
     });
+  });
 
     Homey.emit('list_devices', null, (err, result) => {
       if (err) {
-        statusEl.textContent = 'Unable to load devices.';
+        statusEl.textContent = 'Unable to load rooms.';
         Homey.alert(err.message || String(err));
         return;
       }

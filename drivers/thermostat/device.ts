@@ -1,7 +1,7 @@
 import * as Homey from 'homey';
 import { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { MESSAGE_TYPES, DEVICE_TYPES } from '../../lib/XComfortProtocol';
-import { DeviceStateUpdate, ClimateMode, ClimateState } from '../../lib/types';
+import { DeviceStateUpdate } from '../../lib/types';
 
 interface XComfortApp extends Homey.App {
     bridge: XComfortBridge | null;
@@ -12,10 +12,12 @@ module.exports = class ThermostatDevice extends Homey.Device {
   private deviceId: string = '';
   private onDeviceUpdate: ((deviceId: string | number, state: DeviceStateUpdate) => void) | null = null;
   private onVirtualUpdate: ((deviceId: string | number, data: DeviceStateUpdate) => void) | null = null;
+  private debug: boolean = false;
 
   async onInit() {
     this.bridge = (this.homey.app as XComfortApp).bridge;
     this.deviceId = this.getData().deviceId;
+    this.debug = process.env.XCOMFORT_DEBUG === '1';
 
     this.log(`ThermostatDevice init: ${this.getName()}`);
 
@@ -48,7 +50,9 @@ module.exports = class ThermostatDevice extends Homey.Device {
         const triggerOff = this.homey.flow.getDeviceTriggerCard('thermostat_button_off');
 
         this.onVirtualUpdate = (_id, data) => {
-            this.log(`Virtual Rocker update:`, data);
+            if (this.debug) {
+              this.log(`Virtual Rocker update:`, data);
+            }
             if (data.switch === true) {
                  triggerOn?.trigger(this, {}, {}).catch(this.error);
             } else if (data.switch === false) {
@@ -61,7 +65,9 @@ module.exports = class ThermostatDevice extends Homey.Device {
   }
   
   private updateState(data: DeviceStateUpdate) {
-      this.log(`Termostat update:`, data);
+      if (this.debug) {
+          this.log(`Thermostat update:`, data);
+      }
       
       if (data.setpoint !== undefined) {
           this.setCapabilityValue('target_temperature', data.setpoint).catch(this.error);
