@@ -92,8 +92,16 @@ export const DEVICE_TYPES = {
   HEATING_VALVE: 441,
   RC_TOUCH: 450,
   TEMP_HUMIDITY_SENSOR: 451,
+  WALL_SWITCH: 220,
   WATER_GUARD: 497,
   WATER_SENSOR: 499,
+} as const;
+
+/**
+ * WebSocket Close Codes
+ */
+export const WS_CLOSE_CODES = {
+  ABNORMAL_CLOSURE: 1006,
 } as const;
 
 export type DeviceType = (typeof DEVICE_TYPES)[keyof typeof DEVICE_TYPES];

@@ -7,6 +7,7 @@ import { XComfortBridge } from './lib/connection/XComfortBridge';
 class XComfortApp extends Homey.App {
   public bridge: XComfortBridge | null = null; // Public for drivers to access via app.bridge
   private initToken = 0;
+  private settingsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   async onInit() {
     this.log('Eaton xComfort App has been initialized');
@@ -22,13 +23,19 @@ class XComfortApp extends Homey.App {
       this.log('Bridge configuration missing in Settings.');
     }
 
-    this.homey.settings.on('set', async (key: string) => {
+    this.homey.settings.on('set', (key: string) => {
       if (key === 'bridge_ip' || key === 'bridge_auth_key') {
-        const newIp = this.homey.settings.get('bridge_ip');
-        const newKey = this.homey.settings.get('bridge_auth_key');
-        if (newIp && newKey) {
-          await this.initBridge(newIp, newKey);
-        }
+        // Debounce: settings page saves IP and key separately,
+        // so we wait briefly to avoid double bridge reinit.
+        if (this.settingsDebounceTimer) clearTimeout(this.settingsDebounceTimer);
+        this.settingsDebounceTimer = setTimeout(async () => {
+          this.settingsDebounceTimer = null;
+          const newIp = this.homey.settings.get('bridge_ip');
+          const newKey = this.homey.settings.get('bridge_auth_key');
+          if (newIp && newKey) {
+            await this.initBridge(newIp, newKey);
+          }
+        }, 500);
       }
     });
   }

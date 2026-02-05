@@ -50,10 +50,17 @@
                     statusEl.className = 'status ' + (isError ? 'err' : 'ok');
                 }
 
+                function isValidIp(str) {
+                    // Accept IPv4 addresses and hostnames
+                    var ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
+                    var hostname = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
+                    return ipv4.test(str) || hostname.test(str);
+                }
+
                 function validate() {
                     var ip = (ipInput.value || '').trim();
                     var key = (keyInput.value || '').trim();
-                    saveButton.disabled = !(ip.length > 0 && key.length > 0);
+                    saveButton.disabled = !(ip.length > 0 && key.length > 0 && isValidIp(ip));
                 }
 
                 // Load existing settings

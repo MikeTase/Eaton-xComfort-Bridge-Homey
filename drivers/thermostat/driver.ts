@@ -1,4 +1,3 @@
-import * as Homey from 'homey';
 import { BaseDriver } from '../../lib/BaseDriver';
 import { XComfortDevice } from '../../lib/types';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
@@ -49,9 +48,7 @@ module.exports = class ThermostatDriver extends BaseDriver {
     });
   }
   
-  onPair(session: Homey.PairSession) {
-      session.setHandler('list_devices', async () => {
-          return this.listUnpairedDevices();
-      });
+  async onPairListDevices() {
+      return this.listUnpairedDevices();
   }
 };

@@ -4,6 +4,7 @@ import { DeviceStateUpdate } from '../../lib/types';
 
 module.exports = class ActuatorDevice extends BaseDevice {
     private onDeviceUpdate!: (deviceId: string, state: DeviceStateUpdate) => void;
+    private safetyTimer: NodeJS.Timeout | null = null;
 
     async onInit() {
         try {
@@ -35,7 +36,6 @@ module.exports = class ActuatorDevice extends BaseDevice {
         // Debounce/Race-condition handling
         let pendingSwitchState: boolean | null = null;
         let pendingSwitchTimestamp: number = 0;
-        let safetyTimer: NodeJS.Timeout | null = null;
         const STATE_UPDATE_GRACE_PERIOD = 3000; // ms
 
         this.onDeviceUpdate = (deviceId: string, state: DeviceStateUpdate) => {
@@ -46,9 +46,9 @@ module.exports = class ActuatorDevice extends BaseDevice {
                     if (pendingSwitchState !== null) {
                         if (state.switch === pendingSwitchState) {
                              // State confirmed - Cancel safety check
-                             if (safetyTimer) {
-                                 clearTimeout(safetyTimer);
-                                 safetyTimer = null;
+                             if (this.safetyTimer) {
+                                 clearTimeout(this.safetyTimer);
+                                 this.safetyTimer = null;
                              }
 
                              // Don't clear pendingSwitchState yet to protect against subsequent ghost echoes
@@ -67,7 +67,7 @@ module.exports = class ActuatorDevice extends BaseDevice {
                     }
 
                     if (shouldUpdate) {
-                        this.setCapabilityValue('onoff', state.switch).catch(console.error);
+                        this.setCapabilityValue('onoff', state.switch).catch(this.error);
                     }
                 }
 
@@ -83,7 +83,7 @@ module.exports = class ActuatorDevice extends BaseDevice {
                     }
                     
                     if (shouldUpdateDim) {
-                        this.setCapabilityValue('dim', homeyDim).catch(console.error);
+                        this.setCapabilityValue('dim', homeyDim).catch(this.error);
                     }
                 }
             } catch (err) {
@@ -113,19 +113,19 @@ module.exports = class ActuatorDevice extends BaseDevice {
                 });
 
                 // Safety: Verify state after delay if no confirmation received
-                if (safetyTimer) clearTimeout(safetyTimer);
+                if (this.safetyTimer) clearTimeout(this.safetyTimer);
                 const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500; // 3.5s
-                safetyTimer = setTimeout(() => {
+                this.safetyTimer = setTimeout(() => {
                     if (pendingSwitchState === value) {
                         // Still pending? We might have lost the packet or the update.
                         if (this.bridge && this.bridge.requestDeviceStates) {
                             this.bridge.requestDeviceStates().catch(() => {});
                         }
                     }
-                    safetyTimer = null;
+                    this.safetyTimer = null;
                 }, safetyDelay);
             } catch (err) {
-                console.error(`[Actuator] Error sending onoff command for ${this.getData().deviceId}:`, err);
+                this.error(`[Actuator] Error sending onoff command for ${this.getData().deviceId}:`, err);
                 pendingSwitchState = null; // Reset on error
                 this.setCapabilityValue('onoff', !value).catch(() => {}); // Revert UI
             }
@@ -146,15 +146,15 @@ module.exports = class ActuatorDevice extends BaseDevice {
                         void sendTime;
                     });
 
-                    if (safetyTimer) clearTimeout(safetyTimer);
+                    if (this.safetyTimer) clearTimeout(this.safetyTimer);
                     const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
-                    safetyTimer = setTimeout(() => {
+                    this.safetyTimer = setTimeout(() => {
                          if (pendingSwitchState === false) {
                             if (this.bridge && this.bridge.requestDeviceStates) {
                                 this.bridge.requestDeviceStates().catch(() => {});
                             }
                          }
-                         safetyTimer = null;
+                         this.safetyTimer = null;
                     }, safetyDelay);
                 } else {
                     const dimValue = Math.max(1, Math.round(value * 99));
@@ -168,15 +168,15 @@ module.exports = class ActuatorDevice extends BaseDevice {
                         void sendTime;
                     });
 
-                    if (safetyTimer) clearTimeout(safetyTimer);
+                    if (this.safetyTimer) clearTimeout(this.safetyTimer);
                     const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
-                    safetyTimer = setTimeout(() => {
+                    this.safetyTimer = setTimeout(() => {
                          if (pendingSwitchState === true) {
                             if (this.bridge && this.bridge.requestDeviceStates) {
                                 this.bridge.requestDeviceStates().catch(() => {});
                             }
                          }
-                         safetyTimer = null;
+                         this.safetyTimer = null;
                     }, safetyDelay);
                 }
             } catch (err) {
@@ -196,6 +196,10 @@ module.exports = class ActuatorDevice extends BaseDevice {
     }
 
     onDeleted() {
+        if (this.safetyTimer) {
+            clearTimeout(this.safetyTimer);
+            this.safetyTimer = null;
+        }
         if (this.bridge && this.onDeviceUpdate) {
             this.bridge.removeDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
             this.log('ActuatorDevice listener removed');

@@ -155,7 +155,9 @@ module.exports = class RoomDevice extends BaseDevice {
         if (this.lastPowerUpdateMs !== null && this.lastPowerW !== null) {
             const dtHours = (now - this.lastPowerUpdateMs) / 3600000;
             if (dtHours > 0) {
-                this.energyKwh += (this.lastPowerW / 1000) * dtHours;
+                // Trapezoidal approximation: average of old and new power readings
+                const avgPowerW = (this.lastPowerW + powerW) / 2;
+                this.energyKwh += (avgPowerW / 1000) * dtHours;
                 this.setCapabilityValue('meter_power', this.energyKwh).catch(() => {});
                 this.setStoreValue('energy_kwh', this.energyKwh).catch(() => {});
             }

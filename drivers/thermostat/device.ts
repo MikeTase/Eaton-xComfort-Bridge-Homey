@@ -57,7 +57,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
   }
   
-  private updateState(data: DeviceStateUpdate) {
+  private async updateState(data: DeviceStateUpdate) {
       if (this.debug) {
           this.log(`Thermostat update:`, data);
       }
@@ -71,6 +71,9 @@ module.exports = class ThermostatDevice extends BaseDevice {
       }
       
       if (data.metadata?.humidity !== undefined) {
+          if (!this.hasCapability('measure_humidity')) {
+              await this.addCapability('measure_humidity').catch(this.error);
+          }
           this.setCapabilityValue('measure_humidity', data.metadata.humidity).catch(this.error);
       }
   }

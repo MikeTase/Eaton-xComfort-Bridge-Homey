@@ -9,7 +9,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { MESSAGE_TYPES, PROTOCOL_CONFIG } from '../XComfortProtocol';
+import { MESSAGE_TYPES, PROTOCOL_CONFIG, WS_CLOSE_CODES } from '../XComfortProtocol';
 import { ConnectionManager } from './ConnectionManager';
 import { Authenticator } from './Authenticator';
 import { DeviceStateManager } from '../state/DeviceStateManager';
@@ -292,10 +292,11 @@ export class XComfortBridge extends EventEmitter {
     // Calculate delay: immediate for first 1006, then exponential backoff
     // Base delay: 500ms for 1006, 5000ms for others
     // Max delay: 60 seconds
-    const baseDelay = this.lastCloseCode === 1006 ? 500 : PROTOCOL_CONFIG.TIMEOUTS.RECONNECT_DELAY;
+    const MAX_RECONNECT_DELAY = 60000;
+    const baseDelay = this.lastCloseCode === WS_CLOSE_CODES.ABNORMAL_CLOSURE ? 500 : PROTOCOL_CONFIG.TIMEOUTS.RECONNECT_DELAY;
     const delay = Math.min(
       baseDelay * Math.pow(2, Math.max(0, this.reconnectAttempt - 1)),
-      60000
+      MAX_RECONNECT_DELAY
     );
 
     this.logger(`[XComfortBridge] Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempt}, code ${this.lastCloseCode})`);
@@ -642,6 +643,7 @@ export class XComfortBridge extends EventEmitter {
     this.connectionManager.setReconnecting(false);
     this.connectionState = 'disconnected';
     this.reconnectAttempt = 0;
+    this.dimDebouncers.clear();
     this.removeAllListeners();
   }
 
