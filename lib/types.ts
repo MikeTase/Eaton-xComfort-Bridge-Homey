@@ -148,8 +148,12 @@ export interface BridgeStatus {
   tempOutside?: number;
   power?: number;
   heatingOn?: number;
+  coolingOn?: number;
+  lightsOn?: number;
+  loadsOn?: number;
   windowsOpen?: number;
   doorsOpen?: number;
+  presence?: number;
   [key: string]: unknown;
 }
 

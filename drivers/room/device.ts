@@ -1,3 +1,4 @@
+/// <reference path="../../homey.d.ts" />
 import * as Homey from 'homey';
 import { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { RoomStateUpdate } from '../../lib/types';
@@ -7,6 +8,9 @@ module.exports = class RoomDevice extends Homey.Device {
     private onRoomUpdateListener?: (roomId: string, state: RoomStateUpdate) => void;
     private onDevicesLoadedListener?: () => void;
     private supportsDim: boolean = true;
+    private energyKwh: number = 0;
+    private lastPowerW: number | null = null;
+    private lastPowerUpdateMs: number | null = null;
 
     async onInit() {
         this.log('RoomDevice init:', this.getName());
@@ -20,6 +24,14 @@ module.exports = class RoomDevice extends Homey.Device {
 
         const roomId = String(this.getData().roomId);
         this.updateDimSupport(roomId);
+
+        if (this.hasCapability('meter_power')) {
+            const stored = this.getStoreValue('energy_kwh');
+            if (typeof stored === 'number' && !Number.isNaN(stored)) {
+                this.energyKwh = stored;
+                this.setCapabilityValue('meter_power', this.energyKwh).catch(() => {});
+            }
+        }
 
         this.onDevicesLoadedListener = () => {
             this.updateDimSupport(roomId);
@@ -81,7 +93,8 @@ module.exports = class RoomDevice extends Homey.Device {
             this.setCapabilityValue('dim', dim).catch(() => {});
         }
         if (typeof state.power === 'number') {
-            this.setCapabilityValue('meter_power', state.power).catch(() => {});
+            this.setCapabilityValue('measure_power', state.power).catch(() => {});
+            this.updateEnergy(state.power);
         }
         if (typeof state.windowsOpen === 'number') {
              this.setCapabilityValue('alarm_contact.windows', state.windowsOpen > 0).catch(() => {});
@@ -124,5 +137,22 @@ module.exports = class RoomDevice extends Homey.Device {
         if (!supports && this.hasCapability('dim')) {
             this.removeCapability('dim').catch(this.error);
         }
+    }
+
+    private updateEnergy(powerW: number) {
+        if (!this.hasCapability('meter_power')) return;
+
+        const now = Date.now();
+        if (this.lastPowerUpdateMs !== null && this.lastPowerW !== null) {
+            const dtHours = (now - this.lastPowerUpdateMs) / 3600000;
+            if (dtHours > 0) {
+                this.energyKwh += (this.lastPowerW / 1000) * dtHours;
+                this.setCapabilityValue('meter_power', this.energyKwh).catch(() => {});
+                this.setStoreValue('energy_kwh', this.energyKwh).catch(() => {});
+            }
+        }
+
+        this.lastPowerW = powerW;
+        this.lastPowerUpdateMs = now;
     }
 }

@@ -6,6 +6,7 @@ import { XComfortBridge } from './lib/connection/XComfortBridge';
 
 class XComfortApp extends Homey.App {
   public bridge: XComfortBridge | null = null; // Public for drivers to access via app.bridge
+  private initToken = 0;
 
   async onInit() {
     this.log('Eaton xComfort App has been initialized');
@@ -21,18 +22,19 @@ class XComfortApp extends Homey.App {
       this.log('Bridge configuration missing in Settings.');
     }
 
-    this.homey.settings.on('set', (key: string) => {
-        if (key === 'bridge_ip' || key === 'bridge_auth_key') {
-            const newIp = this.homey.settings.get('bridge_ip');
-            const newKey = this.homey.settings.get('bridge_auth_key');
-            if (newIp && newKey) {
-                this.initBridge(newIp, newKey);
-            }
+    this.homey.settings.on('set', async (key: string) => {
+      if (key === 'bridge_ip' || key === 'bridge_auth_key') {
+        const newIp = this.homey.settings.get('bridge_ip');
+        const newKey = this.homey.settings.get('bridge_auth_key');
+        if (newIp && newKey) {
+          await this.initBridge(newIp, newKey);
         }
+      }
     });
   }
 
   async initBridge(ip: string, authKey: string) {
+    const token = ++this.initToken;
     if (this.bridge) {
       this.bridge.disconnect();
       this.bridge = null;
@@ -53,10 +55,14 @@ class XComfortApp extends Homey.App {
     this.bridge.on('reconnecting', () => this.log('Bridge: Reconnecting...'));
     
     try {
-        await this.bridge.init();
+      await this.bridge.init();
+      if (token === this.initToken) {
         this.log('Bridge: Initialization started');
+      }
     } catch (err) {
+      if (token === this.initToken) {
         this.error('Bridge: Initialization failed', err);
+      }
     }
   }
   

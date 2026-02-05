@@ -52,9 +52,9 @@ module.exports = class WallSwitchDevice extends Homey.Device {
 
             // Trigger specific direction events
             if (state.switch === true) {
-                 triggerUp.trigger(this, {}, {}).catch(this.error);
+                 if (triggerUp) triggerUp.trigger(this, {}, {}).catch(this.error);
             } else if (state.switch === false) {
-                 triggerDown.trigger(this, {}, {}).catch(this.error);
+                 if (triggerDown) triggerDown.trigger(this, {}, {}).catch(this.error);
             }
 
             if (this.triggerPressed) {

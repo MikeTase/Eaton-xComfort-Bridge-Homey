@@ -92,6 +92,8 @@ export const DEVICE_TYPES = {
   HEATING_VALVE: 441,
   RC_TOUCH: 450,
   TEMP_HUMIDITY_SENSOR: 451,
+  WATER_GUARD: 497,
+  WATER_SENSOR: 499,
 } as const;
 
 export type DeviceType = (typeof DEVICE_TYPES)[keyof typeof DEVICE_TYPES];

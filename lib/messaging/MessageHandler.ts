@@ -55,6 +55,8 @@ export class MessageHandler {
   private debugStateItems: boolean = false;
   private pendingAcks: Map<number, boolean> = new Map();
   private homeData: HomeData | null = null;
+  private lastDeviceUpdateAt: Map<string, number> = new Map();
+  private lastRoomUpdateAt: Map<string, number> = new Map();
   private onDeviceListComplete?: OnDeviceListCompleteFn;
   private onScenesReceived?: OnScenesReceivedFn;
   private onAckReceived?: OnAckReceivedFn;
@@ -135,7 +137,7 @@ export class MessageHandler {
   async processMessage(msg: ProtocolMessage): Promise<boolean> {
     // Handle incoming ACK messages
     if (msg.type_int === MESSAGE_TYPES.ACK) {
-      if (msg.ref) {
+      if (msg.ref !== undefined) {
         // console.log(`[MessageHandler] Received ACK for message ref: ${msg.ref}`);
         this.clearAck(msg.ref);
         this.onAckReceived?.(msg.ref);
@@ -154,7 +156,7 @@ export class MessageHandler {
          }
       }
       
-      if (msg.ref) {
+      if (msg.ref !== undefined) {
         this.onNackReceived?.(msg.ref);
       }
       return true;
@@ -323,6 +325,8 @@ export class MessageHandler {
     msgMeta?: { typeInt?: number; mc?: number; ref?: number }
   ): void {
     try {
+      const now = Date.now();
+      const THROTTLE_MS = 150;
       const itemCount = payload?.item?.length ?? 0;
       // console.log(`[MessageHandler] Processing state update with ${itemCount} items`);
       // console.log(`[MessageHandler] STATE PAYLOAD: ${JSON.stringify(payload)}`);
@@ -334,6 +338,11 @@ export class MessageHandler {
         payload.item.forEach((item) => {
           if (item.deviceId !== undefined && item.deviceId !== null) {
             const deviceId = String(item.deviceId);
+            const lastTs = this.lastDeviceUpdateAt.get(deviceId) ?? 0;
+            if (now - lastTs < THROTTLE_MS) {
+              return;
+            }
+            this.lastDeviceUpdateAt.set(deviceId, now);
             const device = this.deviceStateManager.getDevice(deviceId);
             if (device?.devType === 220) {
               // console.log(
@@ -392,6 +401,11 @@ export class MessageHandler {
             }
           } else if (item.roomId !== undefined && item.roomId !== null) {
             const roomId = String(item.roomId);
+            const lastTs = this.lastRoomUpdateAt.get(roomId) ?? 0;
+            if (now - lastTs < THROTTLE_MS) {
+              return;
+            }
+            this.lastRoomUpdateAt.set(roomId, now);
             roomUpdates.set(roomId, {
               switch: item.switch !== undefined ? (item.switch === true || item.switch === 1) : undefined,
               dimmvalue: item.dimmvalue,

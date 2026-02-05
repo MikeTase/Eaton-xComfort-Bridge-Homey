@@ -24,7 +24,8 @@ import type {
   XComfortScene,
   DeviceStateCallback,
   RoomStateCallback,
-  LoggerFunction
+  LoggerFunction,
+  BridgeStatus
 } from '../types';
 
 // Re-export ConnectionState as BridgeConnectionState for external consumers
@@ -50,14 +51,18 @@ export class XComfortBridge extends EventEmitter {
   private connectionState: BridgeConnectionState = 'disconnected';
   private deviceListReceived: boolean = false;
   private detailedScenes: XComfortScene[] = [];
+  private lastBridgeStatus: BridgeStatus | null = null;
 
   // Timeouts
   private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
   private connectionCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private watchdogInterval: ReturnType<typeof setInterval> | null = null;
 
   // Reconnection state
   private reconnectAttempt: number = 0;
   private lastCloseCode: number = 0;
+  private allowReconnect: boolean = true;
 
   // Debouncers
   private dimDebouncers = new Map<string, CommandDebouncer>();
@@ -106,7 +111,7 @@ export class XComfortBridge extends EventEmitter {
       this.logger(`[XComfortBridge] Connection closed: ${code} - ${reason}`);
       this.emit('disconnected');
 
-      if (shouldReconnect) {
+      if (shouldReconnect && this.allowReconnect) {
         this.emit('reconnecting');
         this.scheduleReconnect();
       }
@@ -144,6 +149,8 @@ export class XComfortBridge extends EventEmitter {
           payload: {},
         });
       });
+
+      this.startWatchdog();
     });
 
     // Message handler callbacks
@@ -155,6 +162,7 @@ export class XComfortBridge extends EventEmitter {
 
     this.messageHandler.setOnBridgeStatusUpdate((status) => {
       // console.log('[XComfortBridge] Bridge status update:', status);
+      this.lastBridgeStatus = status;
       this.emit('bridge_status', status);
     });
 
@@ -182,11 +190,13 @@ export class XComfortBridge extends EventEmitter {
       throw new Error('Bridge IP and auth key are required');
     }
 
+    this.allowReconnect = true;
     this.logger(`[XComfortBridge] Connecting to bridge at ${this.bridgeIp}`);
     return this.connect();
   }
 
   public disconnect(): void {
+      this.allowReconnect = false;
       this.cleanup();
   }
 
@@ -217,6 +227,7 @@ export class XComfortBridge extends EventEmitter {
       this.connectionTimeout = setTimeout(() => {
         this.clearConnectionTimers();
         this.logger('[XComfortBridge] Connection timeout');
+        this.stopWatchdog();
         this.connectionManager.cleanup();
         reject(new Error('Connection timeout - device list not received'));
       }, PROTOCOL_CONFIG.TIMEOUTS.CONNECTION);
@@ -234,7 +245,37 @@ export class XComfortBridge extends EventEmitter {
     }
   }
 
+  private startWatchdog(): void {
+    this.stopWatchdog();
+    const maxSilenceMs = PROTOCOL_CONFIG.TIMEOUTS.HEARTBEAT * 3;
+    this.watchdogInterval = setInterval(() => {
+      if (!this.connectionManager.isConnected()) return;
+
+      const last = this.connectionManager.getLastMessageAt();
+      const now = Date.now();
+      if (now - last > maxSilenceMs) {
+        this.logger(`[XComfortBridge] Watchdog: no messages for ${now - last}ms, reconnecting`);
+        this.connectionManager.cleanup();
+        this.scheduleReconnect();
+        return;
+      }
+
+      if (!this.connectionManager.isHeartbeatRunning()) {
+        this.logger('[XComfortBridge] Watchdog: heartbeat stopped, restarting');
+        this.connectionManager.restartHeartbeat();
+      }
+    }, PROTOCOL_CONFIG.TIMEOUTS.HEARTBEAT);
+  }
+
+  private stopWatchdog(): void {
+    if (this.watchdogInterval) {
+      clearInterval(this.watchdogInterval);
+      this.watchdogInterval = null;
+    }
+  }
+
   private scheduleReconnect(): void {
+    if (!this.allowReconnect) return;
     if (this.connectionManager.isReconnecting()) return;
 
     this.connectionManager.setReconnecting(true);
@@ -251,7 +292,10 @@ export class XComfortBridge extends EventEmitter {
 
     this.logger(`[XComfortBridge] Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempt}, code ${this.lastCloseCode})`);
 
-    setTimeout(() => {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+    }
+    this.reconnectTimer = setTimeout(() => {
       this.connectionManager.setReconnecting(false);
       this.connect()
         .then(() => {
@@ -267,6 +311,7 @@ export class XComfortBridge extends EventEmitter {
   }
 
   private handleRawMessage(data: Buffer, timestamp: number): void {
+    this.connectionManager.markMessageReceived(timestamp);
     let rawStr = data.toString();
     if (rawStr.endsWith('\u0004')) rawStr = rawStr.slice(0, -1);
 
@@ -402,6 +447,10 @@ export class XComfortBridge extends EventEmitter {
 
   getDetailedScenes(): XComfortScene[] {
     return this.detailedScenes;
+  }
+
+  getLastBridgeStatus(): BridgeStatus | null {
+    return this.lastBridgeStatus;
   }
 
   // ===========================================================================
@@ -576,8 +625,15 @@ export class XComfortBridge extends EventEmitter {
 
   cleanup(): void {
     this.clearConnectionTimers();
+    this.stopWatchdog();
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     this.connectionManager.cleanup();
+    this.connectionManager.setReconnecting(false);
     this.connectionState = 'disconnected';
+    this.reconnectAttempt = 0;
     this.removeAllListeners();
   }
 

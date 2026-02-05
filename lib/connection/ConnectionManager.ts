@@ -61,6 +61,9 @@ export class ConnectionManager {
   private connectionEstablished: boolean = false;
   private reconnecting: boolean = false;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private heartbeatSend?: () => void;
+  private heartbeatExpectedMs: number = PROTOCOL_CONFIG.TIMEOUTS.HEARTBEAT;
+  private lastMessageAt: number = Date.now();
   private mc: number = 0;
   private connectResolve?: () => void;
   private connectReject?: (error: Error) => void;
@@ -161,6 +164,8 @@ export class ConnectionManager {
    */
   public startHeartbeat(sendHeartbeat: () => void): void {
     this.stopHeartbeat();
+    this.heartbeatSend = sendHeartbeat;
+    this.heartbeatExpectedMs = PROTOCOL_CONFIG.TIMEOUTS.HEARTBEAT;
     this.heartbeatInterval = setInterval(() => {
       if (this.isConnected()) {
         sendHeartbeat();
@@ -176,6 +181,24 @@ export class ConnectionManager {
         clearInterval(this.heartbeatInterval);
         this.heartbeatInterval = null;
     }
+  }
+
+  public isHeartbeatRunning(): boolean {
+    return this.heartbeatInterval !== null;
+  }
+
+  public restartHeartbeat(): void {
+    if (this.heartbeatSend) {
+      this.startHeartbeat(this.heartbeatSend);
+    }
+  }
+
+  public markMessageReceived(ts: number = Date.now()): void {
+    this.lastMessageAt = ts;
+  }
+
+  public getLastMessageAt(): number {
+    return this.lastMessageAt;
   }
 
   /**
@@ -211,6 +234,7 @@ export class ConnectionManager {
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
+        this.connectionEstablished = false;
         this.state = 'connecting';
         this.onStateChange?.(this.state);
 
@@ -229,13 +253,14 @@ export class ConnectionManager {
           }
         });
 
-        this.ws.on('message', (data: Buffer) => {
-          const rawRecvTime = Date.now();
-          // this.logger(
-          //   `[ConnectionManager] RAW MSG at ${rawRecvTime}, size=${data.length}`
-          // );
-          this.onRawMessage?.(data, rawRecvTime);
-        });
+      this.ws.on('message', (data: Buffer) => {
+        const rawRecvTime = Date.now();
+        this.markMessageReceived(rawRecvTime);
+        // this.logger(
+        //   `[ConnectionManager] RAW MSG at ${rawRecvTime}, size=${data.length}`
+        // );
+        this.onRawMessage?.(data, rawRecvTime);
+      });
 
         this.ws.on('error', (err: Error) => {
           this.logger(`[ConnectionManager] WebSocket error: ${err.message}`);
@@ -465,6 +490,8 @@ export class ConnectionManager {
   cleanup(): void {
     this.stopHeartbeat();
     this.clearPendingAcks();
+    this.connectionEstablished = false;
+    this.reconnecting = false;
     if (this.ws) {
       this.ws.removeAllListeners();
       try {
