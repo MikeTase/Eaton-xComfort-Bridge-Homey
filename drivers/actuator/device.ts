@@ -1,13 +1,15 @@
-import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDevice } from '../../lib/BaseDevice';
 import { DeviceStateUpdate } from '../../lib/types';
 
-module.exports = class ActuatorDevice extends Homey.Device {
-    private bridge!: XComfortBridge;
+module.exports = class ActuatorDevice extends BaseDevice {
     private onDeviceUpdate!: (deviceId: string, state: DeviceStateUpdate) => void;
 
     async onInit() {
-        this.log('ActuatorDevice init:', this.getName());
+        try {
+            await super.onInit();
+        } catch (e) {
+            return; // Bridge missing
+        }
 
         // Check dimmable setting and remove dim capability if not applicable
         const settings = this.getSettings();
@@ -21,14 +23,6 @@ module.exports = class ActuatorDevice extends Homey.Device {
         if (!isDimmable && this.hasCapability('dim')) {
             this.log('Device is not dimmable, removing dim capability');
             await this.removeCapability('dim').catch(this.error);
-        }
-
-        const app = this.homey.app as any;
-        this.bridge = app.bridge;
-
-        if (!this.bridge) {
-            this.setUnavailable('Bridge not connected');
-            return;
         }
 
         const resolveDeviceId = (): string | number => {

@@ -1,20 +1,19 @@
-import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDevice } from '../../lib/BaseDevice';
 import { MESSAGE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate, ShadingAction } from '../../lib/types';
 
-interface XComfortApp extends Homey.App {
-    bridge: XComfortBridge | null;
-}
-
-module.exports = class ShadingDevice extends Homey.Device {
-  private bridge: XComfortBridge | null = null;
+module.exports = class ShadingDevice extends BaseDevice {
   private deviceId: string = '';
   private safetyActive: boolean = false;
   private onDeviceUpdate: ((deviceId: string | number, state: DeviceStateUpdate) => void) | null = null;
 
   async onInit() {
-    this.bridge = (this.homey.app as XComfortApp).bridge;
+    try {
+        await super.onInit();
+    } catch (e) {
+        return;
+    }
+    
     this.deviceId = this.getData().deviceId;
     
     const settings = this.getSettings();
@@ -22,11 +21,6 @@ module.exports = class ShadingDevice extends Homey.Device {
 
     if (!supportsPosition && this.hasCapability('windowcoverings_set')) {
         await this.removeCapability('windowcoverings_set').catch(this.error);
-    }
-
-    if (!this.bridge) {
-      this.setUnavailable('Bridge not connected');
-      return;
     }
     
     this.registerStateListener();

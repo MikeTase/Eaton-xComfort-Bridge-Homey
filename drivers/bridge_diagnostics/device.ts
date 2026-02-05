@@ -1,23 +1,15 @@
 /// <reference path="../../homey.d.ts" />
-import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDevice } from '../../lib/BaseDevice';
 import { BridgeStatus } from '../../lib/types';
 
-interface XComfortApp extends Homey.App {
-  bridge: XComfortBridge | null;
-}
-
-module.exports = class BridgeDiagnosticsDevice extends Homey.Device {
-  private bridge: XComfortBridge | null = null;
+module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
   private onBridgeStatus?: (status: BridgeStatus) => void;
 
   async onInit() {
-    this.log('BridgeDiagnosticsDevice init:', this.getName());
-
-    this.bridge = (this.homey.app as XComfortApp).bridge;
-    if (!this.bridge) {
-      this.setUnavailable('Bridge not connected');
-      return;
+    try {
+        await super.onInit();
+    } catch (e) {
+        return;
     }
 
     this.setAvailable();

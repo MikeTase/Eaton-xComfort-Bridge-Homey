@@ -1,24 +1,20 @@
 import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDevice } from '../../lib/BaseDevice';
 import { DeviceStateUpdate } from '../../lib/types';
 
-module.exports = class WallSwitchDevice extends Homey.Device {
-  private bridge!: XComfortBridge;
+module.exports = class WallSwitchDevice extends BaseDevice {
   private triggerPressed: Homey.FlowCardTriggerDevice | null = null;
   private onDeviceUpdate!: (deviceId: string, state: DeviceStateUpdate) => void;
   private debug: boolean = false;
 
   async onInit() {
-    this.log('WallSwitchDevice init:', this.getName());
-    this.debug = process.env.XCOMFORT_DEBUG === '1';
-    
-    const app = this.homey.app as any;
-    this.bridge = app.bridge;
-
-    if (!this.bridge) {
-      this.setUnavailable('Bridge not connected');
-      return;
+    try {
+        await super.onInit();
+    } catch (e) {
+        return;
     }
+
+    this.debug = process.env.XCOMFORT_DEBUG === '1';
 
     if (!this.hasCapability('onoff')) {
       await this.addCapability('onoff').catch(this.error);

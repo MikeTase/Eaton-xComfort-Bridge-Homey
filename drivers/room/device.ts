@@ -1,10 +1,7 @@
-/// <reference path="../../homey.d.ts" />
-import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDevice } from '../../lib/BaseDevice';
 import { RoomStateUpdate } from '../../lib/types';
 
-module.exports = class RoomDevice extends Homey.Device {
-    private bridge!: XComfortBridge;
+module.exports = class RoomDevice extends BaseDevice {
     private onRoomUpdateListener?: (roomId: string, state: RoomStateUpdate) => void;
     private onDevicesLoadedListener?: () => void;
     private supportsDim: boolean = true;
@@ -13,12 +10,9 @@ module.exports = class RoomDevice extends Homey.Device {
     private lastPowerUpdateMs: number | null = null;
 
     async onInit() {
-        this.log('RoomDevice init:', this.getName());
-        const app = this.homey.app as any;
-        this.bridge = app.bridge;
-
-        if (!this.bridge) {
-            this.setUnavailable('Bridge not connected');
+        try {
+            await super.onInit();
+        } catch (e) {
             return;
         }
 

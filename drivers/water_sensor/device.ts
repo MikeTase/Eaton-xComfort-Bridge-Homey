@@ -1,22 +1,14 @@
-import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDevice } from '../../lib/BaseDevice';
 import { DeviceStateUpdate } from '../../lib/types';
 
-interface XComfortApp extends Homey.App {
-  bridge: XComfortBridge | null;
-}
-
-module.exports = class WaterSensorDevice extends Homey.Device {
-  private bridge: XComfortBridge | null = null;
+module.exports = class WaterSensorDevice extends BaseDevice {
   private onDeviceUpdate?: (deviceId: string, state: DeviceStateUpdate) => void;
 
   async onInit() {
-    this.log('WaterSensorDevice init:', this.getName());
-
-    this.bridge = (this.homey.app as XComfortApp).bridge;
-    if (!this.bridge) {
-      this.setUnavailable('Bridge not connected');
-      return;
+    try {
+        await super.onInit();
+    } catch (e) {
+        return;
     }
 
     this.setAvailable();

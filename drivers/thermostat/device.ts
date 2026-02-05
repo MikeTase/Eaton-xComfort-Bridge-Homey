@@ -1,30 +1,22 @@
-import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDevice } from '../../lib/BaseDevice';
 import { MESSAGE_TYPES, DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate } from '../../lib/types';
 
-interface XComfortApp extends Homey.App {
-    bridge: XComfortBridge | null;
-}
-
-module.exports = class ThermostatDevice extends Homey.Device {
-  private bridge: XComfortBridge | null = null;
+module.exports = class ThermostatDevice extends BaseDevice {
   private deviceId: string = '';
   private onDeviceUpdate: ((deviceId: string | number, state: DeviceStateUpdate) => void) | null = null;
   private onVirtualUpdate: ((deviceId: string | number, data: DeviceStateUpdate) => void) | null = null;
   private debug: boolean = false;
 
   async onInit() {
-    this.bridge = (this.homey.app as XComfortApp).bridge;
+    try {
+        await super.onInit();
+    } catch (e) {
+        return;
+    }
+
     this.deviceId = this.getData().deviceId;
     this.debug = process.env.XCOMFORT_DEBUG === '1';
-
-    this.log(`ThermostatDevice init: ${this.getName()}`);
-
-    if (!this.bridge) {
-      this.setUnavailable('Bridge not connected');
-      return;
-    }
     
     // Register listeners
     this.registerStateListener();
