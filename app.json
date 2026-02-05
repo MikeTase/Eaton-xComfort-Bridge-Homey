@@ -1,5 +1,5 @@
 {
-  "id": "com.eaton.xcomfort",
+  "id": "eaton.xcomfort.bridge.homey",
   "name": {
     "en": "Eaton xComfort"
   },
