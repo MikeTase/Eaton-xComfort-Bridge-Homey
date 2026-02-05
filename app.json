@@ -6,7 +6,7 @@
   "description": {
     "en": "Control Eaton xComfort devices via the xComfort Bridge (actuators, rooms, shading, thermostats, wall switches)."
   },
-  "version": "1.0.4",
+  "version": "1.0.6",
   "category": [
     "lights"
   ],
@@ -16,7 +16,7 @@
     "small": "assets/images/small.png"
   },
   "author": {
-    "name": "Mikey"
+    "name": "Mike Taselaar"
   },
   "compatibility": ">=12.0.1",
   "sdk": 3,
@@ -101,7 +101,6 @@
       }
     ]
   },
-  
   "drivers": [
     {
       "id": "room",
@@ -169,6 +168,10 @@
         "onoff",
         "dim"
       ],
+      "images": {
+        "large": "drivers/actuator/assets/images/large.png",
+        "small": "drivers/actuator/assets/images/small.png"
+      },
       "pair": [
         {
           "id": "list_devices",
@@ -199,6 +202,10 @@
         "measure_temperature",
         "target_temperature"
       ],
+      "images": {
+        "large": "drivers/thermostat/assets/images/large.png",
+        "small": "drivers/thermostat/assets/images/small.png"
+      },
       "pair": [
         {
           "id": "list_devices",
@@ -229,6 +236,10 @@
         "windowcoverings_state",
         "windowcoverings_set"
       ],
+      "images": {
+        "large": "drivers/shading/assets/images/large.png",
+        "small": "drivers/shading/assets/images/small.png"
+      },
       "pair": [
         {
           "id": "list_devices",
@@ -258,6 +269,10 @@
       "capabilities": [
         "onoff"
       ],
+      "images": {
+        "large": "drivers/wall_switch/assets/images/large.png",
+        "small": "drivers/wall_switch/assets/images/small.png"
+      },
       "pair": [
         {
           "id": "list_devices",
@@ -315,8 +330,8 @@
         "local"
       ],
       "images": {
-        "large": "drivers/bridge_diagnostics/assets/bridge.svg",
-        "small": "drivers/bridge_diagnostics/assets/bridge.svg"
+        "large": "drivers/bridge_diagnostics/assets/images/large.png",
+        "small": "drivers/bridge_diagnostics/assets/images/small.png"
       }
     },
     {
@@ -348,8 +363,8 @@
         "local"
       ],
       "images": {
-        "large": "drivers/water_sensor/assets/icon.svg",
-        "small": "drivers/water_sensor/assets/icon.svg"
+        "large": "drivers/water_sensor/assets/images/large.png",
+        "small": "drivers/water_sensor/assets/images/small.png"
       }
     }
   ]
