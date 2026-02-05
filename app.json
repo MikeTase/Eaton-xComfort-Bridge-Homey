@@ -6,7 +6,7 @@
   "description": {
     "en": "Control Eaton xComfort devices via the xComfort Bridge (actuators, rooms, shading, thermostats, wall switches)."
   },
-  "version": "1.0.10",
+  "version": "1.0.11",
   "category": [
     "lights"
   ],
