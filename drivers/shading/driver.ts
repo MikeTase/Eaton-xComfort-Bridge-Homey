@@ -1,28 +1,11 @@
 import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDriver } from '../../lib/BaseDriver';
 import { XComfortDevice } from '../../lib/types';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 
-interface XComfortApp extends Homey.App {
-    bridge: XComfortBridge | null;
-}
-
-module.exports = class ShadingDriver extends Homey.Driver {
+module.exports = class ShadingDriver extends BaseDriver {
   private async listUnpairedDevices() {
-    const app = this.homey.app as XComfortApp;
-    const bridge = app.bridge;
-    
-    if (!bridge) {
-      throw new Error('Bridge not connected. Please configure settings first.');
-    }
-
-    let devices: XComfortDevice[] = bridge.getDevices();
-    if (!devices || devices.length === 0) {
-        // Wait for devices (omitted for brevity, same logic as actuator)
-        // Ideally reuse a shared helper, but duplication is safer for now
-        devices = bridge.getDevices() || [];
-    }
-
+    const devices = await this.getDevicesFromBridge();
     const formattedDevices = this.formatForPairing(devices);
     return formattedDevices;
   }

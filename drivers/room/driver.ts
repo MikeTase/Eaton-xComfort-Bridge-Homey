@@ -1,5 +1,5 @@
 import * as Homey from 'homey';
-import { BaseDevice } from '../../lib/BaseDevice'; // Ensure BaseDevice is imported even if not used directly for side effects? No.
+import { BaseDriver } from '../../lib/BaseDriver';
 import { XComfortBridge } from '../../lib/connection/XComfortBridge';
 
 // Define the shape of our specific App class
@@ -7,16 +7,9 @@ interface XComfortApp extends Homey.App {
     bridge: XComfortBridge | null;
 }
 
-module.exports = class RoomDriver extends Homey.Driver {
+module.exports = class RoomDriver extends BaseDriver {
     async onPairListDevices() {
-        // Cast using the interface for type safety
-        const app = this.homey.app as unknown as XComfortApp;
-        const bridge = app.bridge;
-
-        if (!bridge) {
-            throw new Error('Bridge not connected. Please configure settings first.');
-        }
-
+        const bridge = this.getBridge();
         const rooms = bridge.getRooms();
         
         // Filter rooms that actually have devices?

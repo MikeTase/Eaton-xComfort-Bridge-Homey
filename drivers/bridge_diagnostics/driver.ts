@@ -1,24 +1,18 @@
 /// <reference path="../../homey.d.ts" />
 import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDriver } from '../../lib/BaseDriver';
 
-interface XComfortApp extends Homey.App {
-  bridge: XComfortBridge | null;
-}
-
-module.exports = class BridgeDiagnosticsDriver extends Homey.Driver {
+module.exports = class BridgeDiagnosticsDriver extends BaseDriver {
   private async listUnpairedDevices() {
     const existing = this.getDevices();
     const existingIds = new Set<string>(
       (existing || []).map((device: Homey.Device) => String(device.getData()?.id || ''))
     );
 
-    const app = this.homey.app as XComfortApp;
-    const bridge = app.bridge;
-    if (!bridge) {
-      throw new Error('Bridge not connected. Please configure settings first.');
-    }
-
+    const bridge = this.getBridge();
+    // Use bridge just to verify connectivity, though we don't query devices from it here for virtual devices
+    // Actually we might want to check if bridge is connected before allowing adding diagnostics
+    
     const candidates = [
       { id: 'bridge_diag_temp', name: 'Bridge Temperature', kind: 'temp' },
       { id: 'bridge_diag_power', name: 'Bridge Power', kind: 'power' },

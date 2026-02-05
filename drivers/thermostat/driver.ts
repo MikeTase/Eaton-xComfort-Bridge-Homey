@@ -1,50 +1,11 @@
 import * as Homey from 'homey';
-import { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { BaseDriver } from '../../lib/BaseDriver';
 import { XComfortDevice } from '../../lib/types';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 
-interface XComfortApp extends Homey.App {
-    bridge: XComfortBridge | null;
-}
-
-module.exports = class ThermostatDriver extends Homey.Driver {
+module.exports = class ThermostatDriver extends BaseDriver {
   private async listUnpairedDevices() {
-    const app = this.homey.app as XComfortApp;
-    const bridge = app.bridge;
-    
-    if (!bridge) {
-      throw new Error('Bridge not connected. Please configure settings first.');
-    }
-
-    let devices: XComfortDevice[] = bridge.getDevices();
-
-    if (!devices || devices.length === 0) {
-      devices = await new Promise<XComfortDevice[]>((resolve) => {
-        let isResolved = false;
-        let timeoutTimer: NodeJS.Timeout;
-
-        const cleanup = () => {
-             if (timeoutTimer) clearTimeout(timeoutTimer);
-             bridge.removeListener('devices_loaded', onLoaded);
-        };
-
-        const finish = (loaded: XComfortDevice[]) => {
-          if (isResolved) return;
-          isResolved = true;
-          cleanup();
-          resolve(loaded || bridge.getDevices() || []);
-        };
-
-        const onLoaded = (loadedDevices: XComfortDevice[]) => finish(loadedDevices);
-
-        bridge.once('devices_loaded', onLoaded);
-
-        timeoutTimer = setTimeout(() => {
-          finish(bridge.getDevices() || []);
-        }, 15000);
-      });
-    }
-
+    const devices = await this.getDevicesFromBridge();
     const formattedDevices = this.formatForPairing(devices);
     return formattedDevices;
   }
