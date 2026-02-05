@@ -1,4 +1,5 @@
 import { BaseDevice } from '../../lib/BaseDevice';
+import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { MESSAGE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate, ShadingAction } from '../../lib/types';
 
@@ -95,9 +96,17 @@ module.exports = class ShadingDevice extends BaseDevice {
       });
   }
   
+  protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
+      if (this.onDeviceUpdate) {
+          oldBridge.removeDeviceStateListener(this.deviceId, this.onDeviceUpdate);
+          newBridge.addDeviceStateListener(this.deviceId, this.onDeviceUpdate);
+      }
+  }
+  
   onDeleted() {
       if (this.bridge && this.onDeviceUpdate) {
           this.bridge.removeDeviceStateListener(this.deviceId, this.onDeviceUpdate);
       }
+      super.onDeleted();
   }
 };

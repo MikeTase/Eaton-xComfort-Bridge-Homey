@@ -13,6 +13,7 @@ interface XComfortApp extends Homey.App {
 export abstract class BaseDevice extends Homey.Device {
     // Protected property for subclasses to access the bridge
     protected bridge!: XComfortBridge;
+    private onAppBridgeChanged?: (bridge: XComfortBridge | null) => void;
 
     /**
      * Subclasses should call super.onInit() FIRST.
@@ -30,10 +31,29 @@ export abstract class BaseDevice extends Homey.Device {
         }
 
         this.bridge = app.bridge;
+
+        this.onAppBridgeChanged = (newBridge) => {
+            const oldBridge = this.bridge;
+            if (!newBridge) {
+                this.setUnavailable('Bridge not connected');
+                return;
+            }
+            this.bridge = newBridge;
+            this.setAvailable();
+            this.onBridgeChanged(newBridge, oldBridge);
+        };
+        app.on('bridge_changed', this.onAppBridgeChanged);
     }
 
     protected logInit(): void {
         this.log(`Device init: ${this.getName()}`);
+    }
+
+    /**
+     * Hook for subclasses to rebind listeners on bridge change.
+     */
+    protected onBridgeChanged(_newBridge: XComfortBridge, _oldBridge: XComfortBridge): void {
+        // Subclasses may override
     }
 
     /**
@@ -44,6 +64,14 @@ export abstract class BaseDevice extends Homey.Device {
             await this.setCapabilityValue(capabilityId, value).catch(err => {
                 this.error(`Failed to update capability ${capabilityId}:`, err);
             });
+        }
+    }
+
+    onDeleted(): void {
+        const app = this.homey.app as unknown as XComfortApp;
+        if (this.onAppBridgeChanged) {
+            app.removeListener('bridge_changed', this.onAppBridgeChanged);
+            this.onAppBridgeChanged = undefined;
         }
     }
 }

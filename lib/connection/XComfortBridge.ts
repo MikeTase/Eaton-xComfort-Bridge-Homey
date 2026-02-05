@@ -75,7 +75,7 @@ export class XComfortBridge extends EventEmitter {
 
     // Initialize modules
     this.connectionManager = new ConnectionManager(bridgeIp, this.logger);
-    this.deviceStateManager = new DeviceStateManager();
+    this.deviceStateManager = new DeviceStateManager(this.logger);
     this.roomStateManager = new RoomStateManager(this.logger);
     this.messageHandler = new MessageHandler(
       this.deviceStateManager,
@@ -211,6 +211,11 @@ export class XComfortBridge extends EventEmitter {
 
       this.connectionManager.connect().catch((err) => {
         this.clearConnectionTimers();
+        this.stopWatchdog();
+        this.connectionManager.cleanup();
+        if (this.allowReconnect) {
+          this.scheduleReconnect();
+        }
         reject(err);
       });
 
@@ -229,6 +234,9 @@ export class XComfortBridge extends EventEmitter {
         this.logger('[XComfortBridge] Connection timeout');
         this.stopWatchdog();
         this.connectionManager.cleanup();
+        if (this.allowReconnect) {
+          this.scheduleReconnect();
+        }
         reject(new Error('Connection timeout - device list not received'));
       }, PROTOCOL_CONFIG.TIMEOUTS.CONNECTION);
     });

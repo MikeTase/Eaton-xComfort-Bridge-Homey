@@ -37,7 +37,9 @@ class XComfortApp extends Homey.App {
     const token = ++this.initToken;
     if (this.bridge) {
       this.bridge.disconnect();
+      this.bridge.removeAllListeners();
       this.bridge = null;
+      this.emit('bridge_changed', null);
     }
 
     // Sanitize inputs
@@ -48,6 +50,7 @@ class XComfortApp extends Homey.App {
     
     // Pass this.log explicitly to the bridge
     this.bridge = new XComfortBridge(cleanIp, cleanKey, this.log.bind(this));
+    this.emit('bridge_changed', this.bridge);
     
     // Subscribe to events for logging
     this.bridge.on('connected', () => this.log('Bridge: Connected'));

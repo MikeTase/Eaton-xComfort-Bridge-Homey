@@ -12,6 +12,7 @@ import type {
   DeviceMetadata,
   DeviceStateUpdate,
   DeviceStateCallback,
+  LoggerFunction
 } from '../types';
 
 // Re-export types for module consumers
@@ -22,8 +23,13 @@ export type { XComfortDevice, InfoEntry, DeviceMetadata, DeviceStateUpdate, Devi
 // ============================================================================
 
 export class DeviceStateManager {
+  private logger: LoggerFunction;
   private devices: Map<string, XComfortDevice> = new Map();
   private listeners: Map<string, DeviceStateCallback[]> = new Map();
+
+  constructor(logger?: LoggerFunction) {
+      this.logger = logger || console.log;
+  }
 
   /**
    * Add a device to the state manager
@@ -69,7 +75,7 @@ export class DeviceStateManager {
       this.listeners.set(id, []);
     }
     this.listeners.get(id)!.push(callback);
-    // console.log(`[DeviceStateManager] Added state listener for device ${id}`);
+    this.logger(`[DeviceStateManager] Added state listener for device ${id}`);
   }
 
   /**

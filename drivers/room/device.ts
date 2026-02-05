@@ -1,4 +1,5 @@
 import { BaseDevice } from '../../lib/BaseDevice';
+import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { RoomStateUpdate } from '../../lib/types';
 
 module.exports = class RoomDevice extends BaseDevice {
@@ -101,7 +102,20 @@ module.exports = class RoomDevice extends BaseDevice {
         }
     }
 
-    async onDeleted() {
+    protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
+        const roomId = String(this.getData().roomId);
+        if (this.onRoomUpdateListener) {
+            oldBridge.removeRoomStateListener(roomId, this.onRoomUpdateListener);
+            newBridge.addRoomStateListener(roomId, this.onRoomUpdateListener);
+        }
+        if (this.onDevicesLoadedListener) {
+            oldBridge.removeListener('devices_loaded', this.onDevicesLoadedListener);
+            newBridge.on('devices_loaded', this.onDevicesLoadedListener);
+        }
+        this.updateDimSupport(roomId);
+    }
+
+    onDeleted() {
         if (this.bridge) {
             const roomId = String(this.getData().roomId);
             if (this.onRoomUpdateListener) {
@@ -113,6 +127,7 @@ module.exports = class RoomDevice extends BaseDevice {
                 this.onDevicesLoadedListener = undefined;
             }
         }
+        super.onDeleted();
     }
 
     private updateDimSupport(roomId: string) {

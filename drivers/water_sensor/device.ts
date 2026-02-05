@@ -1,4 +1,5 @@
 import { BaseDevice } from '../../lib/BaseDevice';
+import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { DeviceStateUpdate } from '../../lib/types';
 
 module.exports = class WaterSensorDevice extends BaseDevice {
@@ -37,6 +38,14 @@ module.exports = class WaterSensorDevice extends BaseDevice {
   onDeleted() {
     if (this.bridge && this.onDeviceUpdate) {
       this.bridge.removeDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
+    }
+    super.onDeleted();
+  }
+  
+  protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
+    if (this.onDeviceUpdate) {
+      oldBridge.removeDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
+      newBridge.addDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
     }
   }
 };

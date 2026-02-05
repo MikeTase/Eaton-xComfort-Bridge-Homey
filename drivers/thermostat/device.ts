@@ -1,4 +1,5 @@
 import { BaseDevice } from '../../lib/BaseDevice';
+import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { MESSAGE_TYPES, DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate } from '../../lib/types';
 
@@ -90,16 +91,26 @@ module.exports = class ThermostatDevice extends BaseDevice {
       });
   }
   
+  private unregisterStateListener(bridge: XComfortBridge) {
+      if (this.onDeviceUpdate) {
+        bridge.removeDeviceStateListener(this.deviceId, this.onDeviceUpdate);
+      }
+      
+      if (this.onVirtualUpdate) {
+         const virtualId = parseInt(this.deviceId) + 1;
+         bridge.removeDeviceStateListener(String(virtualId), this.onVirtualUpdate);
+      }
+  }
+
+  protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
+      this.unregisterStateListener(oldBridge);
+      this.registerStateListener();
+  }
+
   onDeleted() {
       if (this.bridge) {
-          if (this.onDeviceUpdate) {
-            this.bridge.removeDeviceStateListener(this.deviceId, this.onDeviceUpdate);
-          }
-          
-          if (this.onVirtualUpdate) {
-             const virtualId = parseInt(this.deviceId) + 1;
-             this.bridge.removeDeviceStateListener(String(virtualId), this.onVirtualUpdate);
-          }
+          this.unregisterStateListener(this.bridge);
       }
+      super.onDeleted();
   }
 };

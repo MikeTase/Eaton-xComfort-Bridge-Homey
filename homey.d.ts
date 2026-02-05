@@ -20,6 +20,9 @@ declare module 'homey' {
         log(...args: any[]): void;
         error(...args: any[]): void;
         onInit(): void | Promise<void>;
+        on(event: string, listener: (...args: any[]) => void): this;
+        emit(event: string, ...args: any[]): boolean;
+        removeListener(event: string, listener: (...args: any[]) => void): this;
     }
     export class Device {
         homey: HomeyAppContext;

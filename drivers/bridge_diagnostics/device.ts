@@ -1,5 +1,6 @@
 /// <reference path="../../homey.d.ts" />
 import { BaseDevice } from '../../lib/BaseDevice';
+import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { BridgeStatus } from '../../lib/types';
 
 module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
@@ -94,8 +95,8 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
     }
 
     const coolingOn = toBool(status.coolingOn);
-    if (coolingOn !== undefined && this.hasCapability('alarm_cooling')) {
-      this.setCapabilityValue('alarm_cooling', coolingOn).catch(this.error);
+    if (coolingOn !== undefined && this.hasCapability('alarm_generic.cooling')) {
+      this.setCapabilityValue('alarm_generic.cooling', coolingOn).catch(this.error);
     }
 
     const lightsOn = toBool(status.lightsOn);
@@ -127,6 +128,18 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
   onDeleted() {
     if (this.bridge && this.onBridgeStatus) {
       this.bridge.removeListener('bridge_status', this.onBridgeStatus);
+    }
+    super.onDeleted();
+  }
+
+  protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
+    if (this.onBridgeStatus) {
+      oldBridge.removeListener('bridge_status', this.onBridgeStatus);
+      newBridge.on('bridge_status', this.onBridgeStatus);
+    }
+    const last = newBridge.getLastBridgeStatus?.();
+    if (last) {
+      this.updateFromStatus(last);
     }
   }
 };
