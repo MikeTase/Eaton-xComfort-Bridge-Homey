@@ -20,9 +20,7 @@
   },
   "compatibility": ">=12.0.1",
   "sdk": 3,
-  "permissions": [
-    "homey:manager:api"
-  ],
+  "permissions": [],
   "flow": {
     "triggers": [
       {
