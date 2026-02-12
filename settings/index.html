@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type="text/javascript" src="/homey.js" data-origin="settings"></script>
+        <style>
+            body { font-family: sans-serif; padding: 16px; }
+            .field.row { margin: 8px 0; }
+            .hint { color: #666; font-size: 12px; margin-top: 4px; }
+            .status { margin-top: 12px; min-height: 18px; }
+            .status.ok { color: #0a7f3f; }
+            .status.err { color: #b00020; }
+            .row-inline { display: flex; align-items: center; gap: 8px; }
+        </style>
+    </head>
+    <body>
+        <h1 data-i18n="settings.title">Eaton xComfort</h1>
+        <p data-i18n="settings.intro">Please enter the IP address and Auth Key of your Eaton xComfort Bridge.</p>
+        
+        <fieldset>
+            <legend data-i18n="settings.connection">Connection Details</legend>
+            <div class="field row">
+                <label for="bridge_ip" data-i18n="settings.bridge_ip">IP Address</label>
+                <input id="bridge_ip" type="text" placeholder="192.168.1.x" autocomplete="off" />
+                <div class="hint" data-i18n="settings.bridge_ip_hint">Tip: reserve this IP in your router to keep it stable.</div>
+            </div>
+            <div class="field row">
+                <label for="bridge_auth_key" data-i18n="settings.bridge_auth_key">Auth Key</label>
+                <div class="row-inline">
+                    <input id="bridge_auth_key" type="password" placeholder="e.g. A1B2-C3D4-..." autocomplete="off" />
+                    <button id="toggle_key" type="button" class="button" data-i18n="settings.show">Show</button>
+                </div>
+            </div>
+        </fieldset>
+
+        <button id="save" class="button-primary" data-i18n="settings.save" disabled>Save Settings</button>
+        <div id="status" class="status"></div>
+
+        <script type="text/javascript">
+            function onHomeyReady(Homey) {
+                Homey.ready();
+
+                var ipInput = document.getElementById('bridge_ip');
+                var keyInput = document.getElementById('bridge_auth_key');
+                var saveButton = document.getElementById('save');
+                var toggleButton = document.getElementById('toggle_key');
+                var statusEl = document.getElementById('status');
+
+                function setStatus(text, isError) {
+                    statusEl.textContent = text || '';
+                    statusEl.className = 'status ' + (isError ? 'err' : 'ok');
+                }
+
+                function isValidIp(str) {
+                    // Accept IPv4 addresses and hostnames
+                    var ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
+                    var hostname = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
+                    return ipv4.test(str) || hostname.test(str);
+                }
+
+                function validate() {
+                    var ip = (ipInput.value || '').trim();
+                    var key = (keyInput.value || '').trim();
+                    saveButton.disabled = !(ip.length > 0 && key.length > 0 && isValidIp(ip));
+                }
+
+                // Load existing settings
+                Homey.get('bridge_ip', function(err, value) {
+                    if (value) ipInput.value = value;
+                    validate();
+                });
+                
+                Homey.get('bridge_auth_key', function(err, value) {
+                    if (value) keyInput.value = value;
+                    validate();
+                });
+
+                // Save button handler
+                saveButton.addEventListener('click', function() {
+                    var ip = (ipInput.value || '').trim();
+                    var key = (keyInput.value || '').trim();
+
+                    if (!ip || !key) {
+                        setStatus(Homey.__('settings.fill_required') || 'Please fill in both fields.', true);
+                        return;
+                    }
+
+                    Homey.set('bridge_ip', ip);
+                    Homey.set('bridge_auth_key', key);
+                    setStatus(Homey.__('settings.saved') || 'Settings saved!', false);
+                });
+
+                toggleButton.addEventListener('click', function() {
+                    var isPassword = keyInput.type === 'password';
+                    keyInput.type = isPassword ? 'text' : 'password';
+                    toggleButton.textContent = isPassword
+                        ? (Homey.__('settings.hide') || 'Hide')
+                        : (Homey.__('settings.show') || 'Show');
+                });
+
+                ipInput.addEventListener('input', validate);
+                keyInput.addEventListener('input', validate);
+            }
+        </script>
+    </body>
+</html>

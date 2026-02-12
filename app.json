@@ -1,0 +1,317 @@
+{
+  "id": "eaton.xcomfort.bridge",
+  "name": {
+    "en": "Eaton xComfort"
+  },
+  "description": {
+    "en": "Seamless Eaton xComfort control for lights, shades, and heating."
+  },
+  "version": "1.0.11",
+  "category": [
+    "lights"
+  ],
+  "brandColor": "#005EB8",
+  "bugs": {
+    "url": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey/issues"
+  },
+  "source": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey",
+  "images": {
+    "large": "assets/images/large.png",
+    "small": "assets/images/small.png"
+  },
+  "author": {
+    "name": "Mike Taselaar"
+  },
+  "compatibility": ">=12.0.1",
+  "sdk": 3,
+  "permissions": [],
+  "flow": {
+    "triggers": [
+      {
+        "id": "wall_switch_pressed",
+        "title": {
+          "en": "Wall switch pressed (any)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "event",
+            "type": "string",
+            "title": {
+              "en": "Event"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wall_switch_up",
+        "title": {
+          "en": "Wall switch pressed (up/on)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ]
+      },
+      {
+        "id": "wall_switch_down",
+        "title": {
+          "en": "Wall switch pressed (down/off)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ]
+      },
+      {
+        "id": "thermostat_button_on",
+        "title": {
+          "en": "Thermostat button pressed (right/on)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ]
+      },
+      {
+        "id": "thermostat_button_off",
+        "title": {
+          "en": "Thermostat button pressed (left/off)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ]
+      }
+    ]
+  },
+  "drivers": [
+    {
+      "id": "actuator",
+      "name": {
+        "en": "Actuator / Dimmer"
+      },
+      "class": "light",
+      "capabilities": [
+        "onoff",
+        "dim"
+      ],
+      "images": {
+        "large": "drivers/actuator/assets/images/large.png",
+        "small": "drivers/actuator/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select actuators and dimmers"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "thermostat",
+      "name": {
+        "en": "Thermostat / Heating"
+      },
+      "class": "thermostat",
+      "capabilities": [
+        "measure_temperature",
+        "target_temperature"
+      ],
+      "images": {
+        "large": "drivers/thermostat/assets/images/large.png",
+        "small": "drivers/thermostat/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select thermostats"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "shading",
+      "name": {
+        "en": "Shading / Blinds"
+      },
+      "class": "windowcoverings",
+      "capabilities": [
+        "windowcoverings_state",
+        "windowcoverings_set"
+      ],
+      "images": {
+        "large": "drivers/shading/assets/images/large.png",
+        "small": "drivers/shading/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select shading devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "wall_switch",
+      "name": {
+        "en": "Wall Switch"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "onoff"
+      ],
+      "images": {
+        "large": "drivers/wall_switch/assets/images/large.png",
+        "small": "drivers/wall_switch/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select wall switches"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "bridge_diagnostics",
+      "name": {
+        "en": "Bridge Diagnostics"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_power",
+        "alarm_heat",
+        "alarm_generic.cooling",
+        "onoff",
+        "alarm_generic",
+        "alarm_contact.windows",
+        "alarm_contact.doors",
+        "alarm_motion"
+      ],
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Add bridge diagnostics"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "images": {
+        "large": "drivers/bridge_diagnostics/assets/images/large.png",
+        "small": "drivers/bridge_diagnostics/assets/images/small.png"
+      }
+    },
+    {
+      "id": "water_sensor",
+      "name": {
+        "en": "Water Sensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_water"
+      ],
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select water sensors"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "images": {
+        "large": "drivers/water_sensor/assets/images/large.png",
+        "small": "drivers/water_sensor/assets/images/small.png"
+      }
+    }
+  ]
+}

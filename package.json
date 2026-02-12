@@ -1,0 +1,35 @@
+{
+  "name": "com.eaton.xcomfort",
+  "version": "1.0.4",
+  "description": "Eaton xComfort implementation for Homey",
+  "main": "app.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey/issues"
+  },
+  "homepage": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey#readme",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "dependencies": {
+    "ws": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/ws": "^8.5.0",
+    "homey": "^3.12.2",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "xcomfort": {
+    "clientType": "shl-app",
+    "clientId": "c956e43f999f8004",
+    "clientVersion": "3.0.0"
+  }
+}

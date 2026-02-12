@@ -1,0 +1,7 @@
+.homeybuild/
+.homeybuild_trash/
+.git/
+.github/
+**/*.ts
+tsconfig.json
+
