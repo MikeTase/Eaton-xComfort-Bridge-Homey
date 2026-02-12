@@ -120,6 +120,8 @@ export interface XComfortDevice {
   name: string;
   dimmable?: boolean;
   devType?: number;
+  compId?: number;
+  compType?: number;
   info?: InfoEntry[];
   
   // Shading specific
@@ -192,44 +194,6 @@ export interface DeviceMetadata {
 export type DeviceStateCallback = (
   deviceId: string,
   stateData: DeviceStateUpdate
-) => void | Promise<void>;
-
-// =============================================================================
-// Room Types
-// =============================================================================
-
-/**
- * Room from xComfort Bridge
- */
-export interface XComfortRoom {
-  roomId: string;
-  name: string;
-  devices?: unknown[];
-  [key: string]: unknown;
-}
-
-/**
- * Room state update payload
- */
-export interface RoomStateUpdate {
-  switch?: boolean;
-  dimmvalue?: number;
-  lightsOn?: number;
-  loadsOn?: number;
-  windowsOpen?: number;
-  doorsOpen?: number;
-  presence?: number;
-  shadsClosed?: number;
-  power?: number;
-  errorState?: unknown;
-}
-
-/**
- * Room state listener callback
- */
-export type RoomStateCallback = (
-  roomId: string,
-  stateData: RoomStateUpdate
 ) => void | Promise<void>;
 
 // =============================================================================
@@ -306,9 +270,7 @@ export interface HomeData {
  */
 export interface BridgeEvents extends ConnectionEvents {
   deviceStateChange: [deviceId: string, state: DeviceStateUpdate];
-  roomStateChange: [roomId: string, state: RoomStateUpdate];
   devicesDiscovered: [devices: XComfortDevice[]];
-  roomsDiscovered: [rooms: XComfortRoom[]];
   scenesDiscovered: [scenes: XComfortScene[]];
 }
 

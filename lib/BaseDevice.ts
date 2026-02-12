@@ -59,7 +59,7 @@ export abstract class BaseDevice extends Homey.Device {
     /**
      * Helper to safely update a capability
      */
-    protected async updateCapability(capabilityId: string, value: any): Promise<void> {
+    protected async updateCapability(capabilityId: string, value: string | number | boolean | null): Promise<void> {
         if (this.hasCapability(capabilityId)) {
             await this.setCapabilityValue(capabilityId, value).catch(err => {
                 this.error(`Failed to update capability ${capabilityId}:`, err);

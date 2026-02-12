@@ -1,5 +1,6 @@
 import { BaseDriver } from '../../lib/BaseDriver';
 import { XComfortDevice } from '../../lib/types';
+import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 
 module.exports = class WallSwitchDriver extends BaseDriver {
   private async listUnpairedDevices() {
@@ -13,16 +14,16 @@ module.exports = class WallSwitchDriver extends BaseDriver {
 
   private getPairedDevices(devices: XComfortDevice[]) {
     return devices
-      // Only include wall switches / push buttons (Type 220)
-      .filter((device: any) => {
-        const devType = Number(device.devType ?? device.deviceType ?? device.type);
-        return devType === 220;
+      .filter((device) => {
+        const devType = Number(device.devType ?? 0);
+        return devType === DEVICE_TYPES.WALL_SWITCH;
       })
-      .map((device: any) => {
-        const baseName = device.name || device.deviceName || device.label || `Device ${device.deviceId}`;
-        const displayName = device.roomName ? `${device.roomName} - ${baseName}` : baseName;
+      .map((device) => {
+        const baseName = device.name || `Device ${device.deviceId}`;
+        const roomName = (device as any).roomName;
+        const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
         const deviceId = String(device.deviceId);
-        const deviceType = device.devType ?? device.deviceType ?? device.type ?? 'unknown';
+        const deviceType = device.devType ?? 0;
         return {
           name: displayName,
           data: {

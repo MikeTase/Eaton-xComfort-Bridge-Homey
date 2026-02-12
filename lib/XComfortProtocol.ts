@@ -88,11 +88,13 @@ export const DEVICE_TYPES = {
   
   // Heating / Sensors
   TEMPERATURE_SENSOR: 200,
+  DOOR_WINDOW_SENSOR: 202,
+  WALL_SWITCH: 220,
   HEATING_ACTUATOR: 440,
   HEATING_VALVE: 441,
+  HEATING_WATER_VALVE: 442,
   RC_TOUCH: 450,
   TEMP_HUMIDITY_SENSOR: 451,
-  WALL_SWITCH: 220,
   WATER_GUARD: 497,
   WATER_SENSOR: 499,
 } as const;
@@ -115,7 +117,7 @@ export const INFO_TEXT_CODES = {
   TEMPERATURE_DIMMER: '1109', // Temperature from dimming actuator
   COMPONENT_CHANNEL: '1111', // Component channel information
   COMPONENT_STATUS: '1119', // Component status information
-  // Add more as discovered
+  DIMM_VALUE: '1225', // Dim value from metadata
 } as const;
 
 export type InfoTextCode = (typeof INFO_TEXT_CODES)[keyof typeof INFO_TEXT_CODES];
@@ -124,8 +126,17 @@ export type InfoTextCode = (typeof INFO_TEXT_CODES)[keyof typeof INFO_TEXT_CODES
  * Component Types (based on compType field)
  */
 export const COMPONENT_TYPES = {
-  DIMMING_ACTUATOR_COMP: 77, // Hardware component for dimming actuators
-  // Add more as discovered
+  DOOR_WINDOW_SENSOR: 76,
+  DIMMING_ACTUATOR_COMP: 77,
+  RC_TOUCH: 78,
+  HEATING_1CH: 81,
+  BRIDGE: 83,
+  WATER_GUARD: 84,
+  WATER_SENSOR: 85,
+  SHADING: 86,
+  PUSH_BUTTON_2CH: 87,
+  PUSH_BUTTON_4CH: 88,
+  PUSH_BUTTON_MULTI_SENSOR: 89,
 } as const;
 
 export type ComponentType =

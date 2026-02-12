@@ -123,11 +123,6 @@ export class XComfortBridge extends EventEmitter {
         mc: this.connectionManager.nextMc(),
         payload: {},
       });
-      this.connectionManager.sendEncrypted({
-        type_int: MESSAGE_TYPES.REQUEST_ROOMS,
-        mc: this.connectionManager.nextMc(),
-        payload: {},
-      });
       // OPTIMIZATION: Send initial HEARTBEAT (2) to signals readiness and "wake" the bridge
       this.connectionManager.sendEncrypted({
         type_int: MESSAGE_TYPES.HEARTBEAT,

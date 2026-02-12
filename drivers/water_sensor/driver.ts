@@ -1,8 +1,6 @@
 import { BaseDriver } from '../../lib/BaseDriver';
 import { XComfortDevice } from '../../lib/types';
-
-const WATER_GUARD = 497;
-const WATER_SENSOR = 499;
+import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 
 module.exports = class WaterSensorDriver extends BaseDriver {
   private async listUnpairedDevices() {
@@ -19,7 +17,7 @@ module.exports = class WaterSensorDriver extends BaseDriver {
       const devType = device.devType ?? 0;
       const id = device.deviceId;
       if (!id || seenIds.has(String(id))) return false;
-      if (devType !== WATER_GUARD && devType !== WATER_SENSOR) return false;
+      if (devType !== DEVICE_TYPES.WATER_GUARD && devType !== DEVICE_TYPES.WATER_SENSOR) return false;
       seenIds.add(String(id));
       return true;
     });

@@ -8,9 +8,14 @@
   },
   "version": "1.1.0",
   "category": [
-    "lights"
+    "lights",
+    "climate"
   ],
+  "tags": {
+    "en": ["eaton", "xcomfort", "smart home", "lighting", "heating", "shading", "blinds", "thermostat"]
+  },
   "brandColor": "#005EB8",
+  "support": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey/issues",
   "bugs": {
     "url": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey/issues"
   },
@@ -149,6 +154,13 @@
         "measure_temperature",
         "target_temperature"
       ],
+      "capabilitiesOptions": {
+        "target_temperature": {
+          "min": 5,
+          "max": 35,
+          "step": 0.5
+        }
+      },
       "images": {
         "large": "drivers/thermostat/assets/images/large.png",
         "small": "drivers/thermostat/assets/images/small.png"
@@ -216,6 +228,19 @@
       "capabilities": [
         "onoff"
       ],
+      "capabilitiesOptions": {
+        "onoff": {
+          "title": {
+            "en": "Last Pressed"
+          },
+          "insightsTitleTrue": {
+            "en": "Pressed Up"
+          },
+          "insightsTitleFalse": {
+            "en": "Pressed Down"
+          }
+        }
+      },
       "images": {
         "large": "drivers/wall_switch/assets/images/large.png",
         "small": "drivers/wall_switch/assets/images/small.png"

@@ -1,10 +1,16 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate } from '../../lib/types';
 
 module.exports = class ActuatorDevice extends BaseDevice {
     private onDeviceUpdate!: (deviceId: string, state: DeviceStateUpdate) => void;
     private safetyTimer: NodeJS.Timeout | null = null;
+
+    // Debounce/Race-condition state
+    private pendingSwitchState: boolean | null = null;
+    private pendingSwitchTimestamp: number = 0;
+    private readonly STATE_UPDATE_GRACE_PERIOD = 3000; // ms
 
     async onInit() {
         try {
@@ -15,10 +21,8 @@ module.exports = class ActuatorDevice extends BaseDevice {
 
         // Check dimmable setting and remove dim capability if not applicable
         const settings = this.getSettings();
-        // Check explicit flag OR check deviceType (100 = switch, 101 = dim)
-        // If deviceType is 100, force non-dimmable even if settings said true previously
         let isDimmable = settings.dimmable !== false;
-        if (settings.deviceType === 100) {
+        if (settings.deviceType === DEVICE_TYPES.SWITCHING_ACTUATOR) {
             isDimmable = false;
         }
         
@@ -33,35 +37,25 @@ module.exports = class ActuatorDevice extends BaseDevice {
             return Number.isNaN(numericId) ? String(rawId) : numericId;
         };
 
-        // Debounce/Race-condition handling
-        let pendingSwitchState: boolean | null = null;
-        let pendingSwitchTimestamp: number = 0;
-        const STATE_UPDATE_GRACE_PERIOD = 3000; // ms
-
-        this.onDeviceUpdate = (deviceId: string, state: DeviceStateUpdate) => {
+        this.onDeviceUpdate = (_deviceId: string, state: DeviceStateUpdate) => {
             try {
                 const now = Date.now();
                 if (typeof state.switch === 'boolean') {
                     let shouldUpdate = true;
-                    if (pendingSwitchState !== null) {
-                        if (state.switch === pendingSwitchState) {
-                             // State confirmed - Cancel safety check
+                    if (this.pendingSwitchState !== null) {
+                        if (state.switch === this.pendingSwitchState) {
                              if (this.safetyTimer) {
                                  clearTimeout(this.safetyTimer);
                                  this.safetyTimer = null;
                              }
-
-                             // Don't clear pendingSwitchState yet to protect against subsequent ghost echoes
-                             if (now - pendingSwitchTimestamp >= STATE_UPDATE_GRACE_PERIOD) {
-                                pendingSwitchState = null;
+                             if (now - this.pendingSwitchTimestamp >= this.STATE_UPDATE_GRACE_PERIOD) {
+                                this.pendingSwitchState = null;
                              }
                         } else {
-                            if (now - pendingSwitchTimestamp < STATE_UPDATE_GRACE_PERIOD) {
-                                // Ignore update, it contradicts our recent command and is likely old state
+                            if (now - this.pendingSwitchTimestamp < this.STATE_UPDATE_GRACE_PERIOD) {
                                 shouldUpdate = false;
                             } else {
-                                // Timeout expired, accept valid external change
-                                pendingSwitchState = null;
+                                this.pendingSwitchState = null;
                             }
                         }
                     }
@@ -75,9 +69,8 @@ module.exports = class ActuatorDevice extends BaseDevice {
                     let shouldUpdateDim = true;
                     const homeyDim = Math.max(0, Math.min(1, state.dimmvalue / 99));
 
-                    // If we are expecting ON, and we get dim=0, this is likely an echo of the previous OFF state
-                    if (pendingSwitchState === true && homeyDim === 0) {
-                        if (now - pendingSwitchTimestamp < STATE_UPDATE_GRACE_PERIOD) {
+                    if (this.pendingSwitchState === true && homeyDim === 0) {
+                        if (now - this.pendingSwitchTimestamp < this.STATE_UPDATE_GRACE_PERIOD) {
                             shouldUpdateDim = false;
                         }
                     }
@@ -96,38 +89,19 @@ module.exports = class ActuatorDevice extends BaseDevice {
         this.registerCapabilityListener('onoff', async (value) => {
             if (!this.bridge) return;
             try {
-                // Optimistic UI update
                 this.setCapabilityValue('onoff', value).catch(() => {});
-                
-                // Set pending state to prevent race conditions
-                pendingSwitchState = value;
-                pendingSwitchTimestamp = Date.now();
+                this.setPendingState(value);
 
                 if (!value && this.hasCapability('dim')) {
                     this.setCapabilityValue('dim', 0).catch(() => {});
                 }
                 
-                // switchDevice uses the 1/0 logic internally now
-                await this.bridge.switchDevice(resolveDeviceId(), value, (sendTime?: number) => {
-                    void sendTime;
-                });
-
-                // Safety: Verify state after delay if no confirmation received
-                if (this.safetyTimer) clearTimeout(this.safetyTimer);
-                const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500; // 3.5s
-                this.safetyTimer = setTimeout(() => {
-                    if (pendingSwitchState === value) {
-                        // Still pending? We might have lost the packet or the update.
-                        if (this.bridge && this.bridge.requestDeviceStates) {
-                            this.bridge.requestDeviceStates().catch(() => {});
-                        }
-                    }
-                    this.safetyTimer = null;
-                }, safetyDelay);
+                await this.bridge.switchDevice(resolveDeviceId(), value);
+                this.startSafetyTimer(value);
             } catch (err) {
                 this.error(`[Actuator] Error sending onoff command for ${this.getData().deviceId}:`, err);
-                pendingSwitchState = null; // Reset on error
-                this.setCapabilityValue('onoff', !value).catch(() => {}); // Revert UI
+                this.pendingSwitchState = null;
+                this.setCapabilityValue('onoff', !value).catch(() => {});
             }
         });
 
@@ -137,55 +111,44 @@ module.exports = class ActuatorDevice extends BaseDevice {
             try {
                 if (value === 0) {
                     this.setCapabilityValue('onoff', false).catch(() => {});
-                    
-                     // Set pending state (dim 0 -> off)
-                    pendingSwitchState = false;
-                    pendingSwitchTimestamp = Date.now();
-                    
-                    await this.bridge.switchDevice(resolveDeviceId(), false, (sendTime?: number) => {
-                        void sendTime;
-                    });
-
-                    if (this.safetyTimer) clearTimeout(this.safetyTimer);
-                    const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
-                    this.safetyTimer = setTimeout(() => {
-                         if (pendingSwitchState === false) {
-                            if (this.bridge && this.bridge.requestDeviceStates) {
-                                this.bridge.requestDeviceStates().catch(() => {});
-                            }
-                         }
-                         this.safetyTimer = null;
-                    }, safetyDelay);
+                    this.setPendingState(false);
+                    await this.bridge.switchDevice(resolveDeviceId(), false);
+                    this.startSafetyTimer(false);
                 } else {
                     const dimValue = Math.max(1, Math.round(value * 99));
                     this.setCapabilityValue('onoff', true).catch(() => {});
-
-                    // Set pending state (dim > 0 -> on)
-                    pendingSwitchState = true;
-                    pendingSwitchTimestamp = Date.now();
-
-                    await this.bridge.dimDevice(resolveDeviceId(), dimValue, (sendTime?: number) => {
-                        void sendTime;
-                    });
-
-                    if (this.safetyTimer) clearTimeout(this.safetyTimer);
-                    const safetyDelay = STATE_UPDATE_GRACE_PERIOD + 1500;
-                    this.safetyTimer = setTimeout(() => {
-                         if (pendingSwitchState === true) {
-                            if (this.bridge && this.bridge.requestDeviceStates) {
-                                this.bridge.requestDeviceStates().catch(() => {});
-                            }
-                         }
-                         this.safetyTimer = null;
-                    }, safetyDelay);
+                    this.setPendingState(true);
+                    await this.bridge.dimDevice(resolveDeviceId(), dimValue);
+                    this.startSafetyTimer(true);
                 }
             } catch (err) {
                 this.error(`[Actuator] Error sending dim command for ${this.getData().deviceId}:`, err);
-                pendingSwitchState = null;
-                // Revert is harder for dimming (need previous value), but we can try reverting onoff if that was the intent
+                this.pendingSwitchState = null;
                 if (value === 0) this.setCapabilityValue('onoff', true).catch(() => {});
             }
         });
+    }
+
+    /**
+     * Set the pending switch state and timestamp for debounce protection.
+     */
+    private setPendingState(state: boolean): void {
+        this.pendingSwitchState = state;
+        this.pendingSwitchTimestamp = Date.now();
+    }
+
+    /**
+     * Start a safety timer that requests device states if no confirmation is received.
+     */
+    private startSafetyTimer(expectedState: boolean): void {
+        if (this.safetyTimer) clearTimeout(this.safetyTimer);
+        const safetyDelay = this.STATE_UPDATE_GRACE_PERIOD + 1500;
+        this.safetyTimer = setTimeout(() => {
+            if (this.pendingSwitchState === expectedState) {
+                this.bridge?.requestDeviceStates?.().catch(() => {});
+            }
+            this.safetyTimer = null;
+        }, safetyDelay);
     }
 
     protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
