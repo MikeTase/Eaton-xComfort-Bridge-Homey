@@ -6,13 +6,7 @@ import { BridgeStatus } from '../../lib/types';
 module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
   private onBridgeStatus?: (status: BridgeStatus) => void;
 
-  async onInit() {
-    try {
-        await super.onInit();
-    } catch (e) {
-        return;
-    }
-
+  async onDeviceReady() {
     this.setAvailable();
 
     await this.applyCapabilityProfile();

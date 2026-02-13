@@ -1,5 +1,4 @@
 import { BaseDevice } from '../../lib/BaseDevice';
-import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate } from '../../lib/types';
 
@@ -12,13 +11,7 @@ module.exports = class ActuatorDevice extends BaseDevice {
     private pendingSwitchTimestamp: number = 0;
     private readonly STATE_UPDATE_GRACE_PERIOD = 3000; // ms
 
-    async onInit() {
-        try {
-            await super.onInit();
-        } catch (e) {
-            return; // Bridge missing
-        }
-
+    async onDeviceReady() {
         // Check dimmable setting and remove dim capability if not applicable
         const settings = this.getSettings();
         let isDimmable = settings.dimmable !== false;
@@ -32,9 +25,8 @@ module.exports = class ActuatorDevice extends BaseDevice {
         }
 
         const resolveDeviceId = (): string | number => {
-            const rawId = this.getData().deviceId as unknown;
-            const numericId = Number(rawId);
-            return Number.isNaN(numericId) ? String(rawId) : numericId;
+            const numericId = Number(this.deviceId);
+            return Number.isNaN(numericId) ? this.deviceId : numericId;
         };
 
         this.onDeviceUpdate = (_deviceId: string, state: DeviceStateUpdate) => {
@@ -80,11 +72,11 @@ module.exports = class ActuatorDevice extends BaseDevice {
                     }
                 }
             } catch (err) {
-                this.error(`[Actuator] Error handling deviceUpdate for ${this.getData().deviceId}:`, err);
+                this.error(`[Actuator] Error handling deviceUpdate for ${this.deviceId}:`, err);
             }
         };
 
-        this.bridge.addDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
+        this.addManagedStateListener(this.deviceId, this.onDeviceUpdate);
 
         this.registerCapabilityListener('onoff', async (value) => {
             if (!this.bridge) return;
@@ -99,7 +91,7 @@ module.exports = class ActuatorDevice extends BaseDevice {
                 await this.bridge.switchDevice(resolveDeviceId(), value);
                 this.startSafetyTimer(value);
             } catch (err) {
-                this.error(`[Actuator] Error sending onoff command for ${this.getData().deviceId}:`, err);
+                this.error(`[Actuator] Error sending onoff command for ${this.deviceId}:`, err);
                 this.pendingSwitchState = null;
                 this.setCapabilityValue('onoff', !value).catch(() => {});
             }
@@ -122,7 +114,7 @@ module.exports = class ActuatorDevice extends BaseDevice {
                     this.startSafetyTimer(true);
                 }
             } catch (err) {
-                this.error(`[Actuator] Error sending dim command for ${this.getData().deviceId}:`, err);
+                this.error(`[Actuator] Error sending dim command for ${this.deviceId}:`, err);
                 this.pendingSwitchState = null;
                 if (value === 0) this.setCapabilityValue('onoff', true).catch(() => {});
             }
@@ -151,21 +143,10 @@ module.exports = class ActuatorDevice extends BaseDevice {
         }, safetyDelay);
     }
 
-    protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
-        if (this.onDeviceUpdate) {
-            oldBridge.removeDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
-            newBridge.addDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
-        }
-    }
-
     onDeleted() {
         if (this.safetyTimer) {
             clearTimeout(this.safetyTimer);
             this.safetyTimer = null;
-        }
-        if (this.bridge && this.onDeviceUpdate) {
-            this.bridge.removeDeviceStateListener(String(this.getData().deviceId), this.onDeviceUpdate);
-            this.log('ActuatorDevice listener removed');
         }
         super.onDeleted();
     }

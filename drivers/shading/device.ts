@@ -1,22 +1,11 @@
 import { BaseDevice } from '../../lib/BaseDevice';
-import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { MESSAGE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate, ShadingAction } from '../../lib/types';
 
 module.exports = class ShadingDevice extends BaseDevice {
-  private deviceId: string = '';
   private safetyActive: boolean = false;
-  private onDeviceUpdate: ((deviceId: string | number, state: DeviceStateUpdate) => void) | null = null;
 
-  async onInit() {
-    try {
-        await super.onInit();
-    } catch (e) {
-        return;
-    }
-    
-    this.deviceId = this.getData().deviceId;
-    
+  async onDeviceReady() {
     const settings = this.getSettings();
     const supportsPosition = settings.shRuntime !== undefined && settings.shRuntime > 0;
 
@@ -29,12 +18,9 @@ module.exports = class ShadingDevice extends BaseDevice {
   }
 
   private registerStateListener() {
-    if (!this.bridge) return;
-    
-    this.onDeviceUpdate = (_id, data) => {
+    this.addManagedStateListener(this.deviceId, (_id, data) => {
         this.updateState(data);
-    };
-    this.bridge.addDeviceStateListener(this.deviceId, this.onDeviceUpdate);
+    });
   }
   
   private updateState(data: DeviceStateUpdate) {
@@ -96,17 +82,7 @@ module.exports = class ShadingDevice extends BaseDevice {
       });
   }
   
-  protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
-      if (this.onDeviceUpdate) {
-          oldBridge.removeDeviceStateListener(this.deviceId, this.onDeviceUpdate);
-          newBridge.addDeviceStateListener(this.deviceId, this.onDeviceUpdate);
-      }
-  }
-  
   onDeleted() {
-      if (this.bridge && this.onDeviceUpdate) {
-          this.bridge.removeDeviceStateListener(this.deviceId, this.onDeviceUpdate);
-      }
       super.onDeleted();
   }
 };
