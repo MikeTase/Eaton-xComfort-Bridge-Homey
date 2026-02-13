@@ -36,19 +36,20 @@ module.exports = class ActuatorDevice extends BaseDevice {
                     let shouldUpdate = true;
                     if (this.pendingSwitchState !== null) {
                         if (state.switch === this.pendingSwitchState) {
-                             if (this.safetyTimer) {
-                                 clearTimeout(this.safetyTimer);
-                                 this.safetyTimer = null;
-                             }
-                             if (now - this.pendingSwitchTimestamp >= this.STATE_UPDATE_GRACE_PERIOD) {
-                                this.pendingSwitchState = null;
-                             }
-                        } else {
-                            if (now - this.pendingSwitchTimestamp < this.STATE_UPDATE_GRACE_PERIOD) {
-                                shouldUpdate = false;
-                            } else {
-                                this.pendingSwitchState = null;
+                            // Bridge confirmed our command — clear pending immediately
+                            // so subsequent physical changes aren't suppressed
+                            this.pendingSwitchState = null;
+                            if (this.safetyTimer) {
+                                clearTimeout(this.safetyTimer);
+                                this.safetyTimer = null;
                             }
+                        } else if (now - this.pendingSwitchTimestamp < this.STATE_UPDATE_GRACE_PERIOD) {
+                            // Contradicting state within grace period — likely an echo
+                            // of the old state before our command reached the device
+                            shouldUpdate = false;
+                        } else {
+                            // Grace period expired — accept the actual device state
+                            this.pendingSwitchState = null;
                         }
                     }
 
