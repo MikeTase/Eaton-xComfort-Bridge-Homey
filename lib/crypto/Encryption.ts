@@ -10,10 +10,6 @@ export class Encryption {
     // 1. Format the payload: HEX_KEY:::HEX_IV
     // Reference implementations use standard lowercase hex.
     const payload = `${aesKey.toString('hex')}:::${aesIv.toString('hex')}`;
-    
-    // console.log(`[Encryption] Encrypting session keys. Payload: ${payload}`);
-    // console.log(`[Encryption] Public Key Type: ${typeof publicKeyPem}`);
-    // console.log(`[Encryption] Public Key Preview: ${publicKeyPem.substring(0, 50)}...`);
 
     // Ensure strict type for crypto
     if (typeof publicKeyPem !== 'string') {

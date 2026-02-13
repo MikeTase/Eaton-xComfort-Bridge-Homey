@@ -14,22 +14,19 @@ import WebSocket from 'ws';
 import { PROTOCOL_CONFIG } from '../XComfortProtocol';
 import { Semaphore } from '../utils/Semaphore';
 import { Encryption } from '../crypto/Encryption';
-import type { ConnectionState, EncryptionContext, LoggerFunction } from '../types';
-
-// Re-export types for module consumers
-export type { ConnectionState, EncryptionContext };
+import type { EncryptionContext, LoggerFunction } from '../types';
 
 // ============================================================================
 // Retry Configuration
 // ============================================================================
 
-export interface RetryConfig {
+interface RetryConfig {
   maxRetries: number;
   ackTimeout: number; // ms to wait for ACK before retry
   retryDelay: number; // ms between retries
 }
 
-export const DEFAULT_RETRY_CONFIG: RetryConfig = {
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxRetries: 5,    // Increased retry count for reliability
   ackTimeout: 1000, // Reduced from 2000ms to 1000ms for responsiveness
   retryDelay: 250,  // Reduced to 250ms for faster recovery
@@ -40,13 +37,10 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 // ============================================================================
 
 /** Callback for raw message received */
-export type OnRawMessageFn = (data: Buffer, timestamp: number) => void;
-
-/** Callback for connection state change */
-export type OnStateChangeFn = (state: ConnectionState) => void;
+type OnRawMessageFn = (data: Buffer, timestamp: number) => void;
 
 /** Callback for connection close */
-export type OnCloseFn = (code: number, reason: string, shouldReconnect: boolean) => void;
+type OnCloseFn = (code: number, reason: string, shouldReconnect: boolean) => void;
 
 // ============================================================================
 // ConnectionManager Class
@@ -57,19 +51,16 @@ export class ConnectionManager {
   private ws: WebSocket | null = null;
   private logger: LoggerFunction;
   private encryptionContext: EncryptionContext | null = null;
-  private state: ConnectionState = 'disconnected';
   private connectionEstablished: boolean = false;
   private reconnecting: boolean = false;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private heartbeatSend?: () => void;
-  private heartbeatExpectedMs: number = PROTOCOL_CONFIG.TIMEOUTS.HEARTBEAT;
   private lastMessageAt: number = Date.now();
   private mc: number = 0;
   private connectResolve?: () => void;
   private connectReject?: (error: Error) => void;
 
   private onRawMessage?: OnRawMessageFn;
-  private onStateChange?: OnStateChangeFn;
   private onClose?: OnCloseFn;
 
   private base64regex: RegExp = /^[A-Za-z0-9+/=]+$/;
@@ -85,24 +76,10 @@ export class ConnectionManager {
   }
 
   /**
-   * Configure retry behavior
-   */
-  setRetryConfig(config: Partial<RetryConfig>): void {
-    this.retryConfig = { ...this.retryConfig, ...config };
-  }
-
-  /**
    * Set callback for raw messages
    */
   setOnRawMessage(callback: OnRawMessageFn): void {
     this.onRawMessage = callback;
-  }
-
-  /**
-   * Set callback for state changes
-   */
-  setOnStateChange(callback: OnStateChangeFn): void {
-    this.onStateChange = callback;
   }
 
   /**
@@ -117,13 +94,6 @@ export class ConnectionManager {
    */
   setEncryptionContext(context: EncryptionContext): void {
     this.encryptionContext = context;
-  }
-
-  /**
-   * Get current connection state
-   */
-  getState(): ConnectionState {
-    return this.state;
   }
 
   /**
@@ -153,9 +123,6 @@ export class ConnectionManager {
    */
   markEstablished(): void {
     this.connectionEstablished = true;
-    this.state = 'connected';
-    // Reference implementation does NOT start a periodic heartbeat here
-    // this.startHeartbeat(); 
     this.resolveConnection();
   }
 
@@ -165,7 +132,6 @@ export class ConnectionManager {
   public startHeartbeat(sendHeartbeat: () => void): void {
     this.stopHeartbeat();
     this.heartbeatSend = sendHeartbeat;
-    this.heartbeatExpectedMs = PROTOCOL_CONFIG.TIMEOUTS.HEARTBEAT;
     this.heartbeatInterval = setInterval(() => {
       if (this.isConnected()) {
         sendHeartbeat();
@@ -235,8 +201,6 @@ export class ConnectionManager {
     return new Promise((resolve, reject) => {
       try {
         this.connectionEstablished = false;
-        this.state = 'connecting';
-        this.onStateChange?.(this.state);
 
         this.ws = new WebSocket(`ws://${this.bridgeIp}`, {
           perMessageDeflate: false,
@@ -256,9 +220,6 @@ export class ConnectionManager {
       this.ws.on('message', (data: Buffer) => {
         const rawRecvTime = Date.now();
         this.markMessageReceived(rawRecvTime);
-        // this.logger(
-        //   `[ConnectionManager] RAW MSG at ${rawRecvTime}, size=${data.length}`
-        // );
         this.onRawMessage?.(data, rawRecvTime);
       });
 
@@ -279,8 +240,6 @@ export class ConnectionManager {
           const wasEstablished = this.connectionEstablished;
           const shouldReconnect = wasEstablished && !this.reconnecting;
 
-          this.state = 'disconnected';
-          this.onStateChange?.(this.state);
           // Mark connection as lost so retries can detect it
           this.encryptionContext = null;
           
@@ -303,20 +262,8 @@ export class ConnectionManager {
    */
   resolveConnection(): void {
     if (this.connectResolve) {
-      this.state = 'connected';
-      this.onStateChange?.(this.state);
       this.connectResolve();
       this.connectResolve = undefined;
-    }
-  }
-
-  /**
-   * Reject the connection promise
-   */
-  rejectConnection(error: Error): void {
-    if (this.connectReject) {
-      this.connectReject(error);
-      this.connectReject = undefined;
     }
   }
 

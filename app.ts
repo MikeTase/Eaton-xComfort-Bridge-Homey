@@ -1,8 +1,6 @@
 import * as Homey from 'homey';
 import { XComfortBridge } from './lib/connection/XComfortBridge';
 
-// Log when the app starts
-// console.log('[App] Homey app.ts loaded at', new Date().toISOString());
 
 class XComfortApp extends Homey.App {
   public bridge: XComfortBridge | null = null; // Public for drivers to access via app.bridge
@@ -11,7 +9,6 @@ class XComfortApp extends Homey.App {
 
   async onInit() {
     this.log('Eaton xComfort App has been initialized');
-    // console.log('[App] onInit at', new Date().toISOString());
 
     // Attempt to load settings and connect
     const ip = this.homey.settings.get('bridge_ip');

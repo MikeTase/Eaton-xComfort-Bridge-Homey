@@ -16,24 +16,21 @@ import { MESSAGE_TYPES, CLIENT_CONFIG, PROTOCOL_CONFIG } from '../XComfortProtoc
 import { Encryption } from '../crypto/Encryption';
 import type { ProtocolMessage, AuthState, EncryptionContext, LoggerFunction } from '../types';
 
-// Re-export types for module consumers
-export type { AuthState, EncryptionContext };
-
 // ============================================================================
 // Module-specific Types (callbacks)
 // ============================================================================
 
 /** Callback for sending raw (unencrypted) messages */
-export type SendRawFn = (msg: string) => void;
+type SendRawFn = (msg: string) => void;
 
 /** Callback for sending encrypted messages */
-export type SendEncryptedFn = (msg: Record<string, unknown>) => boolean | Promise<boolean>;
+type SendEncryptedFn = (msg: Record<string, unknown>) => boolean | Promise<boolean>;
 
 /** Callback when authentication completes */
-export type OnAuthenticatedFn = () => void;
+type OnAuthenticatedFn = () => void;
 
 /** Message counter getter */
-export type GetMcFn = () => number;
+type GetMcFn = () => number;
 
 // ============================================================================
 // Authenticator Class
@@ -77,24 +74,10 @@ export class Authenticator {
   }
 
   /**
-   * Get current authentication state
-   */
-  getState(): AuthState {
-    return this.state;
-  }
-
-  /**
    * Check if authenticated
    */
   isAuthenticated(): boolean {
     return this.state === 'authenticated';
-  }
-
-  /**
-   * Get the device ID from the bridge
-   */
-  getDeviceId(): string | null {
-    return this.deviceId;
   }
 
   /**

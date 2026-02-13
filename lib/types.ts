@@ -5,28 +5,6 @@
  * All modules should import types from here to avoid duplication.
  */
 
-import { Buffer } from 'buffer';
-
-// =============================================================================
-// Configuration Types
-// =============================================================================
-
-/**
- * Configuration for initializing the XComfortBridge
- */
-export interface BridgeConfig {
-  /** IP address of the xComfort Bridge */
-  ip: string;
-  /** Authentication key (found under bridge cover) */
-  authKey: string;
-  /** Optional logger function (defaults to console.log) */
-  logger?: LoggerFunction;
-  /** Reconnect delay in ms (default: 5000) */
-  reconnectDelay?: number;
-  /** Heartbeat interval in ms (default: 30000) */
-  heartbeatInterval?: number;
-}
-
 /** Logger function signature */
 export type LoggerFunction = (...args: unknown[]) => void;
 
@@ -41,9 +19,6 @@ export type ConnectionState =
   | 'disconnected'
   | 'connecting'
   | 'connected'
-  | 'authenticating'
-  | 'renewing'
-  | 'token_renewed'
   | 'error';
 
 /**
@@ -51,7 +26,6 @@ export type ConnectionState =
  */
 export type AuthState =
   | 'idle'
-  | 'awaiting_connection'
   | 'awaiting_public_key'
   | 'awaiting_secret_ack'
   | 'awaiting_login_response'
@@ -65,17 +39,6 @@ export type AuthState =
 export interface EncryptionContext {
   key: Buffer;
   iv: Buffer;
-}
-
-/**
- * Connection event types
- */
-export interface ConnectionEvents {
-  connected: [];
-  disconnected: [code: number, reason: string];
-  reconnecting: [attempt: number];
-  stateChange: [state: ConnectionState];
-  error: [error: Error];
 }
 
 // =============================================================================
@@ -197,20 +160,6 @@ export type DeviceStateCallback = (
 ) => void | Promise<void>;
 
 // =============================================================================
-// Scene Types
-// =============================================================================
-
-/**
- * Scene from xComfort Bridge
- */
-export interface XComfortScene {
-  sceneId?: number;
-  name?: string;
-  devices?: unknown[];
-  [key: string]: unknown;
-}
-
-// =============================================================================
 // Protocol Types
 // =============================================================================
 
@@ -253,42 +202,3 @@ export interface StateUpdateItem {
   errorState?: unknown;
 }
 
-/**
- * Home data from bridge
- */
-export interface HomeData {
-  name?: string;
-  [key: string]: unknown;
-}
-
-// =============================================================================
-// Event Types
-// =============================================================================
-
-/**
- * All bridge events
- */
-export interface BridgeEvents extends ConnectionEvents {
-  deviceStateChange: [deviceId: string, state: DeviceStateUpdate];
-  devicesDiscovered: [devices: XComfortDevice[]];
-  scenesDiscovered: [scenes: XComfortScene[]];
-}
-
-// =============================================================================
-// Listener Types
-// =============================================================================
-
-/**
- * Unsubscribe function returned when adding listeners
- */
-export type UnsubscribeFunction = () => void;
-
-/**
- * State change listener callback
- */
-export type StateListener<T> = (id: string, state: T) => void;
-
-/**
- * Generic event listener
- */
-export type EventListener<T extends unknown[]> = (...args: T) => void;

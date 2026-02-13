@@ -19,14 +19,10 @@ import type {
   ConnectionState,
   ProtocolMessage,
   XComfortDevice,
-  XComfortScene,
   DeviceStateCallback,
   LoggerFunction,
   BridgeStatus
 } from '../types';
-
-// Re-export ConnectionState as BridgeConnectionState for external consumers
-export type BridgeConnectionState = ConnectionState;
 
 // ============================================================================
 // XComfortBridge Class
@@ -44,9 +40,8 @@ export class XComfortBridge extends EventEmitter {
   private messageHandler: MessageHandler;
 
   // State
-  private connectionState: BridgeConnectionState = 'disconnected';
+  private connectionState: ConnectionState = 'disconnected';
   private deviceListReceived: boolean = false;
-  private detailedScenes: XComfortScene[] = [];
   private lastBridgeStatus: BridgeStatus | null = null;
 
   // Timeouts
@@ -145,20 +140,12 @@ export class XComfortBridge extends EventEmitter {
     // Message handler callbacks
     this.messageHandler.setOnDeviceListComplete(() => {
       this.deviceListReceived = true;
-      // this.logger('[XComfortBridge] Device discovery complete!');
       this.emit('devices_loaded', this.getDevices());
     });
 
     this.messageHandler.setOnBridgeStatusUpdate((status) => {
-      // console.log('[XComfortBridge] Bridge status update:', status);
       this.lastBridgeStatus = status;
       this.emit('bridge_status', status);
-    });
-
-    this.messageHandler.setOnScenesReceived((scenes) => {
-      this.detailedScenes = scenes;
-      this.logger(`[XComfortBridge] Stored ${scenes.length} scenes`);
-      this.emit('scenes_loaded', scenes);
     });
 
     // Wire up ACK/NACK handling for retry mechanism
@@ -351,53 +338,31 @@ export class XComfortBridge extends EventEmitter {
 
   private handleEncryptedMessage(msg: ProtocolMessage, _rawRecvTime: number): void {
     // Send ACK immediately for messages with 'mc' field (ignore negative mc)
-    // CRITICAL: Send ACK synchronously BEFORE processing to prevent timeouts/disconnects
     if (msg.mc !== undefined && msg.mc >= 0) {
       setImmediate(() => {
-        const ackMsg = {
+        this.connectionManager.sendEncrypted({
           type_int: MESSAGE_TYPES.ACK,
           ref: msg.mc
-        };
-        this.connectionManager.sendEncrypted(ackMsg);
+        });
       });
-      // Log explicit confirmation for high-risk messages like SET_ALL_DATA (300)
     } else if (msg.type_int === MESSAGE_TYPES.PING) {
-      // Always ACK PING from bridge to prevent 1006 disconnects
-      const ackMsg: { type_int: number; ref?: number } = { 
-        type_int: MESSAGE_TYPES.ACK
-      };
-      if (msg.ref !== undefined) {
-        ackMsg.ref = msg.ref;
-      }
-      // console.log(`[XComfortBridge] Replying to PING (ref=${msg.ref}) with ACK`);
+      // Always ACK PING to prevent 1006 disconnects
+      const ackMsg: { type_int: number; ref?: number } = { type_int: MESSAGE_TYPES.ACK };
+      if (msg.ref !== undefined) ackMsg.ref = msg.ref;
       this.connectionManager.sendEncrypted(ackMsg as Record<string, unknown>);
     } else if (msg.type_int === MESSAGE_TYPES.HEARTBEAT) {
-        // Handle HEARTBEAT (2) which some firmwares might expect ACK for
-        // console.log(`[XComfortBridge] Received HEARTBEAT`);
-        const ackMsg = { 
-          type_int: MESSAGE_TYPES.ACK, 
-          ref: msg.mc ?? -1
-        };
-        this.connectionManager.sendEncrypted(ackMsg);
+      this.connectionManager.sendEncrypted({
+        type_int: MESSAGE_TYPES.ACK,
+        ref: msg.mc ?? -1
+      });
     }
-
-    // console.log(
-    //   `[XComfortBridge] << RECV type=${msg.type_int}${msg.mc !== undefined ? ` mc=${msg.mc}` : ''}`
-    // );
 
     // Try authenticator first (for auth flow messages)
-    if (this.authenticator.handleEncryptedMessage(msg)) {
-      return;
-    }
+    if (this.authenticator.handleEncryptedMessage(msg)) return;
 
-    // Then try message handler (for data/state messages)
-    // Use setImmediate to allow I/O (like sending the ACK) to clear first
+    // Then message handler (for data/state messages) — deferred to allow ACK I/O to flush
     setImmediate(() => {
-      this.messageHandler.processMessage(msg).then(handled => {
-          if (!handled) {
-            // maybe emit generic message?
-          }
-      }).catch((err) => {
+      this.messageHandler.processMessage(msg).catch((err) => {
         console.error('[XComfortBridge] Message processing error:', err);
       });
     });
@@ -427,10 +392,6 @@ export class XComfortBridge extends EventEmitter {
     return this.deviceStateManager.getDevice(deviceId);
   }
 
-  getDetailedScenes(): XComfortScene[] {
-    return this.detailedScenes;
-  }
-
   getLastBridgeStatus(): BridgeStatus | null {
     return this.lastBridgeStatus;
   }
@@ -445,8 +406,6 @@ export class XComfortBridge extends EventEmitter {
         switch: switchState ? 1 : 0 // Use 1/0 instead of boolean to prevent bridge 1006 disconnects
     };
 
-    // this.logger(`[XComfortBridge] Sending DEVICE_SWITCH (281) to ${deviceId} payload=${JSON.stringify(payload)}`);
-    
     const ts = Date.now();
     if (onSend) onSend(ts);
 
@@ -499,8 +458,6 @@ export class XComfortBridge extends EventEmitter {
         return this.connectionManager.sendWithRetry(msg);
     });
   }
-  
-
 
   async controlShade(deviceId: string, operation: number): Promise<boolean> {
     const msg = {
@@ -512,16 +469,6 @@ export class XComfortBridge extends EventEmitter {
     // Fire and forget for shades
     await this.connectionManager.sendEncrypted(msg);
     return true;
-  }
-
-  async activateScene(sceneId: number): Promise<boolean> {
-    this.requireConnection();
-
-    return this.connectionManager.sendWithRetry({
-      type_int: MESSAGE_TYPES.ACTIVATE_SCENE,
-      mc: this.connectionManager.nextMc(),
-      payload: { sceneId },
-    });
   }
 
   // ===========================================================================
@@ -546,27 +493,17 @@ export class XComfortBridge extends EventEmitter {
     }
   }
 
-  async refreshAllDeviceInfo(): Promise<boolean> {
-    return this.requestDeviceStates();
-  }
-
   // ===========================================================================
   // Public API - Utilities
   // ===========================================================================
-
-  parseInfoMetadata(infoArray: Array<{ text: string; value: string | number }>) {
-    return this.deviceStateManager.parseInfoMetadata(infoArray);
-  }
 
   get isConnected(): boolean {
     return this.connectionManager.isConnected();
   }
 
-  get state(): BridgeConnectionState {
+  get state(): ConnectionState {
     return this.connectionState;
   }
-  
-
 
   cleanup(): void {
     this.clearConnectionTimers();

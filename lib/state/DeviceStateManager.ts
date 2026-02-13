@@ -15,9 +15,6 @@ import type {
   LoggerFunction
 } from '../types';
 
-// Re-export types for module consumers
-export type { XComfortDevice, InfoEntry, DeviceMetadata, DeviceStateUpdate, DeviceStateCallback };
-
 // ============================================================================
 // DeviceStateManager Class
 // ============================================================================
@@ -53,20 +50,6 @@ export class DeviceStateManager {
   }
 
   /**
-   * Clear all devices
-   */
-  clearDevices(): void {
-    this.devices.clear();
-  }
-
-  /**
-   * Get the number of devices
-   */
-  get deviceCount(): number {
-    return this.devices.size;
-  }
-
-  /**
    * Add a state listener for a specific device
    */
   addListener(deviceId: string | number, callback: DeviceStateCallback): void {
@@ -94,13 +77,6 @@ export class DeviceStateManager {
       this.listeners.delete(id);
     }
     return true;
-  }
-
-  /**
-   * Remove all listeners for a specific device
-   */
-  removeAllListeners(deviceId: string | number): void {
-    this.listeners.delete(String(deviceId));
   }
 
   /**
