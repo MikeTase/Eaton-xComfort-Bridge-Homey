@@ -28,5 +28,8 @@
   },
   "1.2.1": {
     "en": "improved stability and images"
+  },
+  "1.2.3": {
+    "en": "removed dead coding"
   }
 }
