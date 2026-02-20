@@ -51,11 +51,13 @@ module.exports = class ShadingDevice extends BaseDevice {
           this.registerCapabilityListener('windowcoverings_set', async (value) => {
               if (this.safetyActive) throw new Error('Safety lock active');
               
+              const numericId = Number(this.deviceId);
+              if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
               await this.bridge?.getConnectionManager().sendWithRetry({
                   type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
                   mc: this.bridge.getConnectionManager().nextMc(),
                   payload: {
-                      deviceId: parseInt(this.deviceId),
+                      deviceId: numericId,
                       action: ShadingAction.GO_TO,
                       value: value * 100 // Protocol likely expects 0-100
                   }
@@ -71,11 +73,13 @@ module.exports = class ShadingDevice extends BaseDevice {
            if (value === 'up') action = ShadingAction.OPEN;
            if (value === 'down') action = ShadingAction.CLOSE;
            
+           const numericId = Number(this.deviceId);
+           if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
            await this.bridge?.getConnectionManager().sendWithRetry({
               type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
               mc: this.bridge.getConnectionManager().nextMc(),
               payload: {
-                  deviceId: parseInt(this.deviceId),
+                  deviceId: numericId,
                   action: action
               }
           });

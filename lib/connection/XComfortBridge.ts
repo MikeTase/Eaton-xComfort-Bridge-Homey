@@ -180,40 +180,51 @@ export class XComfortBridge extends EventEmitter {
     this.clearConnectionTimers();
 
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const safeResolve = () => {
+        if (settled) return;
+        settled = true;
+        this.clearConnectionTimers();
+        resolve();
+      };
+      const safeReject = (err: Error) => {
+        if (settled) return;
+        settled = true;
+        this.clearConnectionTimers();
+        reject(err);
+      };
+
       this.connectionState = 'connecting';
       this.deviceListReceived = false;
       this.authenticator.reset();
       this.connectionManager.resetMc();
 
       this.connectionManager.connect().catch((err) => {
-        this.clearConnectionTimers();
         this.stopWatchdog();
         this.connectionManager.cleanup();
         if (this.allowReconnect) {
           this.scheduleReconnect();
         }
-        reject(err);
+        safeReject(err);
       });
 
       // Check for device list received
       this.connectionCheckInterval = setInterval(() => {
         if (this.deviceListReceived) {
-          this.clearConnectionTimers();
           this.connectionManager.markEstablished();
-          resolve();
+          safeResolve();
         }
       }, 1000);
 
       // Connection timeout
       this.connectionTimeout = setTimeout(() => {
-        this.clearConnectionTimers();
         this.logger('[XComfortBridge] Connection timeout');
         this.stopWatchdog();
         this.connectionManager.cleanup();
         if (this.allowReconnect) {
           this.scheduleReconnect();
         }
-        reject(new Error('Connection timeout - device list not received'));
+        safeReject(new Error('Connection timeout - device list not received'));
       }, PROTOCOL_CONFIG.TIMEOUTS.CONNECTION);
     });
   }
@@ -239,6 +250,7 @@ export class XComfortBridge extends EventEmitter {
       const now = Date.now();
       if (now - last > maxSilenceMs) {
         this.logger(`[XComfortBridge] Watchdog: no messages for ${now - last}ms, reconnecting`);
+        this.stopWatchdog();
         this.connectionManager.cleanup();
         this.scheduleReconnect();
         return;

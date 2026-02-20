@@ -389,10 +389,16 @@ export class ConnectionManager {
       };
 
       const handleFailure = () => {
+         // Guard: prevent double invocation from both NACK callback and ack timeout
+         if (ackTimeoutTimer) {
+            clearTimeout(ackTimeoutTimer);
+            ackTimeoutTimer = null;
+         }
+         this.pendingAcks.delete(mc);
+
          if (retries < this.retryConfig.maxRetries) {
             retries++;
             this.logger(`[ConnectionManager] Retry ${retries}/${this.retryConfig.maxRetries} for mc=${mc}`);
-            if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
             
             retryTimer = setTimeout(() => {
                sendAttempt();
@@ -439,6 +445,8 @@ export class ConnectionManager {
     this.clearPendingAcks();
     this.connectionEstablished = false;
     this.reconnecting = false;
+    this.connectResolve = undefined;
+    this.connectReject = undefined;
     if (this.ws) {
       this.ws.removeAllListeners();
       // Add no-op error handler to prevent unhandled 'error' crash.

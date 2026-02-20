@@ -67,11 +67,13 @@ module.exports = class ThermostatDevice extends BaseDevice {
       this.registerCapabilityListener('target_temperature', async (value) => {
           if (!this.bridge) throw new Error('Bridge offline');
           
+          const numericId = Number(this.deviceId);
+          if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
           await this.bridge.getConnectionManager().sendWithRetry({
               type_int: MESSAGE_TYPES.SET_HEATING_STATE,
               mc: this.bridge.getConnectionManager().nextMc(),
               payload: {
-                  deviceId: parseInt(this.deviceId),
+                  deviceId: numericId,
                   setpoint: value
               }
           });
