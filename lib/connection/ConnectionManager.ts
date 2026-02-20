@@ -441,6 +441,11 @@ export class ConnectionManager {
     this.reconnecting = false;
     if (this.ws) {
       this.ws.removeAllListeners();
+      // Add no-op error handler to prevent unhandled 'error' crash.
+      // When close() is called on a CONNECTING socket, the ws library
+      // emits 'error' asynchronously via process.nextTick (abortHandshake).
+      // Without a listener, Node.js treats it as an uncaught exception.
+      this.ws.on('error', () => {});
       try {
         this.ws.close();
       } catch (e) {

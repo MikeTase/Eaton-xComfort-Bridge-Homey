@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-02-20
+
+### Fixes
+- Fixed crash when WebSocket is closed before connection is established (cleanup now absorbs async error events)
+
 ## 2026-02-05
 
 ### Improvements
