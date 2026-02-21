@@ -39,7 +39,9 @@ export class MessageHandler {
   private deviceStateManager: DeviceStateManager;
   private logger: LoggerFunction;
   private debugStateItems: boolean = false;
-  private lastDeviceUpdateAt: Map<string, number> = new Map();
+  private pendingDeviceUpdates: Map<string, DeviceStateUpdate> = new Map();
+  private flushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private readonly UPDATE_COALESCE_MS = 150;
   private onDeviceListComplete?: OnDeviceListCompleteFn;
   private onAckReceived?: OnAckReceivedFn;
   private onNackReceived?: OnNackReceivedFn;
@@ -128,25 +130,33 @@ export class MessageHandler {
     }
 
     if (msg.type_int === MESSAGE_TYPES.SET_BRIDGE_STATE) {
-      if (msg.payload && this.onBridgeStatusUpdate) {
-        this.onBridgeStatusUpdate(msg.payload as BridgeStatus);
+      const payload = this.getPayloadObject(msg.payload);
+      if (payload && this.onBridgeStatusUpdate) {
+        this.onBridgeStatusUpdate(payload as BridgeStatus);
       }
       return true;
     }
 
     if (msg.type_int === MESSAGE_TYPES.SET_ALL_DATA) {
-      this.processDeviceData(msg.payload as Record<string, unknown>);
+      const payload = this.getPayloadObject(msg.payload);
+      if (payload) {
+        this.processDeviceData(payload);
+      }
       return true;
     }
 
     if (msg.type_int === MESSAGE_TYPES.STATE_UPDATE) {
-      this.processStateUpdate(msg.payload as { item?: StateUpdateItem[] });
+      const payload = this.getPayloadObject(msg.payload);
+      if (payload) {
+        this.processStateUpdate(payload as { item?: StateUpdateItem[] });
+      }
       return true;
     }
 
     if (msg.type_int === MESSAGE_TYPES.ERROR_INFO) {
-      const payload = msg.payload as { info?: string };
-      this.logger(`[MessageHandler] Error/Info response: ${payload?.info}`);
+      const payload = this.getPayloadObject(msg.payload);
+      const info = payload?.info;
+      this.logger(`[MessageHandler] Error/Info response: ${typeof info === 'string' ? info : 'n/a'}`);
       return true;
     }
 
@@ -157,7 +167,7 @@ export class MessageHandler {
    * Process SET_HOME_DATA (303) messages
    */
   private processHomeData(payload: Record<string, unknown>): void {
-    if (payload.home) {
+    if (payload.home && typeof payload.home === 'object' && !Array.isArray(payload.home)) {
       const home = payload.home as { name?: string };
       this.logger(
         `[MessageHandler] Home data received: ${home.name || 'unnamed'}`
@@ -231,20 +241,12 @@ export class MessageHandler {
    */
   private processStateUpdate(payload: { item?: StateUpdateItem[] }): void {
     try {
-      const now = Date.now();
-      const THROTTLE_MS = 150;
-
       if (payload?.item) {
         const deviceUpdates = new Map<string, DeviceStateUpdate>();
 
         payload.item.forEach((item) => {
           if (item.deviceId !== undefined && item.deviceId !== null) {
             const deviceId = String(item.deviceId);
-            const lastTs = this.lastDeviceUpdateAt.get(deviceId) ?? 0;
-            if (now - lastTs < THROTTLE_MS) {
-              return;
-            }
-            this.lastDeviceUpdateAt.set(deviceId, now);
 
             if (!deviceUpdates.has(deviceId)) {
               deviceUpdates.set(deviceId, {});
@@ -289,11 +291,52 @@ export class MessageHandler {
         });
 
         deviceUpdates.forEach((updateData, deviceId) => {
-          this.deviceStateManager.triggerListeners(deviceId, updateData);
+          this.enqueueDeviceUpdate(deviceId, updateData);
         });
       }
     } catch (error) {
       console.error(`[MessageHandler] Error processing state update:`, error);
     }
+  }
+
+  private enqueueDeviceUpdate(deviceId: string, updateData: DeviceStateUpdate): void {
+    if (!Object.keys(updateData).length) return;
+
+    const pending = this.pendingDeviceUpdates.get(deviceId) || {};
+    const merged: DeviceStateUpdate = {
+      ...pending,
+      ...updateData,
+      metadata: {
+        ...(pending.metadata || {}),
+        ...(updateData.metadata || {}),
+      },
+    };
+
+    // Remove empty metadata to keep payload clean
+    if (!Object.keys(merged.metadata || {}).length) {
+      delete merged.metadata;
+    }
+
+    this.pendingDeviceUpdates.set(deviceId, merged);
+
+    if (!this.flushTimers.has(deviceId)) {
+      const timer = setTimeout(() => {
+        this.flushTimers.delete(deviceId);
+        const latest = this.pendingDeviceUpdates.get(deviceId);
+        if (latest) {
+          this.pendingDeviceUpdates.delete(deviceId);
+          this.deviceStateManager.triggerListeners(deviceId, latest);
+        }
+      }, this.UPDATE_COALESCE_MS);
+
+      this.flushTimers.set(deviceId, timer);
+    }
+  }
+
+  private getPayloadObject(payload: unknown): Record<string, unknown> | null {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return null;
+    }
+    return payload as Record<string, unknown>;
   }
 }

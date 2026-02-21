@@ -428,7 +428,7 @@ export class XComfortBridge extends EventEmitter {
     });
   }
 
-  async dimDevice(deviceId: string | number, dimmValue: number, onSend?: (timestamp: number) => void): Promise<boolean> {
+  async dimDevice(deviceId: string | number, dimmValue: number, onSend?: (timestamp: number) => void): Promise<boolean | undefined> {
     const deviceIdStr = String(deviceId);
     
     // Get or create debouncer for this device
@@ -478,9 +478,8 @@ export class XComfortBridge extends EventEmitter {
       payload: { deviceId: this.parseId(deviceId), value: operation },
     };
 
-    // Fire and forget for shades
-    await this.connectionManager.sendEncrypted(msg);
-    return true;
+    // Use retry to avoid silent command loss under transient link issues
+    return this.connectionManager.sendWithRetry(msg);
   }
 
   // ===========================================================================

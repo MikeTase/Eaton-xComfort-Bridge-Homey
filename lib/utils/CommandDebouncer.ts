@@ -15,7 +15,7 @@ export class CommandDebouncer {
      * @param fn The async function to execute
      * @param delayMs Delay in milliseconds to wait for settling (default: 150ms)
      */
-    async run<T>(fn: () => Promise<T>, delayMs = 150): Promise<T> {
+    async run<T>(fn: () => Promise<T>, delayMs = 150): Promise<T | undefined> {
         const myId = ++this.currentRunId;
         
         await new Promise(resolve => setTimeout(resolve, delayMs));
@@ -23,7 +23,7 @@ export class CommandDebouncer {
         if (myId !== this.currentRunId) {
             // Command superseded by newer request
             // Resolve successfully to prevent UI errors/reverts in Homey
-            return Promise.resolve() as any;
+            return undefined;
         }
 
         return fn();

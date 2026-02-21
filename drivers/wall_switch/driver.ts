@@ -20,7 +20,7 @@ module.exports = class WallSwitchDriver extends BaseDriver {
       })
       .map((device) => {
         const baseName = device.name || `Device ${device.deviceId}`;
-        const roomName = (device as any).roomName;
+        const roomName = device.roomName;
         const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
         const deviceId = String(device.deviceId);
         const deviceType = device.devType ?? 0;

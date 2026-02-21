@@ -81,6 +81,7 @@ export enum ShadingAction {
 export interface XComfortDevice {
   deviceId: string;
   name: string;
+  roomName?: string;
   dimmable?: boolean;
   devType?: number;
   compId?: number;

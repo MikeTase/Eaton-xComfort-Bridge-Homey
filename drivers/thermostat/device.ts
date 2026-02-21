@@ -22,7 +22,12 @@ module.exports = class ThermostatDevice extends BaseDevice {
     // Virtual Rocker Logic for RC Touch
     const device = this.bridge.getDevice(this.deviceId);
     if (device && device.devType === DEVICE_TYPES.RC_TOUCH) {
-        const virtualId = String(parseInt(this.deviceId) + 1);
+        const numericDeviceId = Number(this.deviceId);
+        if (Number.isNaN(numericDeviceId)) {
+            this.error(`[Thermostat] Invalid RC_TOUCH deviceId for virtual rocker mapping: ${this.deviceId}`);
+            return;
+        }
+        const virtualId = String(numericDeviceId + 1);
         this.log(`Device is RC_TOUCH, listening to virtual rocker ${virtualId}`);
 
         const triggerOn = this.homey.flow.getDeviceTriggerCard('thermostat_button_on');

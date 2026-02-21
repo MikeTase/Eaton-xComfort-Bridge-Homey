@@ -106,9 +106,16 @@ export class Authenticator {
    */
   handleUnencryptedMessage(msg: ProtocolMessage): boolean {
     if (msg.type_int === MESSAGE_TYPES.CONNECTION_START) {
-      const payload = msg.payload as { device_id: string; connection_id: string };
-      this.deviceId = payload.device_id;
-      this.connectionId = payload.connection_id;
+      const payload = this.getPayloadObject(msg);
+      const deviceId = this.getStringField(payload, 'device_id');
+      const connectionId = this.getStringField(payload, 'connection_id');
+      if (!deviceId || !connectionId) {
+        this.logger('[Authenticator] Ignoring malformed CONNECTION_START payload');
+        return true;
+      }
+
+      this.deviceId = deviceId;
+      this.connectionId = connectionId;
       this.state = 'awaiting_public_key';
       this.logger(
         `[Authenticator] CONNECTION_START received. deviceId=${this.deviceId}`
@@ -144,8 +151,14 @@ export class Authenticator {
     }
 
     if (msg.type_int === MESSAGE_TYPES.PUBLIC_KEY_RESPONSE) {
-      const payload = msg.payload as { public_key: string };
-      this.publicKey = payload.public_key;
+      const payload = this.getPayloadObject(msg);
+      const publicKey = this.getStringField(payload, 'public_key');
+      if (!publicKey) {
+        this.logger('[Authenticator] Ignoring malformed PUBLIC_KEY_RESPONSE payload');
+        return true;
+      }
+
+      this.publicKey = publicKey;
       this.logger('[Authenticator] Received public key');
 
       // Generate AES key and IV
@@ -181,8 +194,13 @@ export class Authenticator {
    */
   handleEncryptedMessage(msg: ProtocolMessage): boolean {
     if (msg.type_int === MESSAGE_TYPES.SECRET_EXCHANGE_ACK) {
+      if (!this.deviceId) {
+        this.logger('[Authenticator] SECRET_EXCHANGE_ACK received before device_id was set');
+        return true;
+      }
+
       const salt = Encryption.generateSalt(PROTOCOL_CONFIG.LIMITS.SALT_LENGTH);
-      const password = Encryption.calculateAuthHash(this.deviceId!, this.authKey, salt);
+      const password = Encryption.calculateAuthHash(this.deviceId, this.authKey, salt);
 
       const loginMsg = {
         type_int: MESSAGE_TYPES.LOGIN_REQUEST,
@@ -200,8 +218,14 @@ export class Authenticator {
     }
 
     if (msg.type_int === MESSAGE_TYPES.LOGIN_RESPONSE) {
-      const payload = msg.payload as { token: string };
-      this.token = payload.token;
+      const payload = this.getPayloadObject(msg);
+      const token = this.getStringField(payload, 'token');
+      if (!token) {
+        this.logger('[Authenticator] Ignoring malformed LOGIN_RESPONSE payload');
+        return true;
+      }
+
+      this.token = token;
       this.logger('[Authenticator] Login successful, received token');
 
       const applyTokenMsg = {
@@ -216,6 +240,11 @@ export class Authenticator {
 
     if (msg.type_int === MESSAGE_TYPES.TOKEN_APPLY_ACK) {
       if (!this.isRenewing) {
+        if (!this.token) {
+          this.logger('[Authenticator] TOKEN_APPLY_ACK received without token');
+          return true;
+        }
+
         this.logger('[Authenticator] Token applied, renewing token...');
         this.isRenewing = true;
 
@@ -236,8 +265,14 @@ export class Authenticator {
     }
 
     if (msg.type_int === MESSAGE_TYPES.TOKEN_RENEW_RESPONSE) {
-      const payload = msg.payload as { token: string };
-      this.token = payload.token;
+      const payload = this.getPayloadObject(msg);
+      const token = this.getStringField(payload, 'token');
+      if (!token) {
+        this.logger('[Authenticator] Ignoring malformed TOKEN_RENEW_RESPONSE payload');
+        return true;
+      }
+
+      this.token = token;
       this.logger('[Authenticator] Token renewed, applying new token...');
 
       const applyNewTokenMsg = {
@@ -250,5 +285,17 @@ export class Authenticator {
     }
 
     return false;
+  }
+
+  private getPayloadObject(msg: ProtocolMessage): Record<string, unknown> | null {
+    if (!msg.payload || typeof msg.payload !== 'object' || Array.isArray(msg.payload)) {
+      return null;
+    }
+    return msg.payload;
+  }
+
+  private getStringField(payload: Record<string, unknown> | null, key: string): string | null {
+    const value = payload?.[key];
+    return typeof value === 'string' && value.length > 0 ? value : null;
   }
 }

@@ -53,7 +53,7 @@ module.exports = class ShadingDevice extends BaseDevice {
               
               const numericId = Number(this.deviceId);
               if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
-              await this.bridge?.getConnectionManager().sendWithRetry({
+              await this.bridge.getConnectionManager().sendWithRetry({
                   type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
                   mc: this.bridge.getConnectionManager().nextMc(),
                   payload: {
@@ -75,7 +75,7 @@ module.exports = class ShadingDevice extends BaseDevice {
            
            const numericId = Number(this.deviceId);
            if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
-           await this.bridge?.getConnectionManager().sendWithRetry({
+           await this.bridge.getConnectionManager().sendWithRetry({
               type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
               mc: this.bridge.getConnectionManager().nextMc(),
               payload: {

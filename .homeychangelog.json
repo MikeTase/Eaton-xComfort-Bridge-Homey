@@ -46,5 +46,8 @@
   },
   "1.4.0": {
     "en": "tuning"
+  },
+  "1.4.1": {
+    "en": "stability and type-safety improvements"
   }
 }

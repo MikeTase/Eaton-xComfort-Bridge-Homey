@@ -24,7 +24,7 @@ module.exports = class WaterSensorDriver extends BaseDriver {
 
     return filtered.map((device) => {
       const baseName = device.name || `Water Sensor ${device.deviceId}`;
-      const roomName = (device as any).roomName;
+      const roomName = device.roomName;
       const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
 
       return {

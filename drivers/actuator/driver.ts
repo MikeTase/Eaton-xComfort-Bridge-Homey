@@ -30,8 +30,7 @@ module.exports = class ActuatorDriver extends BaseDriver {
 
     return filtered.map((device) => {
       const baseName = device.name || `Device ${device.deviceId}`;
-      // Use room name if available (not in XComfortDevice type explicitly but might exist in runtime)
-      const roomName = (device as any).roomName; 
+      const roomName = device.roomName;
       const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
       
       const deviceId = device.deviceId;

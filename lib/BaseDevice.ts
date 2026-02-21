@@ -20,6 +20,9 @@ export abstract class BaseDevice extends Homey.Device {
     private _deviceId: string | null = null;
 
     private onAppBridgeChanged?: (bridge: XComfortBridge | null) => void;
+    private isDeviceReadyInitialized: boolean = false;
+    private onBridgeConnected?: () => void;
+    private onBridgeDisconnected?: () => void;
 
     /** Managed device-state listeners (auto-rebound on bridge change, auto-cleaned on delete) */
     private managedListeners: Array<{ deviceId: string; callback: DeviceStateCallback }> = [];
@@ -34,34 +37,73 @@ export abstract class BaseDevice extends Homey.Device {
 
         const app = this.homey.app as unknown as XComfortApp;
 
-        if (!app.bridge) {
-            this.setUnavailable('Bridge not connected');
-            this.error('Bridge instance not found in App');
-            return; // no throw — subclass onDeviceReady() simply won't run
-        }
+        this.onBridgeConnected = () => {
+            this.setAvailable();
+        };
 
-        this.bridge = app.bridge;
+        this.onBridgeDisconnected = () => {
+            this.setUnavailable('Bridge disconnected');
+        };
 
         this.onAppBridgeChanged = (newBridge) => {
             const oldBridge = this.bridge;
+
+            if (oldBridge) {
+                if (this.onBridgeConnected) {
+                    oldBridge.removeListener('connected', this.onBridgeConnected);
+                }
+                if (this.onBridgeDisconnected) {
+                    oldBridge.removeListener('disconnected', this.onBridgeDisconnected);
+                }
+            }
+
             if (!newBridge) {
                 this.setUnavailable('Bridge not connected');
                 return;
             }
+
             this.bridge = newBridge;
-            this.setAvailable();
+
+            if (this.onBridgeConnected) {
+                newBridge.on('connected', this.onBridgeConnected);
+            }
+            if (this.onBridgeDisconnected) {
+                newBridge.on('disconnected', this.onBridgeDisconnected);
+            }
+
+            if (newBridge.isConnected) {
+                this.setAvailable();
+            } else {
+                this.setUnavailable('Bridge connecting...');
+            }
+
+            // First successful bridge assignment: initialize device hooks once.
+            if (!this.isDeviceReadyInitialized) {
+                this.isDeviceReadyInitialized = true;
+                this.onDeviceReady().catch((err) => {
+                    this.error(`[BaseDevice] onDeviceReady failed for ${this.getName()}:`, err);
+                });
+                return;
+            }
 
             // Rebind all managed listeners to the new bridge
             for (const entry of this.managedListeners) {
-                oldBridge.removeDeviceStateListener(entry.deviceId, entry.callback);
+                oldBridge?.removeDeviceStateListener(entry.deviceId, entry.callback);
                 newBridge.addDeviceStateListener(entry.deviceId, entry.callback);
             }
 
-            this.onBridgeChanged(newBridge, oldBridge);
+            if (oldBridge) {
+                this.onBridgeChanged(newBridge, oldBridge);
+            }
         };
         app.on('bridge_changed', this.onAppBridgeChanged);
 
-        await this.onDeviceReady();
+        if (app.bridge) {
+            this.onAppBridgeChanged(app.bridge);
+        } else {
+            this.setUnavailable('Bridge not connected');
+            this.error('Bridge instance not found in App');
+        }
     }
 
     // ── Subclass hooks ──────────────────────────────────────────────────
@@ -132,5 +174,16 @@ export abstract class BaseDevice extends Homey.Device {
             app.removeListener('bridge_changed', this.onAppBridgeChanged);
             this.onAppBridgeChanged = undefined;
         }
+
+        if (this.bridge) {
+            if (this.onBridgeConnected) {
+                this.bridge.removeListener('connected', this.onBridgeConnected);
+            }
+            if (this.onBridgeDisconnected) {
+                this.bridge.removeListener('disconnected', this.onBridgeDisconnected);
+            }
+        }
+        this.onBridgeConnected = undefined;
+        this.onBridgeDisconnected = undefined;
     }
 }
