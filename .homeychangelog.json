@@ -49,5 +49,8 @@
   },
   "1.4.1": {
     "en": "stability and type-safety improvements"
+  },
+  "1.4.2": {
+    "en": "Changed readme for IP"
   }
 }
