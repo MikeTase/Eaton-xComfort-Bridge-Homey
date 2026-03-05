@@ -211,7 +211,12 @@ export class Authenticator {
           salt: salt,
         },
       };
-      this.sendEncrypted(loginMsg);
+      const sent = this.sendEncrypted(loginMsg);
+      if (sent === false) {
+        this.logger('[Authenticator-ERROR] Failed to send login request');
+        this.state = 'idle';
+        return true;
+      }
       this.state = 'awaiting_login_response';
       this.logger('[Authenticator] Sent login');
       return true;
@@ -285,6 +290,29 @@ export class Authenticator {
     }
 
     return false;
+  }
+
+  /**
+   * Get current authentication state
+   */
+  getState(): AuthState {
+    return this.state;
+  }
+
+  /**
+   * Get human-readable description of current auth state
+   */
+  getStateDescription(): string {
+    const descriptions: Record<AuthState, string> = {
+      'idle': 'Not started',
+      'awaiting_public_key': 'Waiting for public key',
+      'awaiting_secret_ack': 'Waiting for secret exchange ACK',
+      'awaiting_login_response': 'Waiting for login response (credentials sent)',
+      'awaiting_token_apply': 'Waiting for token apply ACK',
+      'awaiting_token_renew': 'Waiting for token renewal',
+      'authenticated': 'Authenticated',
+    };
+    return descriptions[this.state] || `Unknown (${this.state})`;
   }
 
   private getPayloadObject(msg: ProtocolMessage): Record<string, unknown> | null {

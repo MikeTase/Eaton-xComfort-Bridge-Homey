@@ -58,7 +58,6 @@ export class ConnectionManager {
   private lastMessageAt: number = Date.now();
   private mc: number = 0;
   private connectResolve?: () => void;
-  private connectReject?: (error: Error) => void;
 
   private onRawMessage?: OnRawMessageFn;
   private onClose?: OnCloseFn;
@@ -247,9 +246,7 @@ export class ConnectionManager {
         });
 
         // Resolve is called externally when auth completes
-        // Store resolve/reject for external completion
         this.connectResolve = resolve;
-        this.connectReject = reject;
 
       } catch (error) {
         reject(error);
@@ -329,9 +326,11 @@ export class ConnectionManager {
 
   /**
    * Check if message looks encrypted (Base64)
+   * Requires minimum length to avoid false positives on short alphanumeric strings
    */
   isEncrypted(data: string): boolean {
-    return this.base64regex.test(data.trim());
+    const trimmed = data.trim();
+    return trimmed.length >= 24 && this.base64regex.test(trimmed);
   }
 
   /**
@@ -443,10 +442,10 @@ export class ConnectionManager {
   cleanup(): void {
     this.stopHeartbeat();
     this.clearPendingAcks();
+    this.txSemaphore.drain();
     this.connectionEstablished = false;
     this.reconnecting = false;
     this.connectResolve = undefined;
-    this.connectReject = undefined;
     if (this.ws) {
       this.ws.removeAllListeners();
       // Add no-op error handler to prevent unhandled 'error' crash.

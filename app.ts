@@ -8,6 +8,7 @@ class XComfortApp extends Homey.App {
   private settingsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   async onInit() {
+    (this as any).setMaxListeners(50); // Each device listens for bridge_changed
     this.log('Eaton xComfort App has been initialized');
 
     // Attempt to load settings and connect
@@ -71,11 +72,6 @@ class XComfortApp extends Homey.App {
         this.error('Bridge: Initialization failed', err);
       }
     }
-  }
-  
-  // Helper for drivers
-  getBridge(): XComfortBridge | null {
-      return this.bridge;
   }
 }
 

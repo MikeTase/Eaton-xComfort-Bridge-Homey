@@ -1,5 +1,4 @@
 import { BaseDevice } from '../../lib/BaseDevice';
-import { MESSAGE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate, ShadingAction } from '../../lib/types';
 
 module.exports = class ShadingDevice extends BaseDevice {
@@ -35,10 +34,10 @@ module.exports = class ShadingDevice extends BaseDevice {
       }
       
       if (data.shadsClosed !== undefined || data.dimmvalue !== undefined) {
-          // shadsClosed is likely 0-1 or 0-100. Fallback to dimmvalue if present.
           let pos = data.shadsClosed ?? data.dimmvalue;
           if (pos !== undefined && this.hasCapability('windowcoverings_set')) {
-              if (pos > 1) pos = pos / 100; // Auto-detect 0-100 scale
+              // Values > 1 are on the 0-100 scale, normalize to 0-1
+              if (pos > 1) pos = pos / 100;
               pos = Math.max(0, Math.min(1, pos));
               this.setCapabilityValue('windowcoverings_set', pos).catch(this.error);
           }
@@ -53,15 +52,7 @@ module.exports = class ShadingDevice extends BaseDevice {
               
               const numericId = Number(this.deviceId);
               if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
-              await this.bridge.getConnectionManager().sendWithRetry({
-                  type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
-                  mc: this.bridge.getConnectionManager().nextMc(),
-                  payload: {
-                      deviceId: numericId,
-                      action: ShadingAction.GO_TO,
-                      value: value * 100 // Protocol likely expects 0-100
-                  }
-              });
+              await this.bridge.controlShading(numericId, ShadingAction.GO_TO, value * 100);
           });
       }
       
@@ -75,18 +66,7 @@ module.exports = class ShadingDevice extends BaseDevice {
            
            const numericId = Number(this.deviceId);
            if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
-           await this.bridge.getConnectionManager().sendWithRetry({
-              type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
-              mc: this.bridge.getConnectionManager().nextMc(),
-              payload: {
-                  deviceId: numericId,
-                  action: action
-              }
-          });
+           await this.bridge.controlShading(numericId, action);
       });
-  }
-  
-  onDeleted() {
-      super.onDeleted();
   }
 };

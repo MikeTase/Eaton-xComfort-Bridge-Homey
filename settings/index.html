@@ -54,7 +54,15 @@
                     // Accept IPv4 addresses and hostnames
                     var ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
                     var hostname = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
-                    return ipv4.test(str) || hostname.test(str);
+                    if (ipv4.test(str)) {
+                        // Validate each octet is 0-255
+                        var octets = str.split('.');
+                        return octets.every(function(o) {
+                            var n = parseInt(o, 10);
+                            return n >= 0 && n <= 255;
+                        });
+                    }
+                    return hostname.test(str);
                 }
 
                 function validate() {
@@ -84,9 +92,19 @@
                         return;
                     }
 
-                    Homey.set('bridge_ip', ip);
-                    Homey.set('bridge_auth_key', key);
-                    setStatus(Homey.__('settings.saved') || 'Settings saved!', false);
+                    Homey.set('bridge_ip', ip, function(err) {
+                        if (err) {
+                            setStatus(Homey.__('settings.save_error') || 'Error saving IP address.', true);
+                            return;
+                        }
+                        Homey.set('bridge_auth_key', key, function(err) {
+                            if (err) {
+                                setStatus(Homey.__('settings.save_error') || 'Error saving auth key.', true);
+                                return;
+                            }
+                            setStatus(Homey.__('settings.saved') || 'Settings saved!', false);
+                        });
+                    });
                 });
 
                 toggleButton.addEventListener('click', function() {

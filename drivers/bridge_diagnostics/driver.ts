@@ -9,9 +9,8 @@ module.exports = class BridgeDiagnosticsDriver extends BaseDriver {
       (existing || []).map((device: Homey.Device) => String(device.getData()?.id || ''))
     );
 
-    const bridge = this.getBridge();
-    // Use bridge just to verify connectivity, though we don't query devices from it here for virtual devices
-    // Actually we might want to check if bridge is connected before allowing adding diagnostics
+    // Verify bridge connectivity before allowing adding diagnostics
+    this.getBridge();
     
     const candidates = [
       { id: 'bridge_diag_temp', name: 'Bridge Temperature', kind: 'temp' },

@@ -60,6 +60,7 @@ export class XComfortBridge extends EventEmitter {
 
   constructor(bridgeIp: string, authKey: string, logger?: LoggerFunction) {
     super(); // Initialize EventEmitter
+    this.setMaxListeners(50); // Each device adds connected+disconnected listeners
     this.bridgeIp = bridgeIp;
     this.authKey = authKey;
     this.logger = logger || console.log;
@@ -82,10 +83,6 @@ export class XComfortBridge extends EventEmitter {
     );
 
     this.setupCallbacks();
-  }
-
-  public getConnectionManager(): ConnectionManager {
-    return this.connectionManager;
   }
 
   private setupCallbacks(): void {
@@ -216,16 +213,21 @@ export class XComfortBridge extends EventEmitter {
         }
       }, 1000);
 
-      // Connection timeout
+      // Use longer timeout for reconnection attempts to give the bridge more time
+      const timeout = this.reconnectAttempt > 0
+        ? PROTOCOL_CONFIG.TIMEOUTS.RECONNECT_CONNECTION
+        : PROTOCOL_CONFIG.TIMEOUTS.CONNECTION;
+
       this.connectionTimeout = setTimeout(() => {
-        this.logger('[XComfortBridge] Connection timeout');
+        const authState = this.authenticator.getStateDescription();
+        this.logger(`[XComfortBridge] Connection timeout (auth state: ${authState})`);
         this.stopWatchdog();
         this.connectionManager.cleanup();
         if (this.allowReconnect) {
           this.scheduleReconnect();
         }
-        safeReject(new Error('Connection timeout - device list not received'));
-      }, PROTOCOL_CONFIG.TIMEOUTS.CONNECTION);
+        safeReject(new Error(`Connection timeout - ${authState}`));
+      }, timeout);
     });
   }
 
@@ -274,17 +276,35 @@ export class XComfortBridge extends EventEmitter {
     if (!this.allowReconnect) return;
     if (this.connectionManager.isReconnecting()) return;
 
+    // Stop reconnecting after too many consecutive failures
+    const MAX_RECONNECT_ATTEMPTS = 30;
+    if (this.reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+      this.logger(`[XComfortBridge-ERROR] Maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Giving up. Please check bridge power/network and restart the app.`);
+      this.emit('max_reconnect_reached');
+      this.connectionManager.setReconnecting(false);
+      return;
+    }
+
     this.connectionManager.setReconnecting(true);
     this.reconnectAttempt++;
 
-    // Calculate delay: immediate for first 1006, then exponential backoff
-    // Base delay: 500ms for 1006, 5000ms for others
-    // Max delay: 60 seconds
-    const MAX_RECONNECT_DELAY = 60000;
+    // Calculate delay with escalating backoff:
+    // - First few attempts: quick retry (500ms base for 1006)
+    // - After 5 failures: cap at 60 seconds
+    // - After 10 failures: extend to 120 seconds (give bridge time to clean up sessions)
+    // - After 20 failures: extend to 300 seconds
+    let maxDelay: number;
+    if (this.reconnectAttempt > 20) {
+      maxDelay = 300000; // 5 minutes
+    } else if (this.reconnectAttempt > 10) {
+      maxDelay = 120000; // 2 minutes
+    } else {
+      maxDelay = 60000;  // 1 minute
+    }
     const baseDelay = this.lastCloseCode === WS_CLOSE_CODES.ABNORMAL_CLOSURE ? 500 : PROTOCOL_CONFIG.TIMEOUTS.RECONNECT_DELAY;
     const delay = Math.min(
       baseDelay * Math.pow(2, Math.max(0, this.reconnectAttempt - 1)),
-      MAX_RECONNECT_DELAY
+      maxDelay
     );
 
     this.logger(`[XComfortBridge] Scheduling reconnect in ${delay}ms (attempt ${this.reconnectAttempt}, code ${this.lastCloseCode})`);
@@ -331,6 +351,8 @@ export class XComfortBridge extends EventEmitter {
         }
         return;
       }
+      // JSON message not handled by authenticator - log for diagnostics
+      this.logger(`[XComfortBridge] Unhandled JSON message type: ${msg.type_int}`);
     } catch {
       // Not JSON, check for encrypted
     }
@@ -349,13 +371,14 @@ export class XComfortBridge extends EventEmitter {
   }
 
   private handleEncryptedMessage(msg: ProtocolMessage, _rawRecvTime: number): void {
-    // Send ACK immediately for messages with 'mc' field (ignore negative mc)
+    // Send ACK synchronously BEFORE processing to ensure the bridge receives
+    // our ACK before any response messages (e.g. LOGIN_REQUEST after SECRET_EXCHANGE_ACK).
+    // Previously used setImmediate which caused LOGIN to arrive before ACK,
+    // potentially causing the bridge to ignore the login.
     if (msg.mc !== undefined && msg.mc >= 0) {
-      setImmediate(() => {
-        this.connectionManager.sendEncrypted({
-          type_int: MESSAGE_TYPES.ACK,
-          ref: msg.mc
-        });
+      this.connectionManager.sendEncrypted({
+        type_int: MESSAGE_TYPES.ACK,
+        ref: msg.mc
       });
     } else if (msg.type_int === MESSAGE_TYPES.PING) {
       // Always ACK PING to prevent 1006 disconnects
@@ -363,10 +386,13 @@ export class XComfortBridge extends EventEmitter {
       if (msg.ref !== undefined) ackMsg.ref = msg.ref;
       this.connectionManager.sendEncrypted(ackMsg as Record<string, unknown>);
     } else if (msg.type_int === MESSAGE_TYPES.HEARTBEAT) {
-      this.connectionManager.sendEncrypted({
-        type_int: MESSAGE_TYPES.ACK,
-        ref: msg.mc ?? -1
-      });
+      // Only ACK if the HEARTBEAT has a valid mc
+      if (msg.mc !== undefined && msg.mc >= 0) {
+        this.connectionManager.sendEncrypted({
+          type_int: MESSAGE_TYPES.ACK,
+          ref: msg.mc
+        });
+      }
     }
 
     // Try authenticator first (for auth flow messages)
@@ -374,7 +400,11 @@ export class XComfortBridge extends EventEmitter {
 
     // Then message handler (for data/state messages) — deferred to allow ACK I/O to flush
     setImmediate(() => {
-      this.messageHandler.processMessage(msg).catch((err) => {
+      this.messageHandler.processMessage(msg).then((handled) => {
+        if (!handled) {
+          this.logger(`[XComfortBridge] Unhandled encrypted message type: ${msg.type_int}`);
+        }
+      }).catch((err) => {
         console.error('[XComfortBridge] Message processing error:', err);
       });
     });
@@ -439,12 +469,7 @@ export class XComfortBridge extends EventEmitter {
     }
 
     return debouncer.run(async () => {
-        // Adapter for Homey which might send 0-1
         let targetVal = dimmValue;
-        if (dimmValue <= 1 && dimmValue > 0) {
-            // Assume 0-1 range if low value, scale to 99
-            targetVal = Math.round(dimmValue * 99);
-        }
         
         // If target is 0, switch off explicitly via switchDevice (which handles 0/1 logic)
         if (targetVal === 0) {
@@ -471,15 +496,39 @@ export class XComfortBridge extends EventEmitter {
     });
   }
 
-  async controlShade(deviceId: string, operation: number): Promise<boolean> {
-    const msg = {
-      type_int: MESSAGE_TYPES.DEVICE_SHADE,
-      mc: this.connectionManager.nextMc(),
-      payload: { deviceId: this.parseId(deviceId), value: operation },
+  /**
+   * Control a shading device (open/close/stop/position)
+   */
+  async controlShading(deviceId: string | number, action: number, value?: number): Promise<boolean> {
+    const numericId = this.parseId(String(deviceId));
+    const payload: Record<string, unknown> = {
+      deviceId: numericId,
+      action: action,
     };
+    if (value !== undefined) {
+      payload.value = value;
+    }
 
-    // Use retry to avoid silent command loss under transient link issues
-    return this.connectionManager.sendWithRetry(msg);
+    return this.connectionManager.sendWithRetry({
+      type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
+      mc: this.connectionManager.nextMc(),
+      payload,
+    });
+  }
+
+  /**
+   * Set thermostat setpoint
+   */
+  async setThermostatSetpoint(deviceId: string | number, setpoint: number): Promise<boolean> {
+    const numericId = this.parseId(String(deviceId));
+    return this.connectionManager.sendWithRetry({
+      type_int: MESSAGE_TYPES.SET_HEATING_STATE,
+      mc: this.connectionManager.nextMc(),
+      payload: {
+        deviceId: numericId,
+        setpoint: setpoint,
+      },
+    });
   }
 
   // ===========================================================================
@@ -523,18 +572,13 @@ export class XComfortBridge extends EventEmitter {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.messageHandler.cleanup();
     this.connectionManager.cleanup();
     this.connectionManager.setReconnecting(false);
     this.connectionState = 'disconnected';
     this.reconnectAttempt = 0;
     this.dimDebouncers.clear();
     this.removeAllListeners();
-  }
-
-  private requireConnection(): void {
-    if (!this.connectionManager.isConnected()) {
-      throw new Error('xComfort Bridge not connected');
-    }
   }
 
   private parseId(id: string): string | number {

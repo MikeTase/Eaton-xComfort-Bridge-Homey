@@ -1,5 +1,5 @@
 import { BaseDevice } from '../../lib/BaseDevice';
-import { MESSAGE_TYPES, DEVICE_TYPES } from '../../lib/XComfortProtocol';
+import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate } from '../../lib/types';
 
 module.exports = class ThermostatDevice extends BaseDevice {
@@ -74,18 +74,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
           
           const numericId = Number(this.deviceId);
           if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
-          await this.bridge.getConnectionManager().sendWithRetry({
-              type_int: MESSAGE_TYPES.SET_HEATING_STATE,
-              mc: this.bridge.getConnectionManager().nextMc(),
-              payload: {
-                  deviceId: numericId,
-                  setpoint: value
-              }
-          });
+          await this.bridge.setThermostatSetpoint(numericId, value);
       });
-  }
-  
-  onDeleted() {
-      super.onDeleted();
   }
 };

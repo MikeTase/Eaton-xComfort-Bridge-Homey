@@ -53,8 +53,4 @@ module.exports = class WallSwitchDevice extends BaseDevice {
         }
     });
   }
-
-  onDeleted() {
-      super.onDeleted();
-  }
 }

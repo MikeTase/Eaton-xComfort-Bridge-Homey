@@ -117,6 +117,11 @@ module.exports = class ActuatorDevice extends BaseDevice {
             } catch (err) {
                 this.error(`[Actuator] Error sending dim command for ${this.deviceId}:`, err);
                 this.pendingSwitchState = null;
+                // Revert dim slider to previous value
+                const currentDim = this.getCapabilityValue('dim');
+                if (currentDim !== null && currentDim !== value) {
+                    this.setCapabilityValue('dim', currentDim).catch(() => {});
+                }
                 if (value === 0) this.setCapabilityValue('onoff', true).catch(() => {});
             }
         });

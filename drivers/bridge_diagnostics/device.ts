@@ -7,8 +7,6 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
   private onBridgeStatus?: (status: BridgeStatus) => void;
 
   async onDeviceReady() {
-    this.setAvailable();
-
     await this.applyCapabilityProfile();
 
     this.onBridgeStatus = (status: BridgeStatus) => {

@@ -4,8 +4,6 @@ import { DeviceStateUpdate } from '../../lib/types';
 module.exports = class WaterSensorDevice extends BaseDevice {
 
   async onDeviceReady() {
-    this.setAvailable();
-
     this.addManagedStateListener(this.deviceId, (_deviceId: string, state: DeviceStateUpdate) => {
       this.updateState(state);
     });
@@ -23,9 +21,5 @@ module.exports = class WaterSensorDevice extends BaseDevice {
     if (alarm !== undefined && this.hasCapability('alarm_water')) {
       this.setCapabilityValue('alarm_water', alarm).catch(this.error);
     }
-  }
-
-  onDeleted() {
-    super.onDeleted();
   }
 };

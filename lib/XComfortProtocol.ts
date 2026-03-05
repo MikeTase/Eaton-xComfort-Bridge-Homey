@@ -113,6 +113,7 @@ export const PROTOCOL_CONFIG = {
   },
   TIMEOUTS: {
     CONNECTION: 30000, // 30 seconds
+    RECONNECT_CONNECTION: 45000, // 45 seconds - longer timeout for reconnection attempts
     HEARTBEAT: 30000, // 30 seconds
     RECONNECT_DELAY: 5000, // 5 seconds
   },

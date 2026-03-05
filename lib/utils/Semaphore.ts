@@ -25,4 +25,15 @@ export class Semaphore {
             this.permits++;
         }
     }
+
+    /**
+     * Drain all queued waiters by resolving them immediately.
+     * This prevents orphaned promises when the owner is being destroyed.
+     */
+    drain(): void {
+        while (this.queue.length > 0) {
+            const resolve = this.queue.shift();
+            if (resolve) resolve();
+        }
+    }
 }

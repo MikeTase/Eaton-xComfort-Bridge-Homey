@@ -333,6 +333,18 @@ export class MessageHandler {
     }
   }
 
+  /**
+   * Clear all pending coalesce timers and queued updates.
+   * Should be called when the connection is being torn down.
+   */
+  cleanup(): void {
+    for (const timer of this.flushTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.flushTimers.clear();
+    this.pendingDeviceUpdates.clear();
+  }
+
   private getPayloadObject(payload: unknown): Record<string, unknown> | null {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
       return null;
