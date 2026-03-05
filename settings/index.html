@@ -29,6 +29,7 @@
                     <input id="bridge_auth_key" type="password" placeholder="e.g. A1B2-C3D4-..." autocomplete="off" />
                     <button id="toggle_key" type="button" class="button" data-i18n="settings.show">Show</button>
                 </div>
+                <div class="hint">Dashes and spaces are accepted and removed automatically when saved.</div>
             </div>
         </fieldset>
 
@@ -85,7 +86,7 @@
                 // Save button handler
                 saveButton.addEventListener('click', function() {
                     var ip = (ipInput.value || '').trim();
-                    var key = (keyInput.value || '').trim();
+                    var key = (keyInput.value || '').replace(/[\s-]+/g, '');
 
                     if (!ip || !key) {
                         setStatus(Homey.__('settings.fill_required') || 'Please fill in both fields.', true);

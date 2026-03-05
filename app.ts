@@ -32,6 +32,8 @@ class XComfortApp extends Homey.App {
           const newKey = this.homey.settings.get('bridge_auth_key');
           if (newIp && newKey) {
             await this.initBridge(newIp, newKey);
+          } else {
+            this.resetBridge('Bridge configuration cleared in Settings.');
           }
         }, 500);
       }
@@ -40,16 +42,11 @@ class XComfortApp extends Homey.App {
 
   async initBridge(ip: string, authKey: string) {
     const token = ++this.initToken;
-    if (this.bridge) {
-      this.bridge.disconnect();
-      this.bridge.removeAllListeners();
-      this.bridge = null;
-      this.emit('bridge_changed', null);
-    }
+    this.resetBridge();
 
     // Sanitize inputs
     const cleanIp = ip.trim();
-    const cleanKey = authKey.trim();
+    const cleanKey = authKey.replace(/[\s-]+/g, '');
 
     this.log(`Initializing Bridge at '${cleanIp}'...`);
     
@@ -72,6 +69,24 @@ class XComfortApp extends Homey.App {
         this.error('Bridge: Initialization failed', err);
       }
     }
+  }
+
+  private resetBridge(reason?: string) {
+    if (!this.bridge) {
+      if (reason) {
+        this.log(reason);
+      }
+      return;
+    }
+
+    if (reason) {
+      this.log(reason);
+    }
+
+    this.bridge.disconnect();
+    this.bridge.removeAllListeners();
+    this.bridge = null;
+    this.emit('bridge_changed', null);
   }
 }
 

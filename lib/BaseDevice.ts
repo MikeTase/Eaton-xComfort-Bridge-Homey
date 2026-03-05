@@ -55,9 +55,13 @@ export abstract class BaseDevice extends Homey.Device {
                 if (this.onBridgeDisconnected) {
                     oldBridge.removeListener('disconnected', this.onBridgeDisconnected);
                 }
+                for (const entry of this.managedListeners) {
+                    oldBridge.removeDeviceStateListener(entry.deviceId, entry.callback);
+                }
             }
 
             if (!newBridge) {
+                this.bridge = undefined as unknown as XComfortBridge;
                 this.setUnavailable('Bridge not connected');
                 return;
             }
@@ -88,7 +92,6 @@ export abstract class BaseDevice extends Homey.Device {
 
             // Rebind all managed listeners to the new bridge
             for (const entry of this.managedListeners) {
-                oldBridge?.removeDeviceStateListener(entry.deviceId, entry.callback);
                 newBridge.addDeviceStateListener(entry.deviceId, entry.callback);
             }
 

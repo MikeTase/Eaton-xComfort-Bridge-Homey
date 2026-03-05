@@ -40,6 +40,15 @@ module.exports = class ShadingDevice extends BaseDevice {
               if (pos > 1) pos = pos / 100;
               pos = Math.max(0, Math.min(1, pos));
               this.setCapabilityValue('windowcoverings_set', pos).catch(this.error);
+              if (this.hasCapability('windowcoverings_state')) {
+                  let state: 'up' | 'idle' | 'down' = 'idle';
+                  if (pos <= 0) {
+                      state = 'up';
+                  } else if (pos >= 1) {
+                      state = 'down';
+                  }
+                  this.setCapabilityValue('windowcoverings_state', state).catch(this.error);
+              }
           }
       }
   }
@@ -52,6 +61,10 @@ module.exports = class ShadingDevice extends BaseDevice {
               
               const numericId = Number(this.deviceId);
               if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
+              if (this.hasCapability('windowcoverings_state')) {
+                  const state = value <= 0 ? 'up' : value >= 1 ? 'down' : 'idle';
+                  this.setCapabilityValue('windowcoverings_state', state).catch(this.error);
+              }
               await this.bridge.controlShading(numericId, ShadingAction.GO_TO, value * 100);
           });
       }
@@ -66,6 +79,7 @@ module.exports = class ShadingDevice extends BaseDevice {
            
            const numericId = Number(this.deviceId);
            if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
+           this.setCapabilityValue('windowcoverings_state', value).catch(this.error);
            await this.bridge.controlShading(numericId, action);
       });
   }
