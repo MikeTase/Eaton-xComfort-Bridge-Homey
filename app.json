@@ -6,7 +6,7 @@
   "description": {
     "en": "Seamless Eaton xComfort control for lights, shades, and heating."
   },
-  "version": "1.4.6",
+  "version": "1.4.7",
   "category": [
     "lights",
     "climate"
@@ -60,6 +60,34 @@
             "type": "string",
             "title": {
               "en": "Event"
+            }
+          },
+          {
+            "name": "action",
+            "type": "string",
+            "title": {
+              "en": "Action"
+            }
+          },
+          {
+            "name": "button",
+            "type": "number",
+            "title": {
+              "en": "Button"
+            }
+          },
+          {
+            "name": "component_id",
+            "type": "string",
+            "title": {
+              "en": "Component ID"
+            }
+          },
+          {
+            "name": "component_model",
+            "type": "string",
+            "title": {
+              "en": "Component Model"
             }
           }
         ]
@@ -378,6 +406,48 @@
         "alarm_contact.windows",
         "alarm_contact.doors",
         "alarm_motion"
+      ],
+      "settings": [
+        {
+          "id": "bridge_name",
+          "type": "label",
+          "label": {
+            "en": "Bridge name"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_id",
+          "type": "label",
+          "label": {
+            "en": "Bridge ID"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_model",
+          "type": "label",
+          "label": {
+            "en": "Bridge model"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_ip",
+          "type": "label",
+          "label": {
+            "en": "Bridge IP"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_scenes",
+          "type": "label",
+          "label": {
+            "en": "Scenes"
+          },
+          "value": "-"
+        }
       ],
       "pair": [
         {

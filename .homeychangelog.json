@@ -64,5 +64,8 @@
   },
   "1.4.6": {
     "en": "Removed room and temperature/humidity sensor device types and corrected the door/window sensor images."
+  },
+  "1.4.7": {
+    "en": "Improved thermostat sensor sync and energy tracking, richer wall switch events, bridge diagnostics metadata, and better state restore after reconnect."
   }
 }
