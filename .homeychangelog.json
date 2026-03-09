@@ -61,5 +61,8 @@
   },
   "1.4.5": {
     "en": "Added synced xComfort thermostat presets and room heating state, plus new temperature/humidity, door/window, and room status sensors with improved heater and button telemetry."
+  },
+  "1.4.6": {
+    "en": "Removed room and temperature/humidity sensor device types and corrected the door/window sensor images."
   }
 }

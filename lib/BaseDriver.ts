@@ -1,6 +1,6 @@
 import * as Homey from 'homey';
 import { XComfortBridge } from './connection/XComfortBridge';
-import { XComfortDevice, XComfortRoom } from './types';
+import { XComfortDevice } from './types';
 
 // Define the shape of our specific App class
 interface XComfortApp extends Homey.App {
@@ -68,11 +68,4 @@ export abstract class BaseDriver extends Homey.Driver {
         });
     }
 
-    /**
-     * Gets rooms from the bridge, waiting for the initial data load if needed.
-     */
-    protected async getRoomsFromBridge(timeoutMs: number = 15000): Promise<XComfortRoom[]> {
-        await this.getDevicesFromBridge(timeoutMs);
-        return this.getBridge().getRooms();
-    }
 }
