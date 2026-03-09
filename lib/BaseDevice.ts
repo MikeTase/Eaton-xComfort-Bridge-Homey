@@ -1,6 +1,6 @@
 import * as Homey from 'homey';
 import { XComfortBridge } from './connection/XComfortBridge';
-import type { DeviceStateUpdate, DeviceStateCallback } from './types';
+import type { DeviceStateUpdate, DeviceStateCallback, RoomStateCallback } from './types';
 
 // Define the shape of our specific App class
 interface XComfortApp extends Homey.App {
@@ -26,6 +26,7 @@ export abstract class BaseDevice extends Homey.Device {
 
     /** Managed device-state listeners (auto-rebound on bridge change, auto-cleaned on delete) */
     private managedListeners: Array<{ deviceId: string; callback: DeviceStateCallback }> = [];
+    private managedRoomListeners: Array<{ roomId: string; callback: RoomStateCallback }> = [];
 
     /**
      * Template-method initialisation.
@@ -57,6 +58,9 @@ export abstract class BaseDevice extends Homey.Device {
                 }
                 for (const entry of this.managedListeners) {
                     oldBridge.removeDeviceStateListener(entry.deviceId, entry.callback);
+                }
+                for (const entry of this.managedRoomListeners) {
+                    oldBridge.removeRoomStateListener(entry.roomId, entry.callback);
                 }
             }
 
@@ -93,6 +97,9 @@ export abstract class BaseDevice extends Homey.Device {
             // Rebind all managed listeners to the new bridge
             for (const entry of this.managedListeners) {
                 newBridge.addDeviceStateListener(entry.deviceId, entry.callback);
+            }
+            for (const entry of this.managedRoomListeners) {
+                newBridge.addRoomStateListener(entry.roomId, entry.callback);
             }
 
             if (oldBridge) {
@@ -150,6 +157,16 @@ export abstract class BaseDevice extends Homey.Device {
     }
 
     /**
+     * Register a room-state listener that is automatically:
+     * - rebound when the bridge reconnects
+     * - removed when the device is deleted
+     */
+    protected addManagedRoomStateListener(roomId: string, callback: RoomStateCallback): void {
+        this.bridge.addRoomStateListener(roomId, callback);
+        this.managedRoomListeners.push({ roomId, callback });
+    }
+
+    /**
      * Safely update a capability value (no-ops if capability doesn't exist).
      */
     protected async updateCapability(capabilityId: string, value: string | number | boolean | null): Promise<void> {
@@ -168,8 +185,12 @@ export abstract class BaseDevice extends Homey.Device {
             for (const entry of this.managedListeners) {
                 this.bridge.removeDeviceStateListener(entry.deviceId, entry.callback);
             }
+            for (const entry of this.managedRoomListeners) {
+                this.bridge.removeRoomStateListener(entry.roomId, entry.callback);
+            }
         }
         this.managedListeners = [];
+        this.managedRoomListeners = [];
 
         // Unsubscribe from app-level bridge change events
         const app = this.homey.app as unknown as XComfortApp;

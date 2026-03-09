@@ -49,6 +49,7 @@ export interface EncryptionContext {
  * Climate/Heating Modes
  */
 export enum ClimateMode {
+  Unknown = 0,
   FrostProtection = 1,
   Eco = 2,
   Comfort = 3
@@ -60,7 +61,9 @@ export enum ClimateMode {
 export enum ClimateState {
   Off = 0,
   HeatingAuto = 1,
-  HeatingManual = 2
+  HeatingManual = 2,
+  CoolingAuto = 3,
+  CoolingManual = 4
 }
 
 /**
@@ -82,6 +85,7 @@ export interface XComfortDevice {
   deviceId: string;
   name: string;
   roomName?: string;
+  roomId?: string;
   dimmable?: boolean;
   devType?: number;
   compId?: number;
@@ -96,6 +100,38 @@ export interface XComfortDevice {
   setpoint?: number;
   operationMode?: number;
   
+  [key: string]: unknown;
+}
+
+/**
+ * Room mode setpoint entry from xComfort
+ */
+export interface RoomModeSetpoint {
+  mode: number | ClimateMode;
+  value: number;
+}
+
+/**
+ * Room/zone climate state from xComfort Bridge
+ */
+export interface XComfortRoom {
+  roomId: string;
+  name: string;
+  temperatureOnly?: boolean;
+  roomSensorId?: string | number;
+  setpoint?: number;
+  currentMode?: number | ClimateMode;
+  mode?: number | ClimateMode;
+  state?: number | ClimateState;
+  temp?: number;
+  humidity?: number;
+  power?: number;
+  valve?: number;
+  lightsOn?: number;
+  windowsOpen?: number;
+  doorsOpen?: number;
+  modes?: RoomModeSetpoint[];
+  raw?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -145,6 +181,26 @@ export interface DeviceStateUpdate {
 }
 
 /**
+ * Room state update payload
+ */
+export interface RoomStateUpdate {
+  setpoint?: number;
+  temp?: number;
+  humidity?: number;
+  power?: number;
+  valve?: number;
+  lightsOn?: number;
+  windowsOpen?: number;
+  doorsOpen?: number;
+  currentMode?: number | ClimateMode;
+  mode?: number | ClimateMode;
+  state?: number | ClimateState;
+  temperatureOnly?: boolean;
+  modes?: RoomModeSetpoint[];
+  raw?: Record<string, unknown>;
+}
+
+/**
  * Parsed device metadata
  */
 export interface DeviceMetadata {
@@ -158,6 +214,14 @@ export interface DeviceMetadata {
 export type DeviceStateCallback = (
   deviceId: string,
   stateData: DeviceStateUpdate
+) => void | Promise<void>;
+
+/**
+ * Room state listener callback
+ */
+export type RoomStateCallback = (
+  roomId: string,
+  stateData: RoomStateUpdate
 ) => void | Promise<void>;
 
 // =============================================================================
@@ -183,6 +247,9 @@ export interface StateUpdateItem {
   switch?: boolean | number;
   dimmvalue?: number;
   power?: number;
+  temp?: number;
+  humidity?: number;
+  valve?: number;
   curstate?: unknown;
   info?: InfoEntry[];
   lightsOn?: number;
@@ -197,9 +264,13 @@ export interface StateUpdateItem {
 
   // Heating specific
   setpoint?: number;
+  currentMode?: number | ClimateMode;
+  mode?: number | ClimateMode;
+  state?: number | ClimateState;
   operationMode?: number | ClimateMode;
   tempState?: number | ClimateState;
+  temperatureOnly?: boolean;
+  modes?: RoomModeSetpoint[];
   
   errorState?: unknown;
 }
-

@@ -11,8 +11,11 @@ import type {
   ProtocolMessage,
   StateUpdateItem,
   DeviceStateUpdate,
+  RoomStateUpdate,
   BridgeStatus,
-  LoggerFunction
+  LoggerFunction,
+  XComfortRoom,
+  RoomModeSetpoint
 } from '../types';
 
 // ============================================================================
@@ -40,7 +43,9 @@ export class MessageHandler {
   private logger: LoggerFunction;
   private debugStateItems: boolean = false;
   private pendingDeviceUpdates: Map<string, DeviceStateUpdate> = new Map();
+  private pendingRoomUpdates: Map<string, RoomStateUpdate> = new Map();
   private flushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+  private roomFlushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   private readonly UPDATE_COALESCE_MS = 150;
   private onDeviceListComplete?: OnDeviceListCompleteFn;
   private onAckReceived?: OnAckReceivedFn;
@@ -230,6 +235,42 @@ export class MessageHandler {
       });
     }
 
+    if (payload.rooms && Array.isArray(payload.rooms)) {
+      payload.rooms.forEach((roomPayload) => {
+        if (!roomPayload || typeof roomPayload !== 'object' || Array.isArray(roomPayload)) {
+          return;
+        }
+
+        const room = this.normalizeRoomPayload(roomPayload as Record<string, unknown>);
+        this.deviceStateManager.setRoom(room);
+
+        const update = this.extractRoomUpdate(room);
+        if (Object.keys(update).length > 0) {
+          setImmediate(() => {
+            this.deviceStateManager.triggerRoomListeners(room.roomId, update);
+          });
+        }
+      });
+    }
+
+    if (payload.roomHeating && Array.isArray(payload.roomHeating)) {
+      payload.roomHeating.forEach((roomPayload) => {
+        if (!roomPayload || typeof roomPayload !== 'object' || Array.isArray(roomPayload)) {
+          return;
+        }
+
+        const room = this.normalizeRoomPayload(roomPayload as Record<string, unknown>);
+        this.deviceStateManager.setRoom(room);
+
+        const update = this.extractRoomUpdate(room);
+        if (Object.keys(update).length > 0) {
+          setImmediate(() => {
+            this.deviceStateManager.triggerRoomListeners(room.roomId, update);
+          });
+        }
+      });
+    }
+
     if (payload.lastItem) {
       // this.logger('[MessageHandler] Device discovery complete!');
       this.onDeviceListComplete?.();
@@ -243,6 +284,7 @@ export class MessageHandler {
     try {
       if (payload?.item) {
         const deviceUpdates = new Map<string, DeviceStateUpdate>();
+        const roomUpdates = new Map<string, RoomStateUpdate>();
 
         payload.item.forEach((item) => {
           if (item.deviceId !== undefined && item.deviceId !== null) {
@@ -288,10 +330,50 @@ export class MessageHandler {
               }
             }
           }
+
+          if (item.roomId !== undefined && item.roomId !== null) {
+            const roomId = String(item.roomId);
+
+            if (!roomUpdates.has(roomId)) {
+              roomUpdates.set(roomId, {});
+            }
+            const roomUpdate = roomUpdates.get(roomId)!;
+
+            if (typeof item.setpoint === 'number') roomUpdate.setpoint = item.setpoint;
+            if (typeof item.temp === 'number') roomUpdate.temp = item.temp;
+            if (typeof item.humidity === 'number') roomUpdate.humidity = item.humidity;
+            if (typeof item.power === 'number') roomUpdate.power = item.power;
+            if (typeof item.valve === 'number') roomUpdate.valve = item.valve;
+            if (typeof item.lightsOn === 'number') roomUpdate.lightsOn = item.lightsOn;
+            if (typeof item.windowsOpen === 'number') roomUpdate.windowsOpen = item.windowsOpen;
+            if (typeof item.doorsOpen === 'number') roomUpdate.doorsOpen = item.doorsOpen;
+            if (item.currentMode !== undefined) roomUpdate.currentMode = item.currentMode;
+            if (item.mode !== undefined) roomUpdate.mode = item.mode;
+            if (item.state !== undefined) roomUpdate.state = item.state;
+            if (typeof item.temperatureOnly === 'boolean') roomUpdate.temperatureOnly = item.temperatureOnly;
+            if (Array.isArray(item.modes)) {
+              roomUpdate.modes = item.modes
+                .filter((mode): mode is RoomModeSetpoint => {
+                  return !!mode
+                    && typeof mode === 'object'
+                    && !Array.isArray(mode)
+                    && (mode as RoomModeSetpoint).mode !== undefined
+                    && typeof (mode as RoomModeSetpoint).value === 'number';
+                })
+                .map((mode) => ({
+                  mode: mode.mode,
+                  value: mode.value,
+                }));
+            }
+          }
         });
 
         deviceUpdates.forEach((updateData, deviceId) => {
           this.enqueueDeviceUpdate(deviceId, updateData);
+        });
+
+        roomUpdates.forEach((updateData, roomId) => {
+          this.enqueueRoomUpdate(roomId, updateData);
         });
       }
     } catch (error) {
@@ -333,6 +415,87 @@ export class MessageHandler {
     }
   }
 
+  private enqueueRoomUpdate(roomId: string, updateData: RoomStateUpdate): void {
+    if (!Object.keys(updateData).length) return;
+
+    const pending = this.pendingRoomUpdates.get(roomId) || {};
+    const merged: RoomStateUpdate = {
+      ...pending,
+      ...updateData,
+      raw: {
+        ...(pending.raw || {}),
+        ...(updateData.raw || {}),
+      },
+    };
+
+    if (!Object.keys(merged.raw || {}).length) {
+      delete merged.raw;
+    }
+
+    this.pendingRoomUpdates.set(roomId, merged);
+
+    if (!this.roomFlushTimers.has(roomId)) {
+      const timer = setTimeout(() => {
+        this.roomFlushTimers.delete(roomId);
+        const latest = this.pendingRoomUpdates.get(roomId);
+        if (latest) {
+          this.pendingRoomUpdates.delete(roomId);
+          this.deviceStateManager.triggerRoomListeners(roomId, latest);
+        }
+      }, this.UPDATE_COALESCE_MS);
+
+      this.roomFlushTimers.set(roomId, timer);
+    }
+  }
+
+  private normalizeRoomPayload(payload: Record<string, unknown>): XComfortRoom {
+    const roomId = String(payload.roomId ?? '');
+    const room: XComfortRoom = {
+      ...payload,
+      roomId,
+      name: typeof payload.name === 'string' ? payload.name : `Room ${roomId}`,
+      raw: payload,
+    };
+
+    return room;
+  }
+
+  private extractRoomUpdate(room: XComfortRoom): RoomStateUpdate {
+    const update: RoomStateUpdate = {};
+
+    if (typeof room.setpoint === 'number') update.setpoint = room.setpoint;
+    if (typeof room.temp === 'number') update.temp = room.temp;
+    if (typeof room.humidity === 'number') update.humidity = room.humidity;
+    if (typeof room.power === 'number') update.power = room.power;
+    if (typeof room.valve === 'number') update.valve = room.valve;
+    if (typeof room.lightsOn === 'number') update.lightsOn = room.lightsOn;
+    if (typeof room.windowsOpen === 'number') update.windowsOpen = room.windowsOpen;
+    if (typeof room.doorsOpen === 'number') update.doorsOpen = room.doorsOpen;
+    if (room.currentMode !== undefined) update.currentMode = room.currentMode;
+    if (room.mode !== undefined) update.mode = room.mode;
+    if (room.state !== undefined) update.state = room.state;
+    if (typeof room.temperatureOnly === 'boolean') update.temperatureOnly = room.temperatureOnly;
+    if (Array.isArray(room.modes)) {
+      update.modes = room.modes
+        .filter((mode): mode is RoomModeSetpoint => {
+          return !!mode
+            && typeof mode === 'object'
+            && !Array.isArray(mode)
+            && mode.mode !== undefined
+            && typeof mode.value === 'number';
+        })
+        .map((mode) => ({
+          mode: mode.mode,
+          value: mode.value,
+        }));
+    }
+    if (room.raw) {
+      update.raw = room.raw;
+    }
+
+    return update;
+  }
+
   /**
    * Clear all pending coalesce timers and queued updates.
    * Should be called when the connection is being torn down.
@@ -343,6 +506,12 @@ export class MessageHandler {
     }
     this.flushTimers.clear();
     this.pendingDeviceUpdates.clear();
+
+    for (const timer of this.roomFlushTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.roomFlushTimers.clear();
+    this.pendingRoomUpdates.clear();
   }
 
   private getPayloadObject(payload: unknown): Record<string, unknown> | null {

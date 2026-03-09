@@ -19,9 +19,13 @@ import type {
   ConnectionState,
   ProtocolMessage,
   XComfortDevice,
+  XComfortRoom,
   DeviceStateCallback,
+  RoomStateCallback,
   LoggerFunction,
-  BridgeStatus
+  BridgeStatus,
+  ClimateMode,
+  ClimateState
 } from '../types';
 
 // ============================================================================
@@ -422,6 +426,14 @@ export class XComfortBridge extends EventEmitter {
       this.deviceStateManager.removeListener(deviceId, callback);
   }
 
+  addRoomStateListener(roomId: string, callback: RoomStateCallback): void {
+    this.deviceStateManager.addRoomListener(roomId, callback);
+  }
+
+  removeRoomStateListener(roomId: string, callback: RoomStateCallback): void {
+    this.deviceStateManager.removeRoomListener(roomId, callback);
+  }
+
   // ===========================================================================
   // Public API - Device/Room Access
   // ===========================================================================
@@ -432,6 +444,14 @@ export class XComfortBridge extends EventEmitter {
 
   getDevice(deviceId: string): XComfortDevice | undefined {
     return this.deviceStateManager.getDevice(deviceId);
+  }
+
+  getRooms(): XComfortRoom[] {
+    return this.deviceStateManager.getAllRooms();
+  }
+
+  getRoom(roomId: string): XComfortRoom | undefined {
+    return this.deviceStateManager.getRoom(roomId);
   }
 
   getLastBridgeStatus(): BridgeStatus | null {
@@ -527,6 +547,30 @@ export class XComfortBridge extends EventEmitter {
       payload: {
         deviceId: numericId,
         setpoint: setpoint,
+      },
+    });
+  }
+
+  /**
+   * Set room heating state using the room-based thermostat model used by xComfort.
+   */
+  async setRoomHeatingState(
+    roomId: string | number,
+    mode: ClimateMode | number,
+    state: ClimateState | number,
+    setpoint: number,
+    confirmed: boolean = false,
+  ): Promise<boolean> {
+    const numericId = this.parseId(String(roomId));
+    return this.connectionManager.sendWithRetry({
+      type_int: MESSAGE_TYPES.SET_HEATING_STATE,
+      mc: this.connectionManager.nextMc(),
+      payload: {
+        roomId: numericId,
+        mode,
+        state,
+        setpoint,
+        confirmed,
       },
     });
   }

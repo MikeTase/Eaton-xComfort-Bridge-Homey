@@ -58,5 +58,8 @@
   },
   "1.4.4": {
     "en": "stability"
+  },
+  "1.4.5": {
+    "en": "Added synced xComfort thermostat presets and room heating state, plus new temperature/humidity, door/window, and room status sensors with improved heater and button telemetry."
   }
 }

@@ -1,80 +1,609 @@
 import { BaseDevice } from '../../lib/BaseDevice';
+import { XCOMFORT_CAPABILITIES } from '../../lib/XComfortCapabilities';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
-import { DeviceStateUpdate } from '../../lib/types';
+import {
+  ClimateMode,
+  ClimateState,
+  DeviceStateUpdate,
+  RoomModeSetpoint,
+  RoomStateUpdate,
+  XComfortDevice,
+  XComfortRoom,
+} from '../../lib/types';
+
+const DEFAULT_MODE_SETPOINTS: Record<number, number> = {
+  [ClimateMode.FrostProtection]: 8,
+  [ClimateMode.Eco]: 18,
+  [ClimateMode.Comfort]: 21,
+};
+
+const MODE_SETPOINT_RANGES: Record<number, { min: number; max: number }> = {
+  [ClimateMode.Unknown]: { min: 5, max: 40 },
+  [ClimateMode.FrostProtection]: { min: 5, max: 20 },
+  [ClimateMode.Eco]: { min: 10, max: 30 },
+  [ClimateMode.Comfort]: { min: 18, max: 40 },
+};
+
+type ThermostatModeCapability = 'auto' | 'heat' | 'cool' | 'off';
+type PresetCapabilityValue = 'frost' | 'eco' | 'comfort';
+
+interface ThermostatDeviceData {
+  roomId?: string | number;
+}
 
 module.exports = class ThermostatDevice extends BaseDevice {
   private debug: boolean = false;
+  private roomId: string | null = null;
+  private roomStateBound: boolean = false;
+  private currentPreset: ClimateMode = ClimateMode.Unknown;
+  private currentClimateState: ClimateState = ClimateState.Off;
+  private currentSetpoint: number = 20;
+  private targetRangeKey: string | null = null;
+  private modeSetpoints: Map<ClimateMode, number> = new Map();
+  private onDevicesLoaded?: () => void;
 
   async onDeviceReady() {
     this.debug = process.env.XCOMFORT_DEBUG === '1';
-    
-    // Register listeners
+
+    await this.ensureCapabilities();
     this.registerStateListener();
     this.registerCapabilityListeners();
+    this.registerDevicesLoadedListener();
+    await this.tryBindRoomState();
+  }
+
+  protected onBridgeChanged(): void {
+    this.registerDevicesLoadedListener();
+    if (!this.roomStateBound) {
+      void this.tryBindRoomState();
+      return;
+    }
+
+    const room = this.roomId ? this.bridge.getRoom(this.roomId) : undefined;
+    if (room) {
+      void this.applyRoomSnapshot(room);
+    }
+  }
+
+  onDeleted(): void {
+    if (this.onDevicesLoaded) {
+      this.bridge.removeListener('devices_loaded', this.onDevicesLoaded);
+      this.onDevicesLoaded = undefined;
+    }
+    super.onDeleted();
+  }
+
+  private registerDevicesLoadedListener(): void {
+    if (!this.onDevicesLoaded) {
+      this.onDevicesLoaded = () => {
+        void this.tryBindRoomState();
+      };
+    }
+
+    this.bridge.removeListener('devices_loaded', this.onDevicesLoaded);
+    this.bridge.on('devices_loaded', this.onDevicesLoaded);
+  }
+
+  private async ensureCapabilities(): Promise<void> {
+    if (!this.hasCapability('thermostat_mode')) {
+      await this.addCapability('thermostat_mode').catch(this.error);
+    }
+
+    if (!this.hasCapability(XCOMFORT_CAPABILITIES.PRESET_MODE)) {
+      await this.addCapability(XCOMFORT_CAPABILITIES.PRESET_MODE).catch(this.error);
+    }
   }
 
   private registerStateListener() {
-    // Listen for updates from the bridge
     this.addManagedStateListener(this.deviceId, (_id, data) => {
-        this.updateState(data);
+      void this.updateDeviceState(data);
     });
 
     // Virtual Rocker Logic for RC Touch
     const device = this.bridge.getDevice(this.deviceId);
     if (device && device.devType === DEVICE_TYPES.RC_TOUCH) {
-        const numericDeviceId = Number(this.deviceId);
-        if (Number.isNaN(numericDeviceId)) {
-            this.error(`[Thermostat] Invalid RC_TOUCH deviceId for virtual rocker mapping: ${this.deviceId}`);
-            return;
+      const numericDeviceId = Number(this.deviceId);
+      if (Number.isNaN(numericDeviceId)) {
+        this.error(`[Thermostat] Invalid RC_TOUCH deviceId for virtual rocker mapping: ${this.deviceId}`);
+        return;
+      }
+      const virtualId = String(numericDeviceId + 1);
+      this.log(`Device is RC_TOUCH, listening to virtual rocker ${virtualId}`);
+
+      const triggerOn = this.homey.flow.getDeviceTriggerCard('thermostat_button_on');
+      const triggerOff = this.homey.flow.getDeviceTriggerCard('thermostat_button_off');
+
+      this.addManagedStateListener(virtualId, (_id, data) => {
+        if (this.debug) {
+          this.log(`Virtual Rocker update:`, data);
         }
-        const virtualId = String(numericDeviceId + 1);
-        this.log(`Device is RC_TOUCH, listening to virtual rocker ${virtualId}`);
-
-        const triggerOn = this.homey.flow.getDeviceTriggerCard('thermostat_button_on');
-        const triggerOff = this.homey.flow.getDeviceTriggerCard('thermostat_button_off');
-
-        this.addManagedStateListener(virtualId, (_id, data) => {
-            if (this.debug) {
-              this.log(`Virtual Rocker update:`, data);
-            }
-            if (data.switch === true) {
-                 triggerOn?.trigger(this, {}, {}).catch(this.error);
-            } else if (data.switch === false) {
-                 triggerOff?.trigger(this, {}, {}).catch(this.error);
-            }
-        });
+        if (data.switch === true) {
+          triggerOn?.trigger(this, {}, {}).catch(this.error);
+        } else if (data.switch === false) {
+          triggerOff?.trigger(this, {}, {}).catch(this.error);
+        }
+      });
     }
   }
-  
-  private async updateState(data: DeviceStateUpdate) {
-      if (this.debug) {
-          this.log(`Thermostat update:`, data);
+
+  private async tryBindRoomState(): Promise<void> {
+    if (this.roomStateBound) {
+      const room = this.roomId ? this.bridge.getRoom(this.roomId) : undefined;
+      if (room) {
+        await this.applyRoomSnapshot(room);
       }
-      
-      if (data.setpoint !== undefined) {
-          this.setCapabilityValue('target_temperature', data.setpoint).catch(this.error);
-      }
-      
-      if (data.metadata?.temperature !== undefined) {
-          this.setCapabilityValue('measure_temperature', data.metadata.temperature).catch(this.error);
-      }
-      
-      if (data.metadata?.humidity !== undefined) {
-          if (!this.hasCapability('measure_humidity')) {
-              await this.addCapability('measure_humidity').catch(this.error);
-          }
-          this.setCapabilityValue('measure_humidity', data.metadata.humidity).catch(this.error);
-      }
+      return;
+    }
+
+    const resolvedRoomId = this.resolveRoomId();
+    if (!resolvedRoomId) {
+      return;
+    }
+
+    this.roomId = resolvedRoomId;
+    this.roomStateBound = true;
+    this.addManagedRoomStateListener(resolvedRoomId, (_id, data) => {
+      void this.updateRoomState(data);
+    });
+
+    await this.setStoreValue('roomId', resolvedRoomId).catch(this.error);
+
+    const room = this.bridge.getRoom(resolvedRoomId);
+    if (room) {
+      await this.applyRoomSnapshot(room);
+    }
+
+    if (this.debug) {
+      this.log(`[Thermostat] Bound ${this.getName()} to room ${resolvedRoomId}`);
+    }
+  }
+
+  private resolveRoomId(): string | null {
+    const storedRoomId = this.getStoreValue('roomId');
+    if (typeof storedRoomId === 'string' && storedRoomId.length > 0) {
+      return storedRoomId;
+    }
+
+    const data = this.getData() as ThermostatDeviceData;
+    if (data.roomId !== undefined && data.roomId !== null) {
+      return String(data.roomId);
+    }
+
+    const device = this.bridge.getDevice(this.deviceId);
+    const directRoomId = this.extractRoomIdFromDevice(device);
+    if (directRoomId) {
+      return directRoomId;
+    }
+
+    const roomName = typeof device?.roomName === 'string' ? device.roomName.trim().toLowerCase() : '';
+    if (!roomName) {
+      return null;
+    }
+
+    const matches = this.bridge.getRooms().filter((room) => room.name.trim().toLowerCase() === roomName);
+    if (matches.length === 1) {
+      return matches[0].roomId;
+    }
+
+    if (matches.length > 1) {
+      this.error(`[Thermostat] Multiple room matches found for "${device?.roomName}" on ${this.getName()}`);
+    }
+
+    return null;
+  }
+
+  private extractRoomIdFromDevice(device?: XComfortDevice): string | null {
+    if (!device) {
+      return null;
+    }
+
+    if (typeof device.roomId === 'string' && device.roomId.length > 0) {
+      return device.roomId;
+    }
+
+    if (typeof device.roomId === 'number') {
+      return String(device.roomId);
+    }
+
+    return null;
+  }
+
+  private async applyRoomSnapshot(room: XComfortRoom): Promise<void> {
+    const update: RoomStateUpdate = {
+      setpoint: room.setpoint,
+      temp: room.temp,
+      humidity: room.humidity,
+      power: room.power,
+      valve: room.valve,
+      currentMode: room.currentMode,
+      mode: room.mode,
+      state: room.state,
+      temperatureOnly: room.temperatureOnly,
+      modes: Array.isArray(room.modes) ? room.modes : undefined,
+      raw: room.raw,
+    };
+
+    await this.updateRoomState(update);
+  }
+
+  private async updateDeviceState(data: DeviceStateUpdate) {
+    if (this.debug) {
+      this.log(`Thermostat device update:`, data);
+    }
+
+    if (data.operationMode !== undefined) {
+      await this.applyPreset(this.toClimateMode(data.operationMode));
+    }
+
+    if (data.tempState !== undefined) {
+      await this.applyClimateState(this.toClimateState(data.tempState));
+    }
+
+    if (data.setpoint !== undefined && !this.roomStateBound) {
+      this.currentSetpoint = this.clampSetpoint(data.setpoint, this.getEffectivePreset());
+      await this.updateCapability('target_temperature', this.currentSetpoint);
+    } else if ((data.operationMode !== undefined || data.tempState !== undefined) && !this.roomStateBound) {
+      await this.syncDisplayedSetpoint();
+    }
+
+    if (data.metadata?.temperature !== undefined) {
+      await this.updateCapability('measure_temperature', data.metadata.temperature);
+    }
+
+    if (data.metadata?.humidity !== undefined) {
+      await this.ensureHumidityCapability();
+      await this.updateCapability('measure_humidity', data.metadata.humidity);
+    }
+
+    if (typeof data.dimmvalue === 'number') {
+      await this.ensureHeatingDemandCapability();
+      await this.updateCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND, data.dimmvalue);
+    }
+
+    if (typeof data.power === 'number') {
+      await this.ensurePowerCapability();
+      await this.updateCapability('measure_power', data.power);
+    }
+  }
+
+  private async updateRoomState(data: RoomStateUpdate) {
+    if (this.debug) {
+      this.log(`Thermostat room update:`, data);
+    }
+
+    if (Array.isArray(data.modes)) {
+      this.storeModeSetpoints(data.modes);
+    }
+
+    let nextMode: ClimateMode | null = null;
+    if (data.currentMode !== undefined) {
+      nextMode = this.toClimateMode(data.currentMode);
+    }
+    if (data.mode !== undefined) {
+      nextMode = this.toClimateMode(data.mode);
+    }
+    if (nextMode !== null) {
+      await this.applyPreset(nextMode);
+    }
+
+    if (data.state !== undefined) {
+      await this.applyClimateState(this.toClimateState(data.state));
+    }
+
+    const effectiveMode = nextMode ?? this.getEffectivePreset();
+    const incomingSetpoint = typeof data.setpoint === 'number' ? data.setpoint : undefined;
+    const displaySetpoint = this.getDisplaySetpoint(incomingSetpoint, effectiveMode);
+    if (displaySetpoint !== undefined) {
+      this.currentSetpoint = this.clampSetpoint(displaySetpoint, effectiveMode);
+      await this.updateCapability('target_temperature', this.currentSetpoint);
+    }
+
+    if (typeof data.temp === 'number') {
+      await this.updateCapability('measure_temperature', data.temp);
+    }
+
+    if (typeof data.humidity === 'number') {
+      await this.ensureHumidityCapability();
+      await this.updateCapability('measure_humidity', data.humidity);
+    }
+
+    if (typeof data.valve === 'number') {
+      await this.ensureHeatingDemandCapability();
+      await this.updateCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND, data.valve);
+    }
+
+    if (typeof data.power === 'number') {
+      await this.ensurePowerCapability();
+      await this.updateCapability('measure_power', data.power);
+    }
   }
 
   private registerCapabilityListeners() {
-      // Set Temperature
-      this.registerCapabilityListener('target_temperature', async (value) => {
-          if (!this.bridge) throw new Error('Bridge offline');
-          
-          const numericId = Number(this.deviceId);
-          if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
-          await this.bridge.setThermostatSetpoint(numericId, value);
-      });
+    this.registerCapabilityListener('target_temperature', async (value) => {
+      if (!this.bridge) {
+        throw new Error('Bridge offline');
+      }
+
+      const roomId = await this.ensureRoomIdForControl();
+      if (roomId) {
+        const mode = this.getEffectivePreset(ClimateMode.Comfort);
+        const state = this.currentClimateState;
+        const setpoint = this.clampSetpoint(value, mode);
+
+        await this.bridge.setRoomHeatingState(roomId, mode, state, setpoint);
+        this.modeSetpoints.set(mode, setpoint);
+        this.currentSetpoint = setpoint;
+        await this.updateCapability('target_temperature', setpoint);
+        return;
+      }
+
+      const numericId = Number(this.deviceId);
+      if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
+      await this.bridge.setThermostatSetpoint(numericId, value);
+    });
+
+    this.registerCapabilityListener(XCOMFORT_CAPABILITIES.PRESET_MODE, async (value: PresetCapabilityValue) => {
+      const roomId = await this.ensureRoomIdForControl();
+      if (!roomId) {
+        throw new Error('No linked xComfort room found for preset control');
+      }
+
+      const targetMode = this.fromPresetCapability(value);
+      if (targetMode === this.currentPreset && this.currentClimateState !== ClimateState.Off) {
+        return;
+      }
+
+      const nextState = this.getPresetState(targetMode);
+      const currentMode = this.getEffectivePreset(targetMode);
+      const currentSetpoint = this.clampSetpoint(this.getModeSetpoint(currentMode), currentMode);
+      const newSetpoint = this.clampSetpoint(this.getModeSetpoint(targetMode), targetMode);
+
+      // Mirror the upstream HA implementation: force manual state first, then switch preset.
+      await this.bridge.setRoomHeatingState(roomId, currentMode, nextState, currentSetpoint);
+      await this.bridge.setRoomHeatingState(roomId, targetMode, nextState, newSetpoint);
+
+      await this.applyPreset(targetMode);
+      await this.applyClimateState(nextState);
+      this.currentSetpoint = newSetpoint;
+      this.modeSetpoints.set(targetMode, newSetpoint);
+      await this.updateCapability('target_temperature', newSetpoint);
+    });
+
+    this.registerCapabilityListener('thermostat_mode', async (value: ThermostatModeCapability) => {
+      const roomId = await this.ensureRoomIdForControl();
+      if (!roomId) {
+        throw new Error('No linked xComfort room found for thermostat mode control');
+      }
+
+      const currentMode = this.getEffectivePreset(ClimateMode.Comfort);
+      const nextMode = value === 'off' ? ClimateMode.FrostProtection : currentMode;
+      const nextState = this.fromThermostatModeCapability(value);
+      const commandSetpoint = value === 'off'
+        ? 0
+        : this.clampSetpoint(this.getModeSetpoint(nextMode), nextMode);
+
+      await this.bridge.setRoomHeatingState(roomId, nextMode, nextState, commandSetpoint);
+
+      await this.applyPreset(nextMode);
+      await this.applyClimateState(nextState);
+
+      if (value === 'off') {
+        this.currentSetpoint = this.getModeSetpoint(ClimateMode.FrostProtection);
+      } else {
+        this.currentSetpoint = commandSetpoint;
+      }
+      await this.updateCapability('target_temperature', this.currentSetpoint);
+    });
+  }
+
+  private async ensureRoomIdForControl(): Promise<string | null> {
+    if (!this.roomStateBound) {
+      await this.tryBindRoomState();
+    }
+    return this.roomId;
+  }
+
+  private async ensureHumidityCapability(): Promise<void> {
+    if (!this.hasCapability('measure_humidity')) {
+      await this.addCapability('measure_humidity').catch(this.error);
+    }
+  }
+
+  private async ensurePowerCapability(): Promise<void> {
+    if (!this.hasCapability('measure_power')) {
+      await this.addCapability('measure_power').catch(this.error);
+    }
+  }
+
+  private async ensureHeatingDemandCapability(): Promise<void> {
+    if (!this.hasCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND)) {
+      await this.addCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND).catch(this.error);
+    }
+  }
+
+  private storeModeSetpoints(modes: RoomModeSetpoint[]): void {
+    modes.forEach((mode) => {
+      const normalizedMode = this.toClimateMode(mode.mode);
+      if (normalizedMode === ClimateMode.Unknown) {
+        return;
+      }
+      this.modeSetpoints.set(normalizedMode, mode.value);
+    });
+  }
+
+  private async applyPreset(mode: ClimateMode): Promise<void> {
+    if (mode === ClimateMode.Unknown) {
+      return;
+    }
+
+    this.currentPreset = mode;
+    await this.syncPresetCapability(mode);
+    await this.syncTargetTemperatureOptions(mode);
+  }
+
+  private async applyClimateState(state: ClimateState): Promise<void> {
+    this.currentClimateState = state;
+    await this.updateCapability('thermostat_mode', this.toThermostatModeCapability(state));
+  }
+
+  private async syncPresetCapability(mode: ClimateMode): Promise<void> {
+    const value = this.toPresetCapability(mode);
+    if (value) {
+      await this.updateCapability(XCOMFORT_CAPABILITIES.PRESET_MODE, value);
+    }
+  }
+
+  private async syncTargetTemperatureOptions(mode: ClimateMode): Promise<void> {
+    const range = MODE_SETPOINT_RANGES[mode] || MODE_SETPOINT_RANGES[ClimateMode.Unknown];
+    const nextKey = `${range.min}:${range.max}`;
+    if (this.targetRangeKey === nextKey) {
+      return;
+    }
+
+    this.targetRangeKey = nextKey;
+    await this.setCapabilityOptions('target_temperature', {
+      min: range.min,
+      max: range.max,
+      step: 0.5,
+    }).catch(this.error);
+  }
+
+  private async syncDisplayedSetpoint(): Promise<void> {
+    const displaySetpoint = this.getDisplaySetpoint(undefined, this.getEffectivePreset());
+    if (displaySetpoint === undefined) {
+      return;
+    }
+
+    this.currentSetpoint = this.clampSetpoint(displaySetpoint, this.getEffectivePreset());
+    await this.updateCapability('target_temperature', this.currentSetpoint);
+  }
+
+  private getDisplaySetpoint(
+    incomingSetpoint: number | undefined,
+    mode: ClimateMode,
+  ): number | undefined {
+    if (typeof incomingSetpoint === 'number' && incomingSetpoint > 0) {
+      return incomingSetpoint;
+    }
+
+    if (mode !== ClimateMode.Unknown) {
+      return this.getModeSetpoint(mode);
+    }
+
+    return undefined;
+  }
+
+  private getModeSetpoint(mode: ClimateMode): number {
+    return this.modeSetpoints.get(mode)
+      ?? DEFAULT_MODE_SETPOINTS[mode]
+      ?? this.currentSetpoint;
+  }
+
+  private clampSetpoint(value: number, mode: ClimateMode): number {
+    const range = MODE_SETPOINT_RANGES[mode] || MODE_SETPOINT_RANGES[ClimateMode.Unknown];
+    return Math.max(range.min, Math.min(range.max, value));
+  }
+
+  private getEffectivePreset(fallback: ClimateMode = ClimateMode.Unknown): ClimateMode {
+    return this.currentPreset !== ClimateMode.Unknown ? this.currentPreset : fallback;
+  }
+
+  private getPresetState(mode: ClimateMode): ClimateState {
+    if (mode === ClimateMode.FrostProtection) {
+      return ClimateState.HeatingManual;
+    }
+
+    if (this.currentClimateState === ClimateState.CoolingAuto || this.currentClimateState === ClimateState.CoolingManual) {
+      return ClimateState.CoolingManual;
+    }
+
+    return ClimateState.HeatingManual;
+  }
+
+  private toClimateMode(value: number | ClimateMode): ClimateMode {
+    switch (Number(value)) {
+      case ClimateMode.FrostProtection:
+        return ClimateMode.FrostProtection;
+      case ClimateMode.Eco:
+        return ClimateMode.Eco;
+      case ClimateMode.Comfort:
+        return ClimateMode.Comfort;
+      default:
+        return ClimateMode.Unknown;
+    }
+  }
+
+  private toClimateState(value: number | ClimateState): ClimateState {
+    switch (Number(value)) {
+      case ClimateState.Off:
+        return ClimateState.Off;
+      case ClimateState.HeatingAuto:
+        return ClimateState.HeatingAuto;
+      case ClimateState.HeatingManual:
+        return ClimateState.HeatingManual;
+      case ClimateState.CoolingAuto:
+        return ClimateState.CoolingAuto;
+      case ClimateState.CoolingManual:
+        return ClimateState.CoolingManual;
+      default:
+        return ClimateState.Off;
+    }
+  }
+
+  private toPresetCapability(mode: ClimateMode): PresetCapabilityValue | null {
+    switch (mode) {
+      case ClimateMode.FrostProtection:
+        return 'frost';
+      case ClimateMode.Eco:
+        return 'eco';
+      case ClimateMode.Comfort:
+        return 'comfort';
+      default:
+        return null;
+    }
+  }
+
+  private fromPresetCapability(value: PresetCapabilityValue): ClimateMode {
+    switch (value) {
+      case 'frost':
+        return ClimateMode.FrostProtection;
+      case 'eco':
+        return ClimateMode.Eco;
+      case 'comfort':
+      default:
+        return ClimateMode.Comfort;
+    }
+  }
+
+  private toThermostatModeCapability(state: ClimateState): ThermostatModeCapability {
+    switch (state) {
+      case ClimateState.HeatingAuto:
+        return 'auto';
+      case ClimateState.HeatingManual:
+        return 'heat';
+      case ClimateState.CoolingAuto:
+      case ClimateState.CoolingManual:
+        return 'cool';
+      case ClimateState.Off:
+      default:
+        return 'off';
+    }
+  }
+
+  private fromThermostatModeCapability(value: ThermostatModeCapability): ClimateState {
+    switch (value) {
+      case 'auto':
+        if (this.currentClimateState === ClimateState.CoolingAuto || this.currentClimateState === ClimateState.CoolingManual) {
+          return ClimateState.CoolingAuto;
+        }
+        return ClimateState.HeatingAuto;
+      case 'heat':
+        return ClimateState.HeatingManual;
+      case 'cool':
+        return ClimateState.CoolingManual;
+      case 'off':
+      default:
+        return ClimateState.Off;
+    }
   }
 };

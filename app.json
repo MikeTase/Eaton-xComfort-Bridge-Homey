@@ -6,7 +6,7 @@
   "description": {
     "en": "Seamless Eaton xComfort control for lights, shades, and heating."
   },
-  "version": "1.4.4",
+  "version": "1.4.5",
   "category": [
     "lights",
     "climate"
@@ -118,6 +118,142 @@
       }
     ]
   },
+  "capabilities": {
+    "xcomfort_preset_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Heating preset"
+      },
+      "desc": {
+        "en": "Active xComfort heating preset"
+      },
+      "values": [
+        {
+          "id": "frost",
+          "title": {
+            "en": "Frost"
+          }
+        },
+        {
+          "id": "eco",
+          "title": {
+            "en": "Economy"
+          }
+        },
+        {
+          "id": "comfort",
+          "title": {
+            "en": "Comfort"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": true,
+      "uiComponent": "picker"
+    },
+    "xcomfort_room_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Room mode"
+      },
+      "desc": {
+        "en": "Current xComfort room mode"
+      },
+      "values": [
+        {
+          "id": "unknown",
+          "title": {
+            "en": "Unknown"
+          }
+        },
+        {
+          "id": "frost",
+          "title": {
+            "en": "Frost"
+          }
+        },
+        {
+          "id": "eco",
+          "title": {
+            "en": "Economy"
+          }
+        },
+        {
+          "id": "comfort",
+          "title": {
+            "en": "Comfort"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": false,
+      "uiComponent": "picker"
+    },
+    "xcomfort_heating_demand": {
+      "type": "number",
+      "title": {
+        "en": "Heating demand"
+      },
+      "units": {
+        "en": "%"
+      },
+      "desc": {
+        "en": "Current heating demand"
+      },
+      "insights": true,
+      "decimals": 1,
+      "min": 0,
+      "max": 100,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_lights_on": {
+      "type": "number",
+      "title": {
+        "en": "Lights on"
+      },
+      "desc": {
+        "en": "Number of lights on in the room"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_windows_open": {
+      "type": "number",
+      "title": {
+        "en": "Open windows"
+      },
+      "desc": {
+        "en": "Number of open windows in the room"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_doors_open": {
+      "type": "number",
+      "title": {
+        "en": "Open doors"
+      },
+      "desc": {
+        "en": "Number of open doors in the room"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    }
+  },
   "drivers": [
     {
       "id": "actuator",
@@ -154,6 +290,73 @@
       ]
     },
     {
+      "id": "climate_sensor",
+      "name": {
+        "en": "Temperature / Humidity Sensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_humidity"
+      ],
+      "images": {
+        "large": "drivers/climate_sensor/assets/images/large.png",
+        "small": "drivers/climate_sensor/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select temperature sensors"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "door_window_sensor",
+      "name": {
+        "en": "Door / Window Sensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_contact"
+      ],
+      "images": {
+        "large": "drivers/door_window_sensor/assets/images/large.png",
+        "small": "drivers/door_window_sensor/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select door and window sensors"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
       "id": "thermostat",
       "name": {
         "en": "Thermostat / Heating"
@@ -161,12 +364,14 @@
       "class": "thermostat",
       "capabilities": [
         "measure_temperature",
-        "target_temperature"
+        "target_temperature",
+        "thermostat_mode",
+        "xcomfort_preset_mode"
       ],
       "capabilitiesOptions": {
         "target_temperature": {
           "min": 5,
-          "max": 35,
+          "max": 40,
           "step": 0.5
         }
       },
@@ -183,6 +388,47 @@
           },
           "title": {
             "en": "Select thermostats"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "room_sensor",
+      "name": {
+        "en": "Room Sensor / Status"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_humidity",
+        "measure_power",
+        "meter_power",
+        "xcomfort_room_mode",
+        "xcomfort_heating_demand",
+        "xcomfort_lights_on",
+        "xcomfort_windows_open",
+        "xcomfort_doors_open"
+      ],
+      "images": {
+        "large": "drivers/room_sensor/assets/images/large.png",
+        "small": "drivers/room_sensor/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select rooms"
           }
         },
         {

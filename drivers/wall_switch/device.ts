@@ -1,6 +1,7 @@
 import * as Homey from 'homey';
 import { BaseDevice } from '../../lib/BaseDevice';
-import { DeviceStateUpdate } from '../../lib/types';
+import { DeviceMetadata, DeviceStateUpdate, InfoEntry } from '../../lib/types';
+import { parseInfoMetadata } from '../../lib/utils/parseInfoMetadata';
 
 module.exports = class WallSwitchDevice extends BaseDevice {
   private triggerPressed: Homey.FlowCardTriggerDevice | null = null;
@@ -29,6 +30,8 @@ module.exports = class WallSwitchDevice extends BaseDevice {
     const triggerDown = this.homey.flow.getDeviceTriggerCard('wall_switch_down');
 
     this.addManagedStateListener(this.deviceId, (deviceId: string, state: DeviceStateUpdate) => {
+        void this.applySensorMetadata(state.metadata);
+
         if (this.debug) {
           this.log('Switch Event:', state);
         }
@@ -52,5 +55,37 @@ module.exports = class WallSwitchDevice extends BaseDevice {
             }
         }
     });
+
+    await this.applyDeviceSnapshot();
+  }
+
+  private async applyDeviceSnapshot(): Promise<void> {
+    const device = this.bridge.getDevice(this.deviceId);
+    if (!device || !Array.isArray(device.info)) {
+      return;
+    }
+
+    const metadata = parseInfoMetadata(device.info as InfoEntry[]);
+    await this.applySensorMetadata(metadata);
+  }
+
+  private async applySensorMetadata(metadata?: DeviceMetadata): Promise<void> {
+    if (!metadata) {
+      return;
+    }
+
+    if (typeof metadata.temperature === 'number') {
+      if (!this.hasCapability('measure_temperature')) {
+        await this.addCapability('measure_temperature').catch(this.error);
+      }
+      await this.updateCapability('measure_temperature', metadata.temperature);
+    }
+
+    if (typeof metadata.humidity === 'number') {
+      if (!this.hasCapability('measure_humidity')) {
+        await this.addCapability('measure_humidity').catch(this.error);
+      }
+      await this.updateCapability('measure_humidity', metadata.humidity);
+    }
   }
 }

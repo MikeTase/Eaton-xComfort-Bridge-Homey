@@ -13,13 +13,27 @@ module.exports = class WallSwitchDriver extends BaseDriver {
   }
 
   private getPairedDevices(devices: XComfortDevice[]) {
-    return devices
+    const rockerDevices = devices
       .filter((device) => {
         const devType = Number(device.devType ?? 0);
         return devType === DEVICE_TYPES.WALL_SWITCH;
-      })
-      .map((device) => {
-        const baseName = device.name || `Device ${device.deviceId}`;
+      });
+
+    const componentMap = new Map<string, XComfortDevice[]>();
+    rockerDevices.forEach((device) => {
+      const componentId = device.compId !== undefined ? String(device.compId) : `device:${device.deviceId}`;
+      if (!componentMap.has(componentId)) {
+        componentMap.set(componentId, []);
+      }
+      componentMap.get(componentId)!.push(device);
+    });
+
+    componentMap.forEach((group) => {
+      group.sort((left, right) => Number(left.deviceId) - Number(right.deviceId));
+    });
+
+    return rockerDevices.map((device) => {
+        const baseName = this.getDisplayBaseName(device, componentMap);
         const roomName = device.roomName;
         const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
         const deviceId = String(device.deviceId);
@@ -35,6 +49,23 @@ module.exports = class WallSwitchDriver extends BaseDriver {
           }
         };
       });
+  }
+
+  private getDisplayBaseName(device: XComfortDevice, componentMap: Map<string, XComfortDevice[]>): string {
+    const baseName = device.name || `Device ${device.deviceId}`;
+    const componentId = device.compId !== undefined ? String(device.compId) : `device:${device.deviceId}`;
+    const group = componentMap.get(componentId) || [];
+
+    if (group.length <= 1) {
+      return baseName;
+    }
+
+    const channelIndex = group.findIndex((entry) => String(entry.deviceId) === String(device.deviceId));
+    if (channelIndex === -1) {
+      return baseName;
+    }
+
+    return `${baseName} - Button ${channelIndex + 1}`;
   }
 
   async onPairListDevices() {

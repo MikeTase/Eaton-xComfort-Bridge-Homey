@@ -5,15 +5,18 @@
  * Extracted from XComfortConnection for single responsibility.
  */
 
-import { INFO_TEXT_CODES } from '../XComfortProtocol';
 import type {
   XComfortDevice,
+  XComfortRoom,
   InfoEntry,
   DeviceMetadata,
   DeviceStateUpdate,
   DeviceStateCallback,
+  RoomStateUpdate,
+  RoomStateCallback,
   LoggerFunction
 } from '../types';
+import { parseInfoMetadata } from '../utils/parseInfoMetadata';
 
 // ============================================================================
 // DeviceStateManager Class
@@ -23,6 +26,8 @@ export class DeviceStateManager {
   private logger: LoggerFunction;
   private devices: Map<string, XComfortDevice> = new Map();
   private listeners: Map<string, DeviceStateCallback[]> = new Map();
+  private rooms: Map<string, XComfortRoom> = new Map();
+  private roomListeners: Map<string, RoomStateCallback[]> = new Map();
 
   constructor(logger?: LoggerFunction) {
       this.logger = logger || console.log;
@@ -33,6 +38,28 @@ export class DeviceStateManager {
    */
   setDevice(device: XComfortDevice): void {
     this.devices.set(String(device.deviceId), device);
+  }
+
+  /**
+   * Add or update a room in the state manager
+   */
+  setRoom(room: XComfortRoom): void {
+    const roomId = String(room.roomId);
+    const existing = this.rooms.get(roomId);
+    const merged: XComfortRoom = {
+      ...(existing || {}),
+      ...room,
+      roomId,
+    };
+
+    if (existing?.raw || room.raw) {
+      merged.raw = {
+        ...(existing?.raw || {}),
+        ...(room.raw || {}),
+      };
+    }
+
+    this.rooms.set(roomId, merged);
   }
 
   /**
@@ -50,6 +77,20 @@ export class DeviceStateManager {
   }
 
   /**
+   * Get a room by ID
+   */
+  getRoom(roomId: string | number): XComfortRoom | undefined {
+    return this.rooms.get(String(roomId));
+  }
+
+  /**
+   * Get all rooms
+   */
+  getAllRooms(): XComfortRoom[] {
+    return Array.from(this.rooms.values());
+  }
+
+  /**
    * Add a state listener for a specific device
    */
   addListener(deviceId: string | number, callback: DeviceStateCallback): void {
@@ -59,6 +100,18 @@ export class DeviceStateManager {
     }
     this.listeners.get(id)!.push(callback);
     this.logger(`[DeviceStateManager] Added state listener for device ${id}`);
+  }
+
+  /**
+   * Add a room-state listener for a specific room
+   */
+  addRoomListener(roomId: string | number, callback: RoomStateCallback): void {
+    const id = String(roomId);
+    if (!this.roomListeners.has(id)) {
+      this.roomListeners.set(id, []);
+    }
+    this.roomListeners.get(id)!.push(callback);
+    this.logger(`[DeviceStateManager] Added room state listener for room ${id}`);
   }
 
   /**
@@ -75,6 +128,24 @@ export class DeviceStateManager {
     deviceListeners.splice(index, 1);
     if (deviceListeners.length === 0) {
       this.listeners.delete(id);
+    }
+    return true;
+  }
+
+  /**
+   * Remove a room-state listener for a specific room
+   */
+  removeRoomListener(roomId: string | number, callback: RoomStateCallback): boolean {
+    const id = String(roomId);
+    const roomListeners = this.roomListeners.get(id);
+    if (!roomListeners) return false;
+
+    const index = roomListeners.indexOf(callback);
+    if (index === -1) return false;
+
+    roomListeners.splice(index, 1);
+    if (roomListeners.length === 0) {
+      this.roomListeners.delete(id);
     }
     return true;
   }
@@ -102,27 +173,31 @@ export class DeviceStateManager {
   }
 
   /**
+   * Trigger room-state listeners for a room (non-blocking via setImmediate)
+   */
+  triggerRoomListeners(roomId: string | number, stateData: RoomStateUpdate): void {
+    const id = String(roomId);
+    const roomListeners = this.roomListeners.get(id);
+    if (!roomListeners) return;
+
+    roomListeners.forEach((callback) => {
+      setImmediate(() => {
+        try {
+          callback(id, stateData);
+        } catch (error) {
+          console.error(
+            `[DeviceStateManager] Error in room state listener for room ${id}:`,
+            error
+          );
+        }
+      });
+    });
+  }
+
+  /**
    * Parse known info metadata types from device info array
    */
   parseInfoMetadata(infoArray: InfoEntry[]): DeviceMetadata {
-    const metadata: DeviceMetadata = {};
-
-    infoArray.forEach((info) => {
-      if (info.text && info.value !== undefined) {
-        switch (info.text) {
-          case INFO_TEXT_CODES.TEMPERATURE_STANDARD:
-            metadata.temperature = parseFloat(String(info.value));
-            break;
-          case INFO_TEXT_CODES.HUMIDITY_STANDARD:
-            metadata.humidity = parseFloat(String(info.value));
-            break;
-          case INFO_TEXT_CODES.TEMPERATURE_DIMMER:
-            metadata.temperature = parseFloat(String(info.value));
-            break;
-        }
-      }
-    });
-
-    return metadata;
+    return parseInfoMetadata(infoArray);
   }
 }
