@@ -15,7 +15,8 @@ import type {
   BridgeStatus,
   LoggerFunction,
   XComfortRoom,
-  RoomModeSetpoint
+  RoomModeSetpoint,
+  InfoEntry,
 } from '../types';
 
 // ============================================================================
@@ -34,6 +35,9 @@ type OnNackReceivedFn = (ref: number) => void;
 /** Callback when Bridge Status is received */
 type OnBridgeStatusUpdateFn = (status: BridgeStatus) => void;
 
+/** Callback when Home/Bridge info is received */
+type OnHomeDataUpdateFn = (payload: Record<string, unknown>) => void;
+
 // ============================================================================
 // MessageHandler Class
 // ============================================================================
@@ -51,6 +55,7 @@ export class MessageHandler {
   private onAckReceived?: OnAckReceivedFn;
   private onNackReceived?: OnNackReceivedFn;
   private onBridgeStatusUpdate?: OnBridgeStatusUpdateFn;
+  private onHomeDataUpdate?: OnHomeDataUpdateFn;
 
   constructor(
     deviceStateManager: DeviceStateManager,
@@ -87,6 +92,13 @@ export class MessageHandler {
    */
   setOnBridgeStatusUpdate(callback: OnBridgeStatusUpdateFn): void {
     this.onBridgeStatusUpdate = callback;
+  }
+
+  /**
+   * Set callback for Home/Bridge info updates
+   */
+  setOnHomeDataUpdate(callback: OnHomeDataUpdateFn): void {
+    this.onHomeDataUpdate = callback;
   }
 
   /**
@@ -172,15 +184,19 @@ export class MessageHandler {
    * Process SET_HOME_DATA (303) messages
    */
   private processHomeData(payload: Record<string, unknown>): void {
-    if (payload.home && typeof payload.home === 'object' && !Array.isArray(payload.home)) {
-      const home = payload.home as { name?: string };
-      this.logger(
-        `[MessageHandler] Home data received: ${home.name || 'unnamed'}`
-      );
-    }
+    const homePayload = payload.home && typeof payload.home === 'object' && !Array.isArray(payload.home)
+      ? payload.home as Record<string, unknown>
+      : payload;
+
+    const homeName = typeof homePayload.name === 'string' ? homePayload.name : 'unnamed';
+    this.logger(`[MessageHandler] Home data received: ${homeName}`);
+    this.onHomeDataUpdate?.(homePayload);
 
     if (payload.devices) {
       this.processDeviceData({ devices: payload.devices });
+    }
+    if (payload.comps) {
+      this.processDeviceData({ comps: payload.comps });
     }
     if (payload.scenes) {
       this.processDeviceData({ scenes: payload.scenes });
@@ -191,6 +207,21 @@ export class MessageHandler {
    * Process device/room/scene data
    */
   private processDeviceData(payload: Record<string, unknown>): void {
+    if (payload.comps && Array.isArray(payload.comps)) {
+      payload.comps.forEach((compPayload) => {
+        if (!compPayload || typeof compPayload !== 'object' || Array.isArray(compPayload)) {
+          return;
+        }
+
+        const component = this.normalizeComponentPayload(compPayload as Record<string, unknown>);
+        if (!component.compId) {
+          return;
+        }
+
+        this.deviceStateManager.setComponent(component);
+      });
+    }
+
     if (payload.devices) {
       const devices = payload.devices as Array<{
         deviceId: string;
@@ -224,6 +255,29 @@ export class MessageHandler {
         if (typeof device.shadsClosed === 'number') {
           update.shadsClosed = device.shadsClosed;
           hasUpdate = true;
+        }
+        if (typeof device.shSafety === 'number') {
+          update.shSafety = device.shSafety;
+          hasUpdate = true;
+        }
+        if (device.operationMode !== undefined) {
+          update.operationMode = device.operationMode as number;
+          hasUpdate = true;
+        }
+        if (device.tempState !== undefined) {
+          update.tempState = device.tempState as number;
+          hasUpdate = true;
+        }
+        if (device.curstate !== undefined) {
+          update.curstate = device.curstate;
+          hasUpdate = true;
+        }
+        if (Array.isArray(device.info)) {
+          const metadata = this.deviceStateManager.parseInfoMetadata(device.info as InfoEntry[]);
+          if (Object.keys(metadata).length > 0) {
+            update.metadata = metadata;
+            hasUpdate = true;
+          }
         }
 
         if (hasUpdate) {
@@ -458,6 +512,27 @@ export class MessageHandler {
     };
 
     return room;
+  }
+
+  private normalizeComponentPayload(payload: Record<string, unknown>): {
+    compId: string;
+    name?: string;
+    compType?: number;
+    raw: Record<string, unknown>;
+  } {
+    const compId = String(payload.compId ?? payload.id ?? '');
+    const compType = typeof payload.compType === 'number'
+      ? payload.compType
+      : typeof payload.type === 'number'
+        ? payload.type
+        : undefined;
+
+    return {
+      compId,
+      name: typeof payload.name === 'string' ? payload.name : undefined,
+      compType,
+      raw: payload,
+    };
   }
 
   private extractRoomUpdate(room: XComfortRoom): RoomStateUpdate {

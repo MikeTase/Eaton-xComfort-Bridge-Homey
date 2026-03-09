@@ -6,6 +6,7 @@
  */
 
 import type {
+  XComfortComponent,
   XComfortDevice,
   XComfortRoom,
   InfoEntry,
@@ -25,6 +26,7 @@ import { parseInfoMetadata } from '../utils/parseInfoMetadata';
 export class DeviceStateManager {
   private logger: LoggerFunction;
   private devices: Map<string, XComfortDevice> = new Map();
+  private components: Map<string, XComfortComponent> = new Map();
   private listeners: Map<string, DeviceStateCallback[]> = new Map();
   private rooms: Map<string, XComfortRoom> = new Map();
   private roomListeners: Map<string, RoomStateCallback[]> = new Map();
@@ -37,7 +39,59 @@ export class DeviceStateManager {
    * Add a device to the state manager
    */
   setDevice(device: XComfortDevice): void {
-    this.devices.set(String(device.deviceId), device);
+    const deviceId = String(device.deviceId);
+    const existing = this.devices.get(deviceId);
+    const merged: XComfortDevice = {
+      ...(existing || {}),
+      ...device,
+      deviceId,
+    };
+
+    const component = this.getComponentForDevice(merged);
+    if (component) {
+      if (merged.compType === undefined && component.compType !== undefined) {
+        merged.compType = component.compType;
+      }
+      if (!merged.componentName && component.name) {
+        merged.componentName = component.name;
+      }
+    }
+
+    this.devices.set(deviceId, merged);
+  }
+
+  /**
+   * Add or update a component in the state manager
+   */
+  setComponent(component: XComfortComponent): void {
+    const compId = String(component.compId);
+    const existing = this.components.get(compId);
+    const merged: XComfortComponent = {
+      ...(existing || {}),
+      ...component,
+      compId,
+    };
+
+    if (existing?.raw || component.raw) {
+      merged.raw = {
+        ...(existing?.raw || {}),
+        ...(component.raw || {}),
+      };
+    }
+
+    this.components.set(compId, merged);
+
+    for (const [deviceId, device] of this.devices.entries()) {
+      if (device.compId === undefined || String(device.compId) !== compId) {
+        continue;
+      }
+
+      this.devices.set(deviceId, {
+        ...device,
+        compType: device.compType ?? merged.compType,
+        componentName: device.componentName || merged.name,
+      });
+    }
   }
 
   /**
@@ -74,6 +128,20 @@ export class DeviceStateManager {
    */
   getAllDevices(): XComfortDevice[] {
     return Array.from(this.devices.values());
+  }
+
+  /**
+   * Get a component by ID
+   */
+  getComponent(compId: string | number): XComfortComponent | undefined {
+    return this.components.get(String(compId));
+  }
+
+  /**
+   * Get all components
+   */
+  getAllComponents(): XComfortComponent[] {
+    return Array.from(this.components.values());
   }
 
   /**
@@ -199,5 +267,13 @@ export class DeviceStateManager {
    */
   parseInfoMetadata(infoArray: InfoEntry[]): DeviceMetadata {
     return parseInfoMetadata(infoArray);
+  }
+
+  private getComponentForDevice(device: XComfortDevice): XComfortComponent | undefined {
+    if (device.compId === undefined || device.compId === null) {
+      return undefined;
+    }
+
+    return this.components.get(String(device.compId));
   }
 }

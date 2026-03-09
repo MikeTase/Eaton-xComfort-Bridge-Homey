@@ -18,6 +18,8 @@ import { CommandDebouncer } from '../utils/CommandDebouncer';
 import type {
   ConnectionState,
   ProtocolMessage,
+  BridgeInfo,
+  XComfortComponent,
   XComfortDevice,
   XComfortRoom,
   DeviceStateCallback,
@@ -47,6 +49,7 @@ export class XComfortBridge extends EventEmitter {
   private connectionState: ConnectionState = 'disconnected';
   private deviceListReceived: boolean = false;
   private lastBridgeStatus: BridgeStatus | null = null;
+  private lastBridgeInfo: BridgeInfo = {};
 
   // Timeouts
   private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -68,6 +71,9 @@ export class XComfortBridge extends EventEmitter {
     this.bridgeIp = bridgeIp;
     this.authKey = authKey;
     this.logger = logger || console.log;
+    this.lastBridgeInfo = {
+      ipAddress: bridgeIp,
+    };
 
     // Initialize modules
     this.connectionManager = new ConnectionManager(bridgeIp, this.logger);
@@ -147,6 +153,10 @@ export class XComfortBridge extends EventEmitter {
     this.messageHandler.setOnBridgeStatusUpdate((status) => {
       this.lastBridgeStatus = status;
       this.emit('bridge_status', status);
+    });
+
+    this.messageHandler.setOnHomeDataUpdate((payload) => {
+      this.updateBridgeInfo(payload);
     });
 
     // Wire up ACK/NACK handling for retry mechanism
@@ -454,8 +464,20 @@ export class XComfortBridge extends EventEmitter {
     return this.deviceStateManager.getRoom(roomId);
   }
 
+  getComponents(): XComfortComponent[] {
+    return this.deviceStateManager.getAllComponents();
+  }
+
+  getComponent(compId: string): XComfortComponent | undefined {
+    return this.deviceStateManager.getComponent(compId);
+  }
+
   getLastBridgeStatus(): BridgeStatus | null {
     return this.lastBridgeStatus;
+  }
+
+  getLastBridgeInfo(): BridgeInfo {
+    return this.lastBridgeInfo;
   }
 
   // ===========================================================================
@@ -607,6 +629,42 @@ export class XComfortBridge extends EventEmitter {
 
   get state(): ConnectionState {
     return this.connectionState;
+  }
+
+  private updateBridgeInfo(payload: Record<string, unknown>): void {
+    const bridgeType = typeof payload.bridgeType === 'number' ? payload.bridgeType : this.lastBridgeInfo.bridgeType;
+    const directScenes = Array.isArray(payload.homeScenes)
+      ? payload.homeScenes.length
+      : Array.isArray(payload.scenes)
+        ? payload.scenes.length
+        : this.lastBridgeInfo.homeScenesCount;
+
+    this.lastBridgeInfo = {
+      ...this.lastBridgeInfo,
+      id: typeof payload.id === 'string' || typeof payload.id === 'number' ? String(payload.id) : this.lastBridgeInfo.id,
+      name: typeof payload.name === 'string' ? payload.name : this.lastBridgeInfo.name,
+      bridgeType,
+      bridgeModel: this.resolveBridgeModel(bridgeType),
+      homeScenesCount: typeof directScenes === 'number' ? directScenes : this.lastBridgeInfo.homeScenesCount,
+      raw: {
+        ...(this.lastBridgeInfo.raw || {}),
+        ...payload,
+      },
+    };
+
+    this.emit('bridge_info', this.lastBridgeInfo);
+  }
+
+  private resolveBridgeModel(bridgeType?: number): string | undefined {
+    if (bridgeType === undefined) {
+      return this.lastBridgeInfo.bridgeModel;
+    }
+
+    if (bridgeType === 1) {
+      return 'xComfort Bridge';
+    }
+
+    return `xComfort Bridge (Type ${bridgeType})`;
   }
 
   cleanup(): void {

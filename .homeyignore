@@ -4,4 +4,4 @@
 .github/
 **/*.ts
 tsconfig.json
-
+*.swp

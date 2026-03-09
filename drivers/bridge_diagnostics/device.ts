@@ -1,10 +1,11 @@
 /// <reference path="../../homey.d.ts" />
 import { BaseDevice } from '../../lib/BaseDevice';
 import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
-import { BridgeStatus } from '../../lib/types';
+import { BridgeInfo, BridgeStatus } from '../../lib/types';
 
 module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
   private onBridgeStatus?: (status: BridgeStatus) => void;
+  private onBridgeInfo?: (info: BridgeInfo) => void;
 
   async onDeviceReady() {
     await this.applyCapabilityProfile();
@@ -12,12 +13,21 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
     this.onBridgeStatus = (status: BridgeStatus) => {
       this.updateFromStatus(status);
     };
+    this.onBridgeInfo = (info: BridgeInfo) => {
+      void this.updateFromInfo(info);
+    };
 
     this.bridge.on('bridge_status', this.onBridgeStatus);
+    this.bridge.on('bridge_info', this.onBridgeInfo);
 
-    const last = this.bridge.getLastBridgeStatus?.();
-    if (last) {
-      this.updateFromStatus(last);
+    const lastStatus = this.bridge.getLastBridgeStatus?.();
+    if (lastStatus) {
+      this.updateFromStatus(lastStatus);
+    }
+
+    const lastInfo = this.bridge.getLastBridgeInfo?.();
+    if (lastInfo) {
+      await this.updateFromInfo(lastInfo);
     }
   }
 
@@ -117,9 +127,30 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
     }
   }
 
+  private async updateFromInfo(info: BridgeInfo): Promise<void> {
+    const nextSettings = {
+      bridge_name: info.name || '-',
+      bridge_id: info.id || '-',
+      bridge_model: info.bridgeModel || '-',
+      bridge_ip: info.ipAddress || '-',
+      bridge_scenes: typeof info.homeScenesCount === 'number' ? String(info.homeScenesCount) : '-',
+    };
+
+    const currentSettings = this.getSettings() as Record<string, unknown>;
+    const hasChanges = Object.entries(nextSettings).some(([key, value]) => currentSettings[key] !== value);
+    if (!hasChanges) {
+      return;
+    }
+
+    await this.setSettings(nextSettings).catch(this.error);
+  }
+
   onDeleted() {
     if (this.bridge && this.onBridgeStatus) {
       this.bridge.removeListener('bridge_status', this.onBridgeStatus);
+    }
+    if (this.bridge && this.onBridgeInfo) {
+      this.bridge.removeListener('bridge_info', this.onBridgeInfo);
     }
     super.onDeleted();
   }
@@ -129,9 +160,17 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
       oldBridge.removeListener('bridge_status', this.onBridgeStatus);
       newBridge.on('bridge_status', this.onBridgeStatus);
     }
-    const last = newBridge.getLastBridgeStatus?.();
-    if (last) {
-      this.updateFromStatus(last);
+    if (this.onBridgeInfo) {
+      oldBridge.removeListener('bridge_info', this.onBridgeInfo);
+      newBridge.on('bridge_info', this.onBridgeInfo);
+    }
+    const lastStatus = newBridge.getLastBridgeStatus?.();
+    if (lastStatus) {
+      this.updateFromStatus(lastStatus);
+    }
+    const lastInfo = newBridge.getLastBridgeInfo?.();
+    if (lastInfo) {
+      void this.updateFromInfo(lastInfo);
     }
   }
 };

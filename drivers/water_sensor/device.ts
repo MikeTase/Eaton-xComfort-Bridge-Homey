@@ -7,6 +7,8 @@ module.exports = class WaterSensorDevice extends BaseDevice {
     this.addManagedStateListener(this.deviceId, (_deviceId: string, state: DeviceStateUpdate) => {
       this.updateState(state);
     });
+
+    this.applyDeviceSnapshot();
   }
 
   private updateState(state: DeviceStateUpdate) {
@@ -20,6 +22,29 @@ module.exports = class WaterSensorDevice extends BaseDevice {
 
     if (alarm !== undefined && this.hasCapability('alarm_water')) {
       this.setCapabilityValue('alarm_water', alarm).catch(this.error);
+    }
+  }
+
+  protected onBridgeChanged(): void {
+    this.applyDeviceSnapshot();
+  }
+
+  private applyDeviceSnapshot(): void {
+    const device = this.bridge.getDevice(this.deviceId);
+    if (!device) {
+      return;
+    }
+
+    const snapshot: DeviceStateUpdate = {};
+    if (typeof device.switch === 'boolean') {
+      snapshot.switch = device.switch;
+    }
+    if (device.curstate !== undefined) {
+      snapshot.curstate = device.curstate;
+    }
+
+    if (Object.keys(snapshot).length > 0) {
+      this.updateState(snapshot);
     }
   }
 };

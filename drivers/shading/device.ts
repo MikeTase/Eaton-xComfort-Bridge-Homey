@@ -14,6 +14,7 @@ module.exports = class ShadingDevice extends BaseDevice {
     
     this.registerStateListener();
     this.registerCapabilityListeners();
+    this.applyDeviceSnapshot();
   }
 
   private registerStateListener() {
@@ -50,6 +51,32 @@ module.exports = class ShadingDevice extends BaseDevice {
                   this.setCapabilityValue('windowcoverings_state', state).catch(this.error);
               }
           }
+      }
+  }
+
+  protected onBridgeChanged(): void {
+      this.applyDeviceSnapshot();
+  }
+
+  private applyDeviceSnapshot(): void {
+      const device = this.bridge.getDevice(this.deviceId);
+      if (!device) {
+          return;
+      }
+
+      const snapshot: DeviceStateUpdate = {};
+      if (typeof device.shSafety === 'number') {
+          snapshot.shSafety = device.shSafety;
+      }
+      if (typeof device.shadsClosed === 'number') {
+          snapshot.shadsClosed = device.shadsClosed;
+      }
+      if (typeof device.dimmvalue === 'number') {
+          snapshot.dimmvalue = device.dimmvalue;
+      }
+
+      if (Object.keys(snapshot).length > 0) {
+          this.updateState(snapshot);
       }
   }
 

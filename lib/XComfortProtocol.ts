@@ -75,6 +75,20 @@ export const DEVICE_TYPES = {
 } as const;
 
 /**
+ * Component Types (based on compType field)
+ */
+export const COMPONENT_TYPES = {
+  PUSH_BUTTON_1_CHANNEL: 1,
+  PUSH_BUTTON_2_CHANNEL: 2,
+  PUSH_BUTTON_4_CHANNEL: 3,
+  REMOTE_CONTROL_2_CHANNEL: 48,
+  RC_TOUCH: 78,
+  PUSH_BUTTON_MULTI_SENSOR_1_CHANNEL: 87,
+  PUSH_BUTTON_MULTI_SENSOR_2_CHANNEL: 88,
+  PUSH_BUTTON_MULTI_SENSOR_4_CHANNEL: 89,
+} as const;
+
+/**
  * WebSocket Close Codes
  */
 export const WS_CLOSE_CODES = {
@@ -123,5 +137,4 @@ export const PROTOCOL_CONFIG = {
     SALT_LENGTH: 12,
   },
 } as const;
-
 

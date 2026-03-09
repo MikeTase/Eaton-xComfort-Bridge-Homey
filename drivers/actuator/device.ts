@@ -78,6 +78,7 @@ module.exports = class ActuatorDevice extends BaseDevice {
         };
 
         this.addManagedStateListener(this.deviceId, this.onDeviceUpdate);
+        this.applyDeviceSnapshot();
 
         this.registerCapabilityListener('onoff', async (value) => {
             if (!this.bridge) return;
@@ -125,6 +126,34 @@ module.exports = class ActuatorDevice extends BaseDevice {
                 if (value === 0) this.setCapabilityValue('onoff', true).catch(() => {});
             }
         });
+    }
+
+    protected onBridgeChanged(): void {
+        this.applyDeviceSnapshot();
+    }
+
+    private applyDeviceSnapshot(): void {
+        const device = this.bridge.getDevice(this.deviceId);
+        if (!device || !this.onDeviceUpdate) {
+            return;
+        }
+
+        const snapshot: DeviceStateUpdate = {};
+        if (typeof device.switch === 'boolean') {
+            snapshot.switch = device.switch;
+        } else if (typeof device.curstate === 'number') {
+            snapshot.switch = device.curstate === 1;
+        }
+        if (typeof device.dimmvalue === 'number') {
+            snapshot.dimmvalue = device.dimmvalue;
+        }
+        if (typeof device.power === 'number') {
+            snapshot.power = device.power;
+        }
+
+        if (Object.keys(snapshot).length > 0) {
+            this.onDeviceUpdate(this.deviceId, snapshot);
+        }
     }
 
     /**

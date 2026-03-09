@@ -90,6 +90,7 @@ export interface XComfortDevice {
   devType?: number;
   compId?: number;
   compType?: number;
+  componentName?: string;
   info?: InfoEntry[];
   
   // Shading specific
@@ -101,6 +102,13 @@ export interface XComfortDevice {
   operationMode?: number;
   
   [key: string]: unknown;
+}
+
+export interface XComfortComponent {
+  compId: string;
+  name?: string;
+  compType?: number;
+  raw?: Record<string, unknown>;
 }
 
 /**
@@ -157,6 +165,17 @@ export interface BridgeStatus {
   doorsOpen?: number;
   presence?: number;
   [key: string]: unknown;
+}
+
+export interface BridgeInfo {
+  id?: string;
+  name?: string;
+  bridgeType?: number;
+  bridgeModel?: string;
+  firmwareVersion?: string;
+  ipAddress?: string;
+  homeScenesCount?: number;
+  raw?: Record<string, unknown>;
 }
 
 /**

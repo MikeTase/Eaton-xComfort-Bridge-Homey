@@ -1,10 +1,13 @@
 import { BaseDevice } from '../../lib/BaseDevice';
+import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { XCOMFORT_CAPABILITIES } from '../../lib/XComfortCapabilities';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
+import { parseInfoMetadata } from '../../lib/utils/parseInfoMetadata';
 import {
   ClimateMode,
   ClimateState,
   DeviceStateUpdate,
+  InfoEntry,
   RoomModeSetpoint,
   RoomStateUpdate,
   XComfortDevice,
@@ -40,19 +43,30 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private currentSetpoint: number = 20;
   private targetRangeKey: string | null = null;
   private modeSetpoints: Map<ClimateMode, number> = new Map();
+  private linkedSensorId: string | null = null;
+  private linkedSensorTemperatureAvailable: boolean = false;
+  private linkedSensorHumidityAvailable: boolean = false;
+  private energyKwh: number = 0;
+  private lastEnergyAt: number | null = null;
+  private lastPowerW: number = 0;
+  private energyTimer: NodeJS.Timeout | null = null;
   private onDevicesLoaded?: () => void;
 
   async onDeviceReady() {
     this.debug = process.env.XCOMFORT_DEBUG === '1';
 
     await this.ensureCapabilities();
+    await this.restoreEnergyState();
     this.registerStateListener();
     this.registerCapabilityListeners();
     this.registerDevicesLoadedListener();
     await this.tryBindRoomState();
   }
 
-  protected onBridgeChanged(): void {
+  protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
+    if (this.onDevicesLoaded) {
+      oldBridge.removeListener('devices_loaded', this.onDevicesLoaded);
+    }
     this.registerDevicesLoadedListener();
     if (!this.roomStateBound) {
       void this.tryBindRoomState();
@@ -66,6 +80,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   onDeleted(): void {
+    this.flushEnergyTracking();
     if (this.onDevicesLoaded) {
       this.bridge.removeListener('devices_loaded', this.onDevicesLoaded);
       this.onDevicesLoaded = undefined;
@@ -209,6 +224,8 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   private async applyRoomSnapshot(room: XComfortRoom): Promise<void> {
+    await this.tryBindRoomSensor(room);
+
     const update: RoomStateUpdate = {
       setpoint: room.setpoint,
       temp: room.temp,
@@ -261,8 +278,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
 
     if (typeof data.power === 'number') {
-      await this.ensurePowerCapability();
-      await this.updateCapability('measure_power', data.power);
+      await this.applyPowerMeasurement(data.power);
     }
   }
 
@@ -298,11 +314,11 @@ module.exports = class ThermostatDevice extends BaseDevice {
       await this.updateCapability('target_temperature', this.currentSetpoint);
     }
 
-    if (typeof data.temp === 'number') {
+    if (typeof data.temp === 'number' && !this.linkedSensorTemperatureAvailable) {
       await this.updateCapability('measure_temperature', data.temp);
     }
 
-    if (typeof data.humidity === 'number') {
+    if (typeof data.humidity === 'number' && !this.linkedSensorHumidityAvailable) {
       await this.ensureHumidityCapability();
       await this.updateCapability('measure_humidity', data.humidity);
     }
@@ -313,8 +329,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
 
     if (typeof data.power === 'number') {
-      await this.ensurePowerCapability();
-      await this.updateCapability('measure_power', data.power);
+      await this.applyPowerMeasurement(data.power);
     }
   }
 
@@ -412,6 +427,12 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private async ensurePowerCapability(): Promise<void> {
     if (!this.hasCapability('measure_power')) {
       await this.addCapability('measure_power').catch(this.error);
+    }
+  }
+
+  private async ensureEnergyCapability(): Promise<void> {
+    if (!this.hasCapability('meter_power')) {
+      await this.addCapability('meter_power').catch(this.error);
     }
   }
 
@@ -605,5 +626,158 @@ module.exports = class ThermostatDevice extends BaseDevice {
       default:
         return ClimateState.Off;
     }
+  }
+
+  private async tryBindRoomSensor(room?: XComfortRoom): Promise<void> {
+    const sensorId = this.resolveRoomSensorId(room);
+    if (!sensorId || sensorId === this.deviceId) {
+      this.linkedSensorId = null;
+      this.linkedSensorTemperatureAvailable = false;
+      this.linkedSensorHumidityAvailable = false;
+      return;
+    }
+
+    if (this.linkedSensorId !== sensorId) {
+      this.linkedSensorId = sensorId;
+      this.linkedSensorTemperatureAvailable = false;
+      this.linkedSensorHumidityAvailable = false;
+      const boundSensorId = sensorId;
+      this.addManagedStateListener(boundSensorId, (_id, data) => {
+        if (this.linkedSensorId !== boundSensorId) {
+          return;
+        }
+        void this.updateLinkedSensorState(data);
+      });
+    }
+
+    await this.applyLinkedSensorSnapshot(sensorId);
+  }
+
+  private resolveRoomSensorId(room?: XComfortRoom): string | null {
+    const sourceRoom = room ?? (this.roomId ? this.bridge.getRoom(this.roomId) : undefined);
+    if (!sourceRoom) {
+      return null;
+    }
+
+    if (sourceRoom.roomSensorId !== undefined && sourceRoom.roomSensorId !== null) {
+      return String(sourceRoom.roomSensorId);
+    }
+
+    const rawRoomSensorId = sourceRoom.raw?.roomSensorId;
+    if (typeof rawRoomSensorId === 'string' || typeof rawRoomSensorId === 'number') {
+      return String(rawRoomSensorId);
+    }
+
+    return null;
+  }
+
+  private async applyLinkedSensorSnapshot(sensorId: string): Promise<void> {
+    const sensorDevice = this.bridge.getDevice(sensorId);
+    if (!sensorDevice || !Array.isArray(sensorDevice.info)) {
+      this.linkedSensorTemperatureAvailable = false;
+      this.linkedSensorHumidityAvailable = false;
+      return;
+    }
+
+    const metadata = parseInfoMetadata(sensorDevice.info as InfoEntry[]);
+    const temperature = typeof metadata.temperature === 'number' ? metadata.temperature : null;
+    const humidity = typeof metadata.humidity === 'number' ? metadata.humidity : null;
+    this.linkedSensorTemperatureAvailable = temperature !== null;
+    this.linkedSensorHumidityAvailable = humidity !== null;
+
+    if (this.linkedSensorTemperatureAvailable) {
+      await this.updateCapability('measure_temperature', temperature);
+    }
+
+    if (this.linkedSensorHumidityAvailable) {
+      await this.ensureHumidityCapability();
+      await this.updateCapability('measure_humidity', humidity);
+    }
+  }
+
+  private async updateLinkedSensorState(data: DeviceStateUpdate): Promise<void> {
+    if (typeof data.metadata?.temperature === 'number') {
+      this.linkedSensorTemperatureAvailable = true;
+      await this.updateCapability('measure_temperature', data.metadata.temperature);
+    }
+
+    if (typeof data.metadata?.humidity === 'number') {
+      this.linkedSensorHumidityAvailable = true;
+      await this.ensureHumidityCapability();
+      await this.updateCapability('measure_humidity', data.metadata.humidity);
+    }
+  }
+
+  private async restoreEnergyState(): Promise<void> {
+    const storedValue = this.getStoreValue('meterPowerKwh');
+    if (typeof storedValue !== 'number' || !Number.isFinite(storedValue) || storedValue <= 0) {
+      return;
+    }
+
+    this.energyKwh = storedValue;
+    await this.ensureEnergyCapability();
+    await this.updateCapability('meter_power', this.roundEnergyValue(this.energyKwh));
+  }
+
+  private async applyPowerMeasurement(power: number): Promise<void> {
+    await this.ensurePowerCapability();
+    await this.updateCapability('measure_power', power);
+
+    this.integrateEnergy(Date.now());
+    this.lastPowerW = power;
+    await this.persistEnergyReading();
+
+    if (power > 0) {
+      this.startEnergyTimer();
+      return;
+    }
+
+    this.stopEnergyTimer();
+  }
+
+  private integrateEnergy(now: number): void {
+    if (this.lastEnergyAt !== null && now > this.lastEnergyAt && this.lastPowerW > 0) {
+      const elapsedMs = now - this.lastEnergyAt;
+      this.energyKwh += (this.lastPowerW * elapsedMs) / 3600000000;
+    }
+
+    this.lastEnergyAt = now;
+  }
+
+  private startEnergyTimer(): void {
+    if (this.energyTimer) {
+      return;
+    }
+
+    this.energyTimer = setInterval(() => {
+      this.integrateEnergy(Date.now());
+      void this.persistEnergyReading();
+    }, 60000);
+  }
+
+  private stopEnergyTimer(): void {
+    if (!this.energyTimer) {
+      return;
+    }
+
+    clearInterval(this.energyTimer);
+    this.energyTimer = null;
+  }
+
+  private flushEnergyTracking(): void {
+    this.integrateEnergy(Date.now());
+    this.stopEnergyTimer();
+    void this.persistEnergyReading();
+  }
+
+  private async persistEnergyReading(): Promise<void> {
+    await this.ensureEnergyCapability();
+    const roundedValue = this.roundEnergyValue(this.energyKwh);
+    await this.updateCapability('meter_power', roundedValue);
+    await this.setStoreValue('meterPowerKwh', roundedValue).catch(this.error);
+  }
+
+  private roundEnergyValue(value: number): number {
+    return Number(value.toFixed(6));
   }
 };
