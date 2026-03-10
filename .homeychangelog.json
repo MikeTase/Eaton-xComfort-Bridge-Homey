@@ -106,5 +106,8 @@
   },
   "1.4.21": {
     "en": "Improved bridge state handling for wall switches and shading, added better direct update support, and improved metadata/home-data reliability."
+  },
+  "1.4.22": {
+    "en": "Improved state syncing for actuators, shading, wall switches, and room updates, with better direct update handling from the bridge."
   }
 }

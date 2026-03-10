@@ -14,11 +14,18 @@ module.exports = class WallSwitchDriver extends BaseDriver {
   }
 
   private getPairedDevices(devices: XComfortDevice[]) {
+    const deviceMap = new Map<string, XComfortDevice>(
+      devices.map((device) => [String(device.deviceId), device]),
+    );
     const rockerDevices = devices
       .filter((device) => {
         const devType = Number(device.devType ?? 0);
         const compType = typeof device.compType === 'number' ? device.compType : undefined;
-        return devType === DEVICE_TYPES.WALL_SWITCH || isSupportedWallSwitchComponentType(compType);
+        if (!(devType === DEVICE_TYPES.WALL_SWITCH || isSupportedWallSwitchComponentType(compType))) {
+          return false;
+        }
+
+        return !this.isRcTouchVirtualRocker(device, deviceMap);
       });
 
     const componentMap = new Map<string, XComfortDevice[]>();
@@ -87,6 +94,19 @@ module.exports = class WallSwitchDriver extends BaseDriver {
     }
 
     return channelIndex + 1;
+  }
+
+  private isRcTouchVirtualRocker(
+    device: XComfortDevice,
+    deviceMap: Map<string, XComfortDevice>,
+  ): boolean {
+    const numericId = Number(device.deviceId);
+    if (Number.isNaN(numericId)) {
+      return false;
+    }
+
+    const rcTouchDevice = deviceMap.get(String(numericId - 1));
+    return Number(rcTouchDevice?.devType ?? 0) === DEVICE_TYPES.RC_TOUCH;
   }
 
   async onPairListDevices() {

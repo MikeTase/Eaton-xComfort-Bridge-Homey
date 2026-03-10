@@ -8,7 +8,7 @@ module.exports = class ShadingDevice extends BaseDevice {
 
   async onDeviceReady() {
     const settings = this.getSettings();
-    const supportsPosition = Number(settings.shRuntime ?? 0) > 0;
+    const supportsPosition = Number(settings.shRuntime ?? 0) === 1;
 
     if (!supportsPosition && this.hasCapability('windowcoverings_set')) {
         await this.removeCapability('windowcoverings_set').catch(this.error);

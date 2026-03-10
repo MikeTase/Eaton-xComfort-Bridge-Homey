@@ -66,6 +66,9 @@ module.exports = class ActuatorDevice extends BaseDevice {
 
                     if (shouldUpdate) {
                         this.setCapabilityValue('onoff', state.switch).catch(this.error);
+                        if (state.switch && this.hasCapability('dim') && state.dimmvalue === undefined) {
+                            this.syncImplicitDimOnState();
+                        }
                     }
                 }
 
@@ -101,8 +104,12 @@ module.exports = class ActuatorDevice extends BaseDevice {
                 this.setCapabilityValue('onoff', value).catch(() => {});
                 this.setPendingState(value);
 
-                if (!value && this.hasCapability('dim')) {
-                    this.setCapabilityValue('dim', 0).catch(() => {});
+                if (this.hasCapability('dim')) {
+                    if (!value) {
+                        this.setCapabilityValue('dim', 0).catch(() => {});
+                    } else {
+                        this.syncImplicitDimOnState();
+                    }
                 }
                 
                 await this.bridge.switchDevice(resolveDeviceId(), value);
@@ -145,6 +152,15 @@ module.exports = class ActuatorDevice extends BaseDevice {
 
     protected onBridgeChanged(): void {
         this.applyDeviceSnapshot();
+    }
+
+    private syncImplicitDimOnState(): void {
+        const currentDim = this.getCapabilityValue('dim');
+        if (typeof currentDim === 'number' && currentDim > 0) {
+            return;
+        }
+
+        this.setCapabilityValue('dim', 1).catch(this.error);
     }
 
     private applyDeviceSnapshot(): void {

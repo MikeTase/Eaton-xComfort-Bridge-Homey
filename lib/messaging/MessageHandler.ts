@@ -369,6 +369,7 @@ export class MessageHandler {
     try {
       if (payload?.item) {
         const deviceUpdates = new Map<string, DeviceStateUpdate>();
+        const deviceInfoUpdates = new Map<string, InfoEntry[]>();
         const roomUpdates = new Map<string, RoomStateUpdate>();
 
         payload.item.forEach((item) => {
@@ -415,6 +416,7 @@ export class MessageHandler {
               if (Object.keys(metadata).length > 0) {
                 deviceUpdate.metadata = metadata;
               }
+              deviceInfoUpdates.set(deviceId, item.info);
             }
           }
 
@@ -452,6 +454,10 @@ export class MessageHandler {
                   value: mode.value,
                 }));
             }
+            roomUpdate.raw = {
+              ...(roomUpdate.raw || {}),
+              ...(item as Record<string, unknown>),
+            };
           }
         });
 
@@ -471,6 +477,7 @@ export class MessageHandler {
             if (updateData.setpoint !== undefined) patch.setpoint = updateData.setpoint;
             if (updateData.operationMode !== undefined) patch.operationMode = updateData.operationMode;
             if (updateData.tempState !== undefined) patch.tempState = updateData.tempState;
+            if (deviceInfoUpdates.has(deviceId)) patch.info = deviceInfoUpdates.get(deviceId);
 
             if (Object.keys(patch).length > 0) {
               this.deviceStateManager.setDevice({ ...device, ...patch } as any);
@@ -481,6 +488,30 @@ export class MessageHandler {
         });
 
         roomUpdates.forEach((updateData, roomId) => {
+          const existingRoom = this.deviceStateManager.getRoom(roomId);
+          const patch: Record<string, unknown> = {};
+          if (updateData.setpoint !== undefined) patch.setpoint = updateData.setpoint;
+          if (updateData.temp !== undefined) patch.temp = updateData.temp;
+          if (updateData.humidity !== undefined) patch.humidity = updateData.humidity;
+          if (updateData.power !== undefined) patch.power = updateData.power;
+          if (updateData.valve !== undefined) patch.valve = updateData.valve;
+          if (updateData.lightsOn !== undefined) patch.lightsOn = updateData.lightsOn;
+          if (updateData.windowsOpen !== undefined) patch.windowsOpen = updateData.windowsOpen;
+          if (updateData.doorsOpen !== undefined) patch.doorsOpen = updateData.doorsOpen;
+          if (updateData.currentMode !== undefined) patch.currentMode = updateData.currentMode;
+          if (updateData.mode !== undefined) patch.mode = updateData.mode;
+          if (updateData.state !== undefined) patch.state = updateData.state;
+          if (updateData.temperatureOnly !== undefined) patch.temperatureOnly = updateData.temperatureOnly;
+          if (updateData.modes !== undefined) patch.modes = updateData.modes;
+          if (updateData.raw !== undefined) patch.raw = updateData.raw;
+
+          if (Object.keys(patch).length > 0) {
+            this.deviceStateManager.setRoom({
+              ...(existingRoom || { roomId, name: `Room ${roomId}` }),
+              ...patch,
+            });
+          }
+
           this.enqueueRoomUpdate(roomId, updateData);
         });
 
