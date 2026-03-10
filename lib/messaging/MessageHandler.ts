@@ -177,6 +177,18 @@ export class MessageHandler {
       return true;
     }
 
+    if (
+      msg.type_int === MESSAGE_TYPES.SET_DEVICE_STATE ||
+      msg.type_int === MESSAGE_TYPES.SET_ROOM_STATE ||
+      msg.type_int === MESSAGE_TYPES.SET_ROOM_HEATING_STATE
+    ) {
+      const payload = this.getPayloadObject(msg.payload);
+      if (payload) {
+        this.processSingleStateUpdate(payload);
+      }
+      return true;
+    }
+
     if (msg.type_int === MESSAGE_TYPES.STATE_UPDATE) {
       const payload = this.getPayloadObject(msg.payload);
       if (payload) {
@@ -471,10 +483,30 @@ export class MessageHandler {
         roomUpdates.forEach((updateData, roomId) => {
           this.enqueueRoomUpdate(roomId, updateData);
         });
+
+        // Process compId items — update stored component data (matches HA _handle_SET_STATE_INFO)
+        payload.item.forEach((item) => {
+          if (item.compId !== undefined && item.compId !== null) {
+            const compId = String(item.compId);
+            const existing = this.deviceStateManager.getComponent(compId);
+            if (existing) {
+              this.deviceStateManager.setComponent({
+                ...existing,
+                raw: { ...(existing.raw || {}), ...(item as Record<string, unknown>) },
+              });
+            }
+          }
+        });
       }
     } catch (error) {
       console.error(`[MessageHandler] Error processing state update:`, error);
     }
+  }
+
+  private processSingleStateUpdate(payload: Record<string, unknown>): void {
+    this.processStateUpdate({
+      item: [payload as StateUpdateItem],
+    });
   }
 
   private enqueueDeviceUpdate(deviceId: string, updateData: DeviceStateUpdate): void {

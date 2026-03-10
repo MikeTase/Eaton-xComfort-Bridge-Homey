@@ -117,11 +117,27 @@ export class XComfortBridge extends EventEmitter {
     this.authenticator.setOnAuthenticated(() => {
       this.connectionState = 'connected';
       this.logger('[XComfortBridge] Authenticated - requesting device list');
+
+      // Store firmware version from handshake (matches HA device_version extraction)
+      const fwVersion = this.authenticator.getFirmwareVersion();
+      if (fwVersion && fwVersion !== this.lastBridgeInfo.firmwareVersion) {
+        this.lastBridgeInfo = {
+          ...this.lastBridgeInfo,
+          firmwareVersion: fwVersion,
+        };
+        this.emit('bridge_info', this.lastBridgeInfo);
+      }
+
       this.emit('connected');
 
       // Request initial data
       this.connectionManager.sendEncrypted({
         type_int: MESSAGE_TYPES.REQUEST_DEVICES,
+        mc: this.connectionManager.nextMc(),
+        payload: {},
+      });
+      this.connectionManager.sendEncrypted({
+        type_int: MESSAGE_TYPES.REQUEST_HOME_DATA,
         mc: this.connectionManager.nextMc(),
         payload: {},
       });

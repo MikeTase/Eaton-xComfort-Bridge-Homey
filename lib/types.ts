@@ -272,6 +272,7 @@ export interface ProtocolMessage {
 export interface StateUpdateItem {
   deviceId?: string;
   roomId?: string;
+  compId?: string | number;
   switch?: boolean | number;
   dimmvalue?: number;
   power?: number;

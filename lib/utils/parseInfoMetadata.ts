@@ -3,6 +3,10 @@ import type { DeviceMetadata, InfoEntry } from '../types';
 
 export function parseInfoMetadata(infoArray: InfoEntry[] = []): DeviceMetadata {
   const metadata: DeviceMetadata = {};
+  const parseNumericValue = (value: string | number): number | null => {
+    const parsed = Number.parseFloat(String(value));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
 
   infoArray.forEach((info) => {
     if (!info.text || info.value === undefined) {
@@ -11,16 +15,29 @@ export function parseInfoMetadata(infoArray: InfoEntry[] = []): DeviceMetadata {
 
     switch (info.text) {
       case INFO_TEXT_CODES.TEMPERATURE_STANDARD:
-      case INFO_TEXT_CODES.TEMPERATURE_DIMMER:
-        metadata.temperature = parseFloat(String(info.value));
+      case INFO_TEXT_CODES.TEMPERATURE_DIMMER: {
+        const parsed = parseNumericValue(info.value);
+        if (parsed !== null) {
+          metadata.temperature = parsed;
+        }
         break;
+      }
       case INFO_TEXT_CODES.HUMIDITY_STANDARD:
-        metadata.humidity = parseFloat(String(info.value));
+        {
+          const parsed = parseNumericValue(info.value);
+          if (parsed !== null) {
+            metadata.humidity = parsed;
+          }
+        }
         break;
       case INFO_TEXT_CODES.DIMM_VALUE:
-      case INFO_TEXT_CODES.DIMM_VALUE_ALT:
-        metadata.heatingDemand = parseFloat(String(info.value));
+      case INFO_TEXT_CODES.DIMM_VALUE_ALT: {
+        const parsed = parseNumericValue(info.value);
+        if (parsed !== null) {
+          metadata.heatingDemand = parsed;
+        }
         break;
+      }
       default:
         break;
     }

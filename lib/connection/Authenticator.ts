@@ -44,6 +44,7 @@ export class Authenticator {
   private publicKey: string | null = null;
   private encryptionContext: EncryptionContext | null = null;
   private token: string | null = null;
+  private firmwareVersion: string | null = null;
   private state: AuthState = 'idle';
   private isRenewing: boolean = false;
 
@@ -96,6 +97,7 @@ export class Authenticator {
     this.publicKey = null;
     this.encryptionContext = null;
     this.token = null;
+    this.firmwareVersion = null;
     this.state = 'idle';
     this.isRenewing = false;
   }
@@ -116,9 +118,10 @@ export class Authenticator {
 
       this.deviceId = deviceId;
       this.connectionId = connectionId;
+      this.firmwareVersion = this.getStringField(payload, 'device_version');
       this.state = 'awaiting_public_key';
       this.logger(
-        `[Authenticator] CONNECTION_START received. deviceId=${this.deviceId}`
+        `[Authenticator] CONNECTION_START received. deviceId=${this.deviceId}, fw=${this.firmwareVersion ?? 'unknown'}`
       );
 
       const confirmMsg = {
@@ -222,6 +225,12 @@ export class Authenticator {
       return true;
     }
 
+    if (msg.type_int === MESSAGE_TYPES.LOGIN_DENIED) {
+      this.logger('[Authenticator-ERROR] Login DENIED by bridge — check your auth key in Settings');
+      this.state = 'idle';
+      return true;
+    }
+
     if (msg.type_int === MESSAGE_TYPES.LOGIN_RESPONSE) {
       const payload = this.getPayloadObject(msg);
       const token = this.getStringField(payload, 'token');
@@ -290,6 +299,13 @@ export class Authenticator {
     }
 
     return false;
+  }
+
+  /**
+   * Get the firmware version reported by the bridge during connection
+   */
+  getFirmwareVersion(): string | null {
+    return this.firmwareVersion;
   }
 
   /**

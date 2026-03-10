@@ -4,10 +4,11 @@ import { DeviceStateUpdate, ShadingAction } from '../../lib/types';
 module.exports = class ShadingDevice extends BaseDevice {
   private safetyActive: boolean = false;
   private lastCurstate: number | null = null;
+  private lastPosition: number | null = null;
 
   async onDeviceReady() {
     const settings = this.getSettings();
-    const supportsPosition = settings.shRuntime !== undefined && settings.shRuntime > 0;
+    const supportsPosition = Number(settings.shRuntime ?? 0) > 0;
 
     if (!supportsPosition && this.hasCapability('windowcoverings_set')) {
         await this.removeCapability('windowcoverings_set').catch(this.error);
@@ -38,24 +39,29 @@ module.exports = class ShadingDevice extends BaseDevice {
       // Track curstate for running/idle detection (matches HA ShadeState.current_state)
       if (typeof data.curstate === 'number') {
           this.lastCurstate = data.curstate;
+          if (this.hasCapability('windowcoverings_state')) {
+              this.setCapabilityValue(
+                  'windowcoverings_state',
+                  this.resolveWindowcoveringsState(this.lastPosition),
+              ).catch(this.error);
+          }
       }
       
       if (data.shPos !== undefined || data.shadsClosed !== undefined || data.dimmvalue !== undefined) {
-          let pos = data.shPos ?? data.shadsClosed ?? data.dimmvalue;
+          const previousPosition = this.lastPosition;
+          const pos = this.normalizePosition(data.shPos ?? data.shadsClosed ?? data.dimmvalue);
           if (pos !== undefined && this.hasCapability('windowcoverings_set')) {
               // Values > 1 are on the 0-100 scale, normalize to 0-1
-              if (pos > 1) pos = pos / 100;
-              pos = Math.max(0, Math.min(1, pos));
               this.setCapabilityValue('windowcoverings_set', pos).catch(this.error);
               if (this.hasCapability('windowcoverings_state')) {
-                  let state: 'up' | 'idle' | 'down' = 'idle';
-                  if (pos <= 0) {
-                      state = 'up';
-                  } else if (pos >= 1) {
-                      state = 'down';
-                  }
-                  this.setCapabilityValue('windowcoverings_state', state).catch(this.error);
+                  this.setCapabilityValue(
+                      'windowcoverings_state',
+                      this.resolveWindowcoveringsState(pos, previousPosition),
+                  ).catch(this.error);
               }
+          }
+          if (pos !== undefined) {
+              this.lastPosition = pos;
           }
       }
   }
@@ -121,5 +127,47 @@ module.exports = class ShadingDevice extends BaseDevice {
            this.setCapabilityValue('windowcoverings_state', value).catch(this.error);
            await this.bridge.controlShading(numericId, action);
       });
+  }
+
+  private normalizePosition(value?: number): number | undefined {
+      if (typeof value !== 'number' || Number.isNaN(value)) {
+          return undefined;
+      }
+
+      return Math.max(0, Math.min(1, value > 1 ? value / 100 : value));
+  }
+
+  private resolveWindowcoveringsState(
+      position: number | null,
+      previousPosition: number | null = this.lastPosition,
+  ): 'up' | 'idle' | 'down' {
+      switch (this.lastCurstate) {
+          case ShadingAction.OPEN:
+          case ShadingAction.STEP_OPEN:
+              return 'up';
+          case ShadingAction.CLOSE:
+          case ShadingAction.STEP_CLOSE:
+              return 'down';
+          case ShadingAction.STOP:
+              return 'idle';
+          case ShadingAction.GO_TO:
+              if (position !== null && previousPosition !== null && position !== previousPosition) {
+                  return position < previousPosition ? 'up' : 'down';
+              }
+              break;
+          default:
+              break;
+      }
+
+      if (position !== null) {
+          if (position <= 0) {
+              return 'up';
+          }
+          if (position >= 1) {
+              return 'down';
+          }
+      }
+
+      return 'idle';
   }
 };

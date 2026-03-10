@@ -103,5 +103,8 @@
   },
   "1.4.20": {
     "en": "wattage changes"
+  },
+  "1.4.21": {
+    "en": "Improved bridge state handling for wall switches and shading, added better direct update support, and improved metadata/home-data reliability."
   }
 }

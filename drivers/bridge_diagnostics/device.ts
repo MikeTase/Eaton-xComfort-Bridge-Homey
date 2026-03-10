@@ -132,6 +132,7 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
       bridge_name: info.name || '-',
       bridge_id: info.id || '-',
       bridge_model: info.bridgeModel || '-',
+      bridge_firmware: info.firmwareVersion || '-',
       bridge_ip: info.ipAddress || '-',
       bridge_scenes: typeof info.homeScenesCount === 'number' ? String(info.homeScenesCount) : '-',
     };

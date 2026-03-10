@@ -1,5 +1,7 @@
 import * as Homey from 'homey';
 import { BaseDevice } from '../../lib/BaseDevice';
+import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
+import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceMetadata, DeviceStateUpdate, InfoEntry, XComfortDevice } from '../../lib/types';
 import { parseInfoMetadata } from '../../lib/utils/parseInfoMetadata';
 
@@ -13,6 +15,8 @@ module.exports = class WallSwitchDevice extends BaseDevice {
   private triggerPressed: Homey.FlowCardTriggerDevice | null = null;
   private debug: boolean = false;
   private hasSeenInitialButtonState: boolean = false;
+  private companionSensorId: string | null = null;
+  private onDevicesLoaded?: () => void;
 
   async onDeviceReady() {
     this.debug = process.env.XCOMFORT_DEBUG === '1';
@@ -41,7 +45,29 @@ module.exports = class WallSwitchDevice extends BaseDevice {
         void this.handleButtonState(state, triggerUp, triggerDown);
     });
 
+    this.registerDevicesLoadedListener();
+    await this.bindCompanionSensor();
     await this.applyDeviceSnapshot();
+  }
+
+  onDeleted(): void {
+    if (this.onDevicesLoaded && this.bridge) {
+      this.bridge.removeListener('devices_loaded', this.onDevicesLoaded);
+      this.onDevicesLoaded = undefined;
+    }
+    super.onDeleted();
+  }
+
+  private registerDevicesLoadedListener(): void {
+    if (!this.onDevicesLoaded) {
+      this.onDevicesLoaded = () => {
+        void this.bindCompanionSensor();
+        void this.applyDeviceSnapshot();
+      };
+    }
+
+    this.bridge.removeListener('devices_loaded', this.onDevicesLoaded);
+    this.bridge.on('devices_loaded', this.onDevicesLoaded);
   }
 
   private async applyDeviceSnapshot(): Promise<void> {
@@ -60,11 +86,87 @@ module.exports = class WallSwitchDevice extends BaseDevice {
       const metadata = parseInfoMetadata(device.info as InfoEntry[]);
       await this.applySensorMetadata(metadata);
     }
+
+    if (this.companionSensorId) {
+      await this.applyCompanionSensorSnapshot(this.companionSensorId);
+    }
   }
 
-  protected onBridgeChanged(): void {
+  protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
+    if (this.onDevicesLoaded) {
+      oldBridge.removeListener('devices_loaded', this.onDevicesLoaded);
+    }
+    this.registerDevicesLoadedListener();
     this.hasSeenInitialButtonState = false;
+    void this.bindCompanionSensor();
     void this.applyDeviceSnapshot();
+  }
+
+  private async bindCompanionSensor(): Promise<void> {
+    const sensorId = this.findCompanionSensorId();
+    if (!sensorId) {
+      return;
+    }
+
+    if (this.companionSensorId !== sensorId) {
+      this.companionSensorId = sensorId;
+      const boundSensorId = sensorId;
+      this.addManagedStateListener(boundSensorId, (_deviceId: string, state: DeviceStateUpdate) => {
+        if (this.companionSensorId !== boundSensorId) {
+          return;
+        }
+        void this.applySensorMetadata(state.metadata);
+      });
+    }
+
+    await this.applyCompanionSensorSnapshot(sensorId);
+  }
+
+  private findCompanionSensorId(): string | null {
+    const device = this.bridge.getDevice(this.deviceId);
+    const data = this.getData() as WallSwitchData;
+    const componentId = device?.compId ?? data.componentId;
+    if (componentId === undefined || componentId === null) {
+      return null;
+    }
+
+    const componentIdString = String(componentId);
+    const sensorDevice = this.bridge.getDevices().find((candidate) => {
+      if (String(candidate.deviceId) === this.deviceId) {
+        return false;
+      }
+
+      if (candidate.compId === undefined || String(candidate.compId) !== componentIdString) {
+        return false;
+      }
+
+      return this.isCompanionSensorDevice(candidate);
+    });
+
+    return sensorDevice ? String(sensorDevice.deviceId) : null;
+  }
+
+  private isCompanionSensorDevice(device: XComfortDevice): boolean {
+    const devType = Number(device.devType ?? 0);
+    if (
+      devType === DEVICE_TYPES.TEMPERATURE_SENSOR ||
+      devType === DEVICE_TYPES.TEMP_SENSOR ||
+      devType === DEVICE_TYPES.TEMP_HUMIDITY_SENSOR
+    ) {
+      return true;
+    }
+
+    return Array.isArray(device.info) && devType !== DEVICE_TYPES.WALL_SWITCH;
+  }
+
+  private async applyCompanionSensorSnapshot(sensorId: string): Promise<void> {
+    const sensorDevice = this.bridge.getDevice(sensorId);
+    if (!sensorDevice || !Array.isArray(sensorDevice.info)) {
+      return;
+    }
+
+    const metadata = parseInfoMetadata(sensorDevice.info as InfoEntry[]);
+    await this.applySensorMetadata(metadata);
   }
 
   private async handleButtonState(

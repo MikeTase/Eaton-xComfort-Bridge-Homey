@@ -6,7 +6,7 @@
   "description": {
     "en": "Seamless Eaton xComfort control for lights, shades, and heating."
   },
-  "version": "1.4.20",
+  "version": "1.4.21",
   "category": [
     "lights",
     "climate"
@@ -611,6 +611,14 @@
           "type": "label",
           "label": {
             "en": "Bridge model"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_firmware",
+          "type": "label",
+          "label": {
+            "en": "Firmware version"
           },
           "value": "-"
         },
