@@ -89,4 +89,27 @@ module.exports = class WaterSensorDevice extends BaseDevice {
     const settings = this.getSettings() as { deviceType?: number };
     return Number(settings.deviceType) === DEVICE_TYPES.WATER_GUARD;
   }
+
+  /**
+   * Public method for flow action card to control the water valve.
+   * open = true  → valve open (water flows)
+   * open = false → valve closed (water blocked)
+   */
+  async setValveState(open: boolean): Promise<void> {
+    if (!this.hasCapability('onoff')) {
+      throw new Error('This device does not have a controllable valve');
+    }
+    if (!this.bridge) {
+      throw new Error('Bridge offline');
+    }
+
+    await this.updateCapability('onoff', open);
+
+    try {
+      await this.bridge.switchDevice(this.deviceId, open);
+    } catch (error) {
+      await this.updateCapability('onoff', !open);
+      throw error;
+    }
+  }
 };

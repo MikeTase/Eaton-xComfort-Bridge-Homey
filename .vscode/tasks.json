@@ -58,6 +58,41 @@
 			"label": "Commit and Publish App",
 			"type": "shell",
 			"command": "git add . && git commit -m \"Add flow capabilities for thermostat presets\" && homey app publish"
+		},
+		{
+			"label": "npm build check",
+			"type": "shell",
+			"command": "npm run build"
+		},
+		{
+			"label": "npm build",
+			"type": "shell",
+			"command": "npm run build"
+		},
+		{
+			"label": "npm build",
+			"type": "shell",
+			"command": "npm run build"
+		},
+		{
+			"label": "npm build 2",
+			"type": "shell",
+			"command": "npm run build"
+		},
+		{
+			"label": "npm build 3",
+			"type": "shell",
+			"command": "npm run build"
+		},
+		{
+			"label": "npm build 4",
+			"type": "shell",
+			"command": "npm run build"
+		},
+		{
+			"label": "Update package.json version",
+			"type": "shell",
+			"command": "node -e \"const fs = require('fs'); const file = './package.json'; const data = JSON.parse(fs.readFileSync(file, 'utf8')); data.version = '1.4.13'; fs.writeFileSync(file, JSON.stringify(data, null, 2));\""
 		}
 	]
 }

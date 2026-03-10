@@ -209,6 +209,64 @@
         ]
       }
     ],
+    "conditions": [
+      {
+        "id": "xcomfort_preset_is",
+        "title": {
+          "en": "Heating preset is"
+        },
+        "titleFormatted": {
+          "en": "Heating preset is [[preset]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          },
+          {
+            "name": "preset",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "frost",
+                "label": {
+                  "en": "Frost"
+                }
+              },
+              {
+                "id": "eco",
+                "label": {
+                  "en": "Economy"
+                }
+              },
+              {
+                "id": "comfort",
+                "label": {
+                  "en": "Comfort"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "water_valve_is",
+        "title": {
+          "en": "Water valve is"
+        },
+        "titleFormatted": {
+          "en": "Water valve !{{is|is not}} open"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=water_sensor"
+          }
+        ]
+      }
+    ],
     "actions": [
       {
         "id": "set_xcomfort_preset",
@@ -244,6 +302,40 @@
                 "id": "comfort",
                 "label": {
                   "en": "Comfort"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "set_water_valve",
+        "title": {
+          "en": "Set water valve"
+        },
+        "titleFormatted": {
+          "en": "Set water valve to [[state]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=water_sensor"
+          },
+          {
+            "name": "state",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "closed",
+                "label": {
+                  "en": "Closed"
+                }
+              },
+              {
+                "id": "open",
+                "label": {
+                  "en": "Open"
                 }
               }
             ]
