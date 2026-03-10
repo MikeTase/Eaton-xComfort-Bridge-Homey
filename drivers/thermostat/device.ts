@@ -89,7 +89,10 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
 
     if (changedKeys.includes('estimated_active_power_watts')) {
-      await this.refreshEstimatedPowerMeasurement();
+      const newPower = newSettings.estimated_active_power_watts;
+      const watts = typeof newPower === 'number' ? newPower : Number(newPower) || 0;
+      this.log(`Estimated active power changed to: ${watts}W`);
+      await this.refreshEstimatedPowerMeasurement(watts);
     }
   }
 
@@ -732,8 +735,8 @@ module.exports = class ThermostatDevice extends BaseDevice {
     await this.refreshEstimatedPowerMeasurement();
   }
 
-  private async refreshEstimatedPowerMeasurement(): Promise<void> {
-    const configuredPower = this.getEstimatedActivePowerWatts();
+  private async refreshEstimatedPowerMeasurement(overrideWatts?: number): Promise<void> {
+    const configuredPower = overrideWatts !== undefined ? overrideWatts : this.getEstimatedActivePowerWatts();
     if (configuredPower <= 0) {
       if (this.lastPowerSource === 'estimated') {
         await this.applyPowerMeasurement(0, 'estimated');
