@@ -444,6 +444,27 @@ export class MessageHandler {
         });
 
         deviceUpdates.forEach((updateData, deviceId) => {
+          // Persist key state fields back to the stored device so that
+          // snapshots (used on reconnect) always reflect the latest state.
+          const device = this.deviceStateManager.getDevice(deviceId);
+          if (device) {
+            const patch: Record<string, unknown> = {};
+            if (updateData.switch !== undefined) patch.switch = updateData.switch;
+            if (updateData.dimmvalue !== undefined) patch.dimmvalue = updateData.dimmvalue;
+            if (updateData.power !== undefined) patch.power = updateData.power;
+            if (updateData.curstate !== undefined) patch.curstate = updateData.curstate;
+            if (updateData.shadsClosed !== undefined) patch.shadsClosed = updateData.shadsClosed;
+            if (updateData.shPos !== undefined) patch.shPos = updateData.shPos;
+            if (updateData.shSafety !== undefined) patch.shSafety = updateData.shSafety;
+            if (updateData.setpoint !== undefined) patch.setpoint = updateData.setpoint;
+            if (updateData.operationMode !== undefined) patch.operationMode = updateData.operationMode;
+            if (updateData.tempState !== undefined) patch.tempState = updateData.tempState;
+
+            if (Object.keys(patch).length > 0) {
+              this.deviceStateManager.setDevice({ ...device, ...patch } as any);
+            }
+          }
+
           this.enqueueDeviceUpdate(deviceId, updateData);
         });
 
