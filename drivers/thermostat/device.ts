@@ -3,6 +3,7 @@ import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { XCOMFORT_CAPABILITIES } from '../../lib/XComfortCapabilities';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { parseInfoMetadata } from '../../lib/utils/parseInfoMetadata';
+import { resolveThermostatRoomId } from '../../lib/utils/resolveThermostatRoomId';
 import {
   ClimateMode,
   ClimateState,
@@ -175,52 +176,9 @@ module.exports = class ThermostatDevice extends BaseDevice {
 
   private resolveRoomId(): string | null {
     const storedRoomId = this.getStoreValue('roomId');
-    if (typeof storedRoomId === 'string' && storedRoomId.length > 0) {
-      return storedRoomId;
-    }
-
     const data = this.getData() as ThermostatDeviceData;
-    if (data.roomId !== undefined && data.roomId !== null) {
-      return String(data.roomId);
-    }
-
     const device = this.bridge.getDevice(this.deviceId);
-    const directRoomId = this.extractRoomIdFromDevice(device);
-    if (directRoomId) {
-      return directRoomId;
-    }
-
-    const roomName = typeof device?.roomName === 'string' ? device.roomName.trim().toLowerCase() : '';
-    if (!roomName) {
-      return null;
-    }
-
-    const matches = this.bridge.getRooms().filter((room) => room.name.trim().toLowerCase() === roomName);
-    if (matches.length === 1) {
-      return matches[0].roomId;
-    }
-
-    if (matches.length > 1) {
-      this.error(`[Thermostat] Multiple room matches found for "${device?.roomName}" on ${this.getName()}`);
-    }
-
-    return null;
-  }
-
-  private extractRoomIdFromDevice(device?: XComfortDevice): string | null {
-    if (!device) {
-      return null;
-    }
-
-    if (typeof device.roomId === 'string' && device.roomId.length > 0) {
-      return device.roomId;
-    }
-
-    if (typeof device.roomId === 'number') {
-      return String(device.roomId);
-    }
-
-    return null;
+    return resolveThermostatRoomId(device, this.bridge.getRooms(), [storedRoomId, data.roomId]);
   }
 
   private async applyRoomSnapshot(room: XComfortRoom): Promise<void> {
@@ -340,21 +298,18 @@ module.exports = class ThermostatDevice extends BaseDevice {
       }
 
       const roomId = await this.ensureRoomIdForControl();
-      if (roomId) {
-        const mode = this.getEffectivePreset(ClimateMode.Comfort);
-        const state = this.currentClimateState;
-        const setpoint = this.clampSetpoint(value, mode);
-
-        await this.bridge.setRoomHeatingState(roomId, mode, state, setpoint);
-        this.modeSetpoints.set(mode, setpoint);
-        this.currentSetpoint = setpoint;
-        await this.updateCapability('target_temperature', setpoint);
-        return;
+      if (!roomId) {
+        throw new Error('No linked xComfort room found for temperature control');
       }
 
-      const numericId = Number(this.deviceId);
-      if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
-      await this.bridge.setThermostatSetpoint(numericId, value);
+      const mode = this.getEffectivePreset(ClimateMode.Comfort);
+      const state = this.currentClimateState;
+      const setpoint = this.clampSetpoint(value, mode);
+
+      await this.bridge.setRoomHeatingState(roomId, mode, state, setpoint);
+      this.modeSetpoints.set(mode, setpoint);
+      this.currentSetpoint = setpoint;
+      await this.updateCapability('target_temperature', setpoint);
     });
 
     this.registerCapabilityListener(XCOMFORT_CAPABILITIES.PRESET_MODE, async (value: PresetCapabilityValue) => {

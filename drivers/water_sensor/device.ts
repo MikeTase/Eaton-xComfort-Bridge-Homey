@@ -1,5 +1,5 @@
 import { BaseDevice } from '../../lib/BaseDevice';
-import { DeviceStateUpdate } from '../../lib/types';
+import { DeviceStateUpdate, XComfortDevice } from '../../lib/types';
 
 module.exports = class WaterSensorDevice extends BaseDevice {
 
@@ -12,13 +12,7 @@ module.exports = class WaterSensorDevice extends BaseDevice {
   }
 
   private updateState(state: DeviceStateUpdate) {
-    let alarm: boolean | undefined;
-
-    if (typeof state.switch === 'boolean') {
-      alarm = state.switch;
-    } else if (typeof state.curstate === 'number') {
-      alarm = state.curstate === 1;
-    }
+    const alarm = this.resolveAlarmState(state);
 
     if (alarm !== undefined && this.hasCapability('alarm_water')) {
       this.setCapabilityValue('alarm_water', alarm).catch(this.error);
@@ -46,5 +40,17 @@ module.exports = class WaterSensorDevice extends BaseDevice {
     if (Object.keys(snapshot).length > 0) {
       this.updateState(snapshot);
     }
+  }
+
+  private resolveAlarmState(state: { switch?: boolean; curstate?: unknown } | XComfortDevice): boolean | undefined {
+    if (typeof state.curstate === 'number') {
+      return state.curstate !== 1;
+    }
+
+    if (typeof state.switch === 'boolean') {
+      return state.switch;
+    }
+
+    return undefined;
   }
 };

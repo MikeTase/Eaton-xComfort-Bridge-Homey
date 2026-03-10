@@ -1,6 +1,7 @@
 import { BaseDriver } from '../../lib/BaseDriver';
-import { XComfortDevice } from '../../lib/types';
+import { XComfortDevice, XComfortRoom } from '../../lib/types';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
+import { resolveThermostatRoomId } from '../../lib/utils/resolveThermostatRoomId';
 
 module.exports = class ThermostatDriver extends BaseDriver {
   private async listUnpairedDevices() {
@@ -10,17 +11,8 @@ module.exports = class ThermostatDriver extends BaseDriver {
     return formattedDevices;
   }
 
-  private formatForPairing(devices: XComfortDevice[], rooms: Array<{ roomId: string; name: string }>) {
+  private formatForPairing(devices: XComfortDevice[], rooms: XComfortRoom[]) {
     const seenIds = new Set<string>();
-    const roomNameMap = new Map<string, string[]>();
-
-    rooms.forEach((room) => {
-      const normalizedName = room.name.trim().toLowerCase();
-      if (!roomNameMap.has(normalizedName)) {
-        roomNameMap.set(normalizedName, []);
-      }
-      roomNameMap.get(normalizedName)!.push(room.roomId);
-    });
     
     const filtered = devices.filter((device) => {
       const devType = device.devType ?? 0;
@@ -43,7 +35,7 @@ module.exports = class ThermostatDriver extends BaseDriver {
       
       const deviceId = device.deviceId;
       const deviceType = device.devType ?? 0;
-      const roomId = this.resolveRoomId(device, roomNameMap);
+      const roomId = resolveThermostatRoomId(device, rooms);
       
       return {
         name: displayName,
@@ -57,24 +49,6 @@ module.exports = class ThermostatDriver extends BaseDriver {
         }
       };
     });
-  }
-
-  private resolveRoomId(device: XComfortDevice, roomNameMap: Map<string, string[]>): string | undefined {
-    if (typeof device.roomId === 'string' && device.roomId.length > 0) {
-      return device.roomId;
-    }
-
-    const roomName = typeof device.roomName === 'string' ? device.roomName.trim().toLowerCase() : '';
-    if (!roomName) {
-      return undefined;
-    }
-
-    const matches = roomNameMap.get(roomName);
-    if (!matches || matches.length !== 1) {
-      return undefined;
-    }
-
-    return matches[0];
   }
   
   async onPairListDevices() {
