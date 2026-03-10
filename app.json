@@ -308,6 +308,19 @@
       ],
       "platforms": [
         "local"
+      ],
+      "settings": [
+        {
+          "id": "room_id_override",
+          "type": "text",
+          "label": {
+            "en": "xComfort Room ID override"
+          },
+          "hint": {
+            "en": "Leave blank for automatic detection. Only set this if you see errors about NO linked room. E.g. 1"
+          },
+          "value": ""
+        }
       ]
     },
     {

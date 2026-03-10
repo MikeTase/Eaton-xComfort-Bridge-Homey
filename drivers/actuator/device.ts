@@ -11,7 +11,15 @@ module.exports = class ActuatorDevice extends BaseDevice {
     private pendingSwitchTimestamp: number = 0;
     private readonly STATE_UPDATE_GRACE_PERIOD = 3000; // ms
 
+    // Energy tracking
+    private energyKwh: number = 0;
+    private lastEnergyAt: number | null = null;
+    private lastPowerW: number = 0;
+    private energyTimer: NodeJS.Timeout | null = null;
+
     async onDeviceReady() {
+        await this.restoreEnergyState();
+
         // Check dimmable setting and remove dim capability if not applicable
         const settings = this.getSettings();
         let isDimmable = settings.dimmable !== false;
@@ -71,6 +79,10 @@ module.exports = class ActuatorDevice extends BaseDevice {
                     if (shouldUpdateDim) {
                         this.setCapabilityValue('dim', homeyDim).catch(this.error);
                     }
+                }
+
+                if (typeof state.power === 'number') {
+                    void this.applyPowerMeasurement(state.power);
                 }
             } catch (err) {
                 this.error(`[Actuator] Error handling deviceUpdate for ${this.deviceId}:`, err);
@@ -178,7 +190,95 @@ module.exports = class ActuatorDevice extends BaseDevice {
         }, safetyDelay);
     }
 
+    // --- Energy Tracking Methods ---
+
+    private async restoreEnergyState(): Promise<void> {
+        const storedValue = this.getStoreValue('meterPowerKwh');
+        if (typeof storedValue !== 'number' || !Number.isFinite(storedValue) || storedValue <= 0) {
+            return;
+        }
+
+        this.energyKwh = storedValue;
+        await this.ensureEnergyCapability();
+        await this.updateCapability('meter_power', this.roundEnergyValue(this.energyKwh));
+    }
+
+    private async ensurePowerCapability(): Promise<void> {
+        if (!this.hasCapability('measure_power')) {
+            await this.addCapability('measure_power').catch(this.error);
+        }
+    }
+
+    private async ensureEnergyCapability(): Promise<void> {
+        if (!this.hasCapability('meter_power')) {
+            await this.addCapability('meter_power').catch(this.error);
+        }
+    }
+
+    private async applyPowerMeasurement(power: number): Promise<void> {
+        await this.ensurePowerCapability();
+        await this.updateCapability('measure_power', power);
+
+        this.integrateEnergy(Date.now());
+        this.lastPowerW = power;
+        await this.persistEnergyReading();
+
+        if (power > 0) {
+            this.startEnergyTimer();
+            return;
+        }
+
+        this.stopEnergyTimer();
+    }
+
+    private integrateEnergy(now: number): void {
+        if (this.lastEnergyAt !== null && now > this.lastEnergyAt && this.lastPowerW > 0) {
+            const elapsedMs = now - this.lastEnergyAt;
+            this.energyKwh += (this.lastPowerW * elapsedMs) / 3600000000;
+        }
+
+        this.lastEnergyAt = now;
+    }
+
+    private startEnergyTimer(): void {
+        if (this.energyTimer) {
+            return;
+        }
+
+        this.energyTimer = setInterval(() => {
+            this.integrateEnergy(Date.now());
+            void this.persistEnergyReading();
+        }, 60000);
+    }
+
+    private stopEnergyTimer(): void {
+        if (!this.energyTimer) {
+            return;
+        }
+
+        clearInterval(this.energyTimer);
+        this.energyTimer = null;
+    }
+
+    private flushEnergyTracking(): void {
+        this.integrateEnergy(Date.now());
+        this.stopEnergyTimer();
+        void this.persistEnergyReading();
+    }
+
+    private async persistEnergyReading(): Promise<void> {
+        await this.ensureEnergyCapability();
+        const roundedValue = this.roundEnergyValue(this.energyKwh);
+        await this.updateCapability('meter_power', roundedValue);
+        await this.setStoreValue('meterPowerKwh', roundedValue).catch(this.error);
+    }
+
+    private roundEnergyValue(value: number): number {
+        return Number(value.toFixed(6));
+    }
+
     onDeleted() {
+        this.flushEnergyTracking();
         if (this.safetyTimer) {
             clearTimeout(this.safetyTimer);
             this.safetyTimer = null;

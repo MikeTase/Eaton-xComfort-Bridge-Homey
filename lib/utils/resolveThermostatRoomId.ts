@@ -131,7 +131,15 @@ export function resolveThermostatRoomId(
   }
 
   if (typeof device.roomName === 'string') {
-    return matchByName(device.roomName, rooms);
+    const matched = matchByName(device.roomName, rooms);
+    if (matched) {
+      return matched;
+    }
+  }
+
+  const heatingRooms = rooms.filter(room => room.temperatureOnly === false || room.mode !== undefined);
+  if (heatingRooms.length === 1) {
+    return String(heatingRooms[0].roomId);
   }
 
   return null;

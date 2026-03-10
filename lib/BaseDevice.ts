@@ -167,6 +167,19 @@ export abstract class BaseDevice extends Homey.Device {
     }
 
     /**
+     * Remove a managed room-state listener.
+     */
+    protected removeManagedRoomStateListener(roomId: string): void {
+        const listeners = this.managedRoomListeners.filter(l => l.roomId === roomId);
+        if (this.bridge) {
+            for (const entry of listeners) {
+                this.bridge.removeRoomStateListener(roomId, entry.callback);
+            }
+        }
+        this.managedRoomListeners = this.managedRoomListeners.filter(l => l.roomId !== roomId);
+    }
+
+    /**
      * Safely update a capability value (no-ops if capability doesn't exist).
      */
     protected async updateCapability(capabilityId: string, value: string | number | boolean | null): Promise<void> {

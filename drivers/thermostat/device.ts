@@ -64,6 +64,24 @@ module.exports = class ThermostatDevice extends BaseDevice {
     await this.tryBindRoomState();
   }
 
+  async onSettings({ newSettings, changedKeys }: { newSettings: Record<string, unknown>, changedKeys: string[] }): Promise<void> {
+    if (changedKeys.includes('room_id_override')) {
+      const override = newSettings.room_id_override as string;
+      this.log(`Room override changed to: ${override}`);
+      this.roomStateBound = false;
+      
+      // Cleanup old listener if it exists
+      if (this.roomId) {
+         this.removeManagedRoomStateListener(this.roomId);
+      }
+      this.roomId = null;
+
+      if (this.bridge && this.bridge.isConnected) {
+         void this.tryBindRoomState();
+      }
+    }
+  }
+
   protected onBridgeChanged(newBridge: XComfortBridge, oldBridge: XComfortBridge): void {
     if (this.onDevicesLoaded) {
       oldBridge.removeListener('devices_loaded', this.onDevicesLoaded);
@@ -175,10 +193,17 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   private resolveRoomId(): string | null {
+    const settings = this.getSettings() as { room_id_override?: string };
+    const overrideId = settings.room_id_override;
     const storedRoomId = this.getStoreValue('roomId');
     const data = this.getData() as ThermostatDeviceData;
     const device = this.bridge.getDevice(this.deviceId);
-    return resolveThermostatRoomId(device, this.bridge.getRooms(), [storedRoomId, data.roomId]);
+    
+    return resolveThermostatRoomId(device, this.bridge.getRooms(), [
+      overrideId,
+      storedRoomId,
+      data.roomId
+    ]);
   }
 
   private async applyRoomSnapshot(room: XComfortRoom): Promise<void> {
