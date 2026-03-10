@@ -17,6 +17,9 @@ module.exports = class ActuatorDevice extends BaseDevice {
     private lastPowerW: number = 0;
     private energyTimer: NodeJS.Timeout | null = null;
 
+    /** Whether this device actually reports power data. */
+    private deviceReportsPower: boolean = false;
+
     async onDeviceReady() {
         await this.restoreEnergyState();
 
@@ -195,12 +198,32 @@ module.exports = class ActuatorDevice extends BaseDevice {
     private async restoreEnergyState(): Promise<void> {
         const storedValue = this.getStoreValue('meterPowerKwh');
         if (typeof storedValue !== 'number' || !Number.isFinite(storedValue) || storedValue <= 0) {
+            // No real energy data was ever tracked — clean up any capabilities
+            // that were dynamically added for a device that doesn't report power.
+            await this.removeStaleEnergyCapabilities();
             return;
         }
 
+        // Device has stored energy history — it genuinely reports power
+        this.deviceReportsPower = true;
         this.energyKwh = storedValue;
         await this.ensureEnergyCapability();
         await this.updateCapability('meter_power', this.roundEnergyValue(this.energyKwh));
+    }
+
+    /**
+     * Remove measure_power and meter_power capabilities from devices that
+     * were dynamically granted them but never actually reported power > 0.
+     */
+    private async removeStaleEnergyCapabilities(): Promise<void> {
+        if (this.hasCapability('measure_power')) {
+            this.log('Removing stale measure_power capability — device never reported power');
+            await this.removeCapability('measure_power').catch(this.error);
+        }
+        if (this.hasCapability('meter_power')) {
+            this.log('Removing stale meter_power capability — device never reported power');
+            await this.removeCapability('meter_power').catch(this.error);
+        }
     }
 
     private async ensurePowerCapability(): Promise<void> {
@@ -216,6 +239,19 @@ module.exports = class ActuatorDevice extends BaseDevice {
     }
 
     private async applyPowerMeasurement(power: number): Promise<void> {
+        // Ignore zero-power from devices that have never reported real power.
+        // This prevents adding energy capabilities to non-metering actuators
+        // that receive power: 0 in initial discovery or state updates.
+        if (!this.deviceReportsPower && power === 0) {
+            return;
+        }
+
+        // First non-zero power reading confirms this device reports power
+        if (!this.deviceReportsPower && power > 0) {
+            this.deviceReportsPower = true;
+            this.log(`Device reports power (${power}W) — enabling energy tracking`);
+        }
+
         await this.ensurePowerCapability();
         await this.updateCapability('measure_power', power);
 
