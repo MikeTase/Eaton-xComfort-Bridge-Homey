@@ -112,5 +112,8 @@
   },
   "1.4.23": {
     "en": "Fixed water sensor alarm state so Homey no longer shows a triggered alarm when the bridge reports no water alarm."
+  },
+  "1.4.24": {
+    "en": "Fix WaterGuard alarm sync so opening the water valve no longer triggers a false alarm in Homey."
   }
 }

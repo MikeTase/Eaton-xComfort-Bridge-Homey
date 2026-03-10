@@ -82,6 +82,9 @@ module.exports = class WaterSensorDevice extends BaseDevice {
     if (device.curstate !== undefined) {
       snapshot.curstate = device.curstate;
     }
+    if (device.errorState !== undefined) {
+      snapshot.errorState = device.errorState;
+    }
 
     if (Object.keys(snapshot).length > 0) {
       await this.updateState(snapshot);
@@ -96,9 +99,46 @@ module.exports = class WaterSensorDevice extends BaseDevice {
     }
   }
 
-  private resolveAlarmState(state: { switch?: boolean; curstate?: unknown } | XComfortDevice): boolean | undefined {
+  private resolveAlarmState(
+    state: { switch?: boolean; curstate?: unknown; errorState?: unknown } | XComfortDevice,
+  ): boolean | undefined {
+    const explicitAlarm = this.normalizeExplicitAlarmState(state.errorState);
+    if (explicitAlarm !== undefined) {
+      return explicitAlarm;
+    }
+
+    if (this.isWaterGuard()) {
+      return undefined;
+    }
+
+    if (typeof state.switch === 'boolean') {
+      return state.switch;
+    }
+
     if (typeof state.curstate === 'number') {
       return state.curstate === 1;
+    }
+
+    return undefined;
+  }
+
+  private normalizeExplicitAlarmState(value: unknown): boolean | undefined {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'number') {
+      return value !== 0;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === '1' || normalized === 'true' || normalized === 'alarm' || normalized === 'active') {
+        return true;
+      }
+      if (normalized === '0' || normalized === 'false' || normalized === 'ok' || normalized === 'inactive') {
+        return false;
+      }
     }
 
     return undefined;

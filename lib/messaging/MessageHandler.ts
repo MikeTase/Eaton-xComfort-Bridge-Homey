@@ -179,6 +179,7 @@ export class MessageHandler {
 
     if (
       msg.type_int === MESSAGE_TYPES.SET_DEVICE_STATE ||
+      msg.type_int === MESSAGE_TYPES.SET_DEVICE_ALARM_STATE ||
       msg.type_int === MESSAGE_TYPES.SET_ROOM_STATE ||
       msg.type_int === MESSAGE_TYPES.SET_ROOM_HEATING_STATE
     ) {
@@ -393,6 +394,7 @@ export class MessageHandler {
               item.shPos !== undefined ||
               item.shSafety !== undefined ||
               item.curstate !== undefined ||
+              item.errorState !== undefined ||
               item.power !== undefined
             ) {
               if (item.switch !== undefined) {
@@ -404,6 +406,7 @@ export class MessageHandler {
               if (item.dimmvalue !== undefined) deviceUpdate.dimmvalue = item.dimmvalue;
               if (item.power !== undefined) deviceUpdate.power = item.power;
               if (item.curstate !== undefined) deviceUpdate.curstate = item.curstate;
+              if (item.errorState !== undefined) deviceUpdate.errorState = item.errorState;
               if (item.shadsClosed !== undefined) deviceUpdate.shadsClosed = item.shadsClosed;
               if (item.shPos !== undefined) deviceUpdate.shPos = item.shPos;
               if (item.shSafety !== undefined) deviceUpdate.shSafety = item.shSafety;
@@ -471,6 +474,7 @@ export class MessageHandler {
             if (updateData.dimmvalue !== undefined) patch.dimmvalue = updateData.dimmvalue;
             if (updateData.power !== undefined) patch.power = updateData.power;
             if (updateData.curstate !== undefined) patch.curstate = updateData.curstate;
+            if (updateData.errorState !== undefined) patch.errorState = updateData.errorState;
             if (updateData.shadsClosed !== undefined) patch.shadsClosed = updateData.shadsClosed;
             if (updateData.shPos !== undefined) patch.shPos = updateData.shPos;
             if (updateData.shSafety !== undefined) patch.shSafety = updateData.shSafety;

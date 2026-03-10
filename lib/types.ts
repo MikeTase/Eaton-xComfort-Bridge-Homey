@@ -194,6 +194,7 @@ export interface DeviceStateUpdate {
   dimmvalue?: number;
   power?: number;
   curstate?: unknown;
+  errorState?: unknown;
 
   // Shading
   shadsClosed?: number; 
