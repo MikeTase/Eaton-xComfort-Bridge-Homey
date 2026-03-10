@@ -35,6 +35,11 @@ interface ThermostatDeviceData {
   roomId?: string | number;
 }
 
+interface ThermostatSettings {
+  room_id_override?: string;
+  estimated_active_power_watts?: number | string;
+}
+
 module.exports = class ThermostatDevice extends BaseDevice {
   private debug: boolean = false;
   private roomId: string | null = null;
@@ -50,6 +55,8 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private energyKwh: number = 0;
   private lastEnergyAt: number | null = null;
   private lastPowerW: number = 0;
+  private currentHeatingDemand: number | null = null;
+  private lastPowerSource: 'none' | 'live' | 'estimated' = 'none';
   private energyTimer: NodeJS.Timeout | null = null;
   private onDevicesLoaded?: () => void;
 
@@ -79,6 +86,10 @@ module.exports = class ThermostatDevice extends BaseDevice {
       if (this.bridge && this.bridge.isConnected) {
          void this.tryBindRoomState();
       }
+    }
+
+    if (changedKeys.includes('estimated_active_power_watts')) {
+      await this.refreshEstimatedPowerMeasurement();
     }
   }
 
@@ -193,7 +204,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   private resolveRoomId(): string | null {
-    const settings = this.getSettings() as { room_id_override?: string };
+    const settings = this.getSettings() as ThermostatSettings;
     const overrideId = settings.room_id_override;
     const storedRoomId = this.getStoreValue('roomId');
     const data = this.getData() as ThermostatDeviceData;
@@ -256,12 +267,13 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
 
     if (typeof data.dimmvalue === 'number') {
-      await this.ensureHeatingDemandCapability();
-      await this.updateCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND, data.dimmvalue);
+      await this.applyHeatingDemand(data.dimmvalue);
     }
 
     if (typeof data.power === 'number') {
-      await this.applyPowerMeasurement(data.power);
+      await this.applyPowerMeasurement(data.power, 'live');
+    } else {
+      await this.refreshEstimatedPowerMeasurement();
     }
   }
 
@@ -307,12 +319,13 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
 
     if (typeof data.valve === 'number') {
-      await this.ensureHeatingDemandCapability();
-      await this.updateCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND, data.valve);
+      await this.applyHeatingDemand(data.valve);
     }
 
     if (typeof data.power === 'number') {
-      await this.applyPowerMeasurement(data.power);
+      await this.applyPowerMeasurement(data.power, 'live');
+    } else {
+      await this.refreshEstimatedPowerMeasurement();
     }
   }
 
@@ -338,36 +351,17 @@ module.exports = class ThermostatDevice extends BaseDevice {
     });
 
     this.registerCapabilityListener(XCOMFORT_CAPABILITIES.PRESET_MODE, async (value: PresetCapabilityValue) => {
-      const roomId = await this.ensureRoomIdForControl();
-      if (!roomId) {
-        throw new Error('No linked xComfort room found for preset control');
-      }
-
-      const targetMode = this.fromPresetCapability(value);
-      if (targetMode === this.currentPreset && this.currentClimateState !== ClimateState.Off) {
-        return;
-      }
-
-      const nextState = this.getPresetState(targetMode);
-      const currentMode = this.getEffectivePreset(targetMode);
-      const currentSetpoint = this.clampSetpoint(this.getModeSetpoint(currentMode), currentMode);
-      const newSetpoint = this.clampSetpoint(this.getModeSetpoint(targetMode), targetMode);
-
-      // Mirror the upstream HA implementation: force manual state first, then switch preset.
-      await this.bridge.setRoomHeatingState(roomId, currentMode, nextState, currentSetpoint);
-      await this.bridge.setRoomHeatingState(roomId, targetMode, nextState, newSetpoint);
-
-      await this.applyPreset(targetMode);
-      await this.applyClimateState(nextState);
-      this.currentSetpoint = newSetpoint;
-      this.modeSetpoints.set(targetMode, newSetpoint);
-      await this.updateCapability('target_temperature', newSetpoint);
+      await this.setPresetModeAction(value);
     });
 
     this.registerCapabilityListener('thermostat_mode', async (value: ThermostatModeCapability) => {
       const roomId = await this.ensureRoomIdForControl();
       if (!roomId) {
         throw new Error('No linked xComfort room found for thermostat mode control');
+      }
+
+      if (value === 'cool') {
+        throw new Error('Cooling mode is not supported by xComfort thermostat presets');
       }
 
       const currentMode = this.getEffectivePreset(ClimateMode.Comfort);
@@ -389,6 +383,33 @@ module.exports = class ThermostatDevice extends BaseDevice {
       }
       await this.updateCapability('target_temperature', this.currentSetpoint);
     });
+  }
+
+  public async setPresetModeAction(value: PresetCapabilityValue): Promise<void> {
+    const roomId = await this.ensureRoomIdForControl();
+    if (!roomId) {
+      throw new Error('No linked xComfort room found for preset control');
+    }
+
+    const targetMode = this.fromPresetCapability(value);
+    if (targetMode === this.currentPreset && this.currentClimateState !== ClimateState.Off) {
+      return;
+    }
+
+    const nextState = this.getPresetState(targetMode);
+    const currentMode = this.getEffectivePreset(targetMode);
+    const currentSetpoint = this.clampSetpoint(this.getModeSetpoint(currentMode), currentMode);
+    const newSetpoint = this.clampSetpoint(this.getModeSetpoint(targetMode), targetMode);
+
+    // Mirror the upstream HA implementation: force manual state first, then switch preset.
+    await this.bridge.setRoomHeatingState(roomId, currentMode, nextState, currentSetpoint);
+    await this.bridge.setRoomHeatingState(roomId, targetMode, nextState, newSetpoint);
+
+    await this.applyPreset(targetMode);
+    await this.applyClimateState(nextState);
+    this.currentSetpoint = newSetpoint;
+    this.modeSetpoints.set(targetMode, newSetpoint);
+    await this.updateCapability('target_temperature', newSetpoint);
   }
 
   private async ensureRoomIdForControl(): Promise<string | null> {
@@ -445,12 +466,21 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private async applyClimateState(state: ClimateState): Promise<void> {
     this.currentClimateState = state;
     await this.updateCapability('thermostat_mode', this.toThermostatModeCapability(state));
+    await this.refreshEstimatedPowerMeasurement();
   }
 
   private async syncPresetCapability(mode: ClimateMode): Promise<void> {
     const value = this.toPresetCapability(mode);
     if (value) {
+      const prev = this.getCapabilityValue(XCOMFORT_CAPABILITIES.PRESET_MODE);
       await this.updateCapability(XCOMFORT_CAPABILITIES.PRESET_MODE, value);
+      
+      if (prev !== value) {
+        const trigger = this.homey.flow.getDeviceTriggerCard('xcomfort_preset_changed');
+        if (trigger) {
+          await trigger.trigger(this, { preset: value }).catch(this.error);
+        }
+      }
     }
   }
 
@@ -510,14 +540,9 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   private getPresetState(mode: ClimateMode): ClimateState {
-    if (mode === ClimateMode.FrostProtection) {
-      return ClimateState.HeatingManual;
-    }
-
-    if (this.currentClimateState === ClimateState.CoolingAuto || this.currentClimateState === ClimateState.CoolingManual) {
-      return ClimateState.CoolingManual;
-    }
-
+    // xComfort presets are heating presets, so preset changes should always
+    // drive the room into a heating state instead of preserving Homey's generic
+    // cooling mode semantics.
     return ClimateState.HeatingManual;
   }
 
@@ -579,12 +604,11 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private toThermostatModeCapability(state: ClimateState): ThermostatModeCapability {
     switch (state) {
       case ClimateState.HeatingAuto:
+      case ClimateState.CoolingAuto:
         return 'auto';
       case ClimateState.HeatingManual:
-        return 'heat';
-      case ClimateState.CoolingAuto:
       case ClimateState.CoolingManual:
-        return 'cool';
+        return 'heat';
       case ClimateState.Off:
       default:
         return 'off';
@@ -594,14 +618,11 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private fromThermostatModeCapability(value: ThermostatModeCapability): ClimateState {
     switch (value) {
       case 'auto':
-        if (this.currentClimateState === ClimateState.CoolingAuto || this.currentClimateState === ClimateState.CoolingManual) {
-          return ClimateState.CoolingAuto;
-        }
         return ClimateState.HeatingAuto;
       case 'heat':
         return ClimateState.HeatingManual;
       case 'cool':
-        return ClimateState.CoolingManual;
+        return ClimateState.HeatingManual;
       case 'off':
       default:
         return ClimateState.Off;
@@ -699,15 +720,69 @@ module.exports = class ThermostatDevice extends BaseDevice {
     await this.updateCapability('meter_power', this.roundEnergyValue(this.energyKwh));
   }
 
-  private async applyPowerMeasurement(power: number): Promise<void> {
+  private async applyHeatingDemand(value: number): Promise<void> {
+    const normalizedDemand = Math.max(0, Math.min(100, value));
+    this.currentHeatingDemand = normalizedDemand;
+    await this.ensureHeatingDemandCapability();
+    await this.updateCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND, normalizedDemand);
+    await this.refreshEstimatedPowerMeasurement();
+  }
+
+  private async refreshEstimatedPowerMeasurement(): Promise<void> {
+    const configuredPower = this.getEstimatedActivePowerWatts();
+    if (configuredPower <= 0) {
+      if (this.lastPowerSource === 'estimated') {
+        await this.applyPowerMeasurement(0, 'estimated');
+      }
+      return;
+    }
+
+    await this.applyPowerMeasurement(this.estimateCurrentPower(configuredPower), 'estimated');
+  }
+
+  private getEstimatedActivePowerWatts(): number {
+    const settings = this.getSettings() as ThermostatSettings;
+    const rawValue = settings.estimated_active_power_watts;
+    const parsedValue = typeof rawValue === 'number'
+      ? rawValue
+      : typeof rawValue === 'string'
+        ? Number(rawValue)
+        : 0;
+
+    if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      return 0;
+    }
+
+    return parsedValue;
+  }
+
+  private estimateCurrentPower(configuredPower: number): number {
+    if (this.currentClimateState === ClimateState.Off) {
+      return 0;
+    }
+
+    if (this.currentHeatingDemand !== null) {
+      return this.roundPowerValue((configuredPower * this.currentHeatingDemand) / 100);
+    }
+
+    if (this.currentClimateState === ClimateState.HeatingAuto || this.currentClimateState === ClimateState.HeatingManual) {
+      return configuredPower;
+    }
+
+    return 0;
+  }
+
+  private async applyPowerMeasurement(power: number, source: 'live' | 'estimated' = 'live'): Promise<void> {
+    const sanitizedPower = this.roundPowerValue(Math.max(0, power));
+    this.lastPowerSource = source;
     await this.ensurePowerCapability();
-    await this.updateCapability('measure_power', power);
+    await this.updateCapability('measure_power', sanitizedPower);
 
     this.integrateEnergy(Date.now());
-    this.lastPowerW = power;
+    this.lastPowerW = sanitizedPower;
     await this.persistEnergyReading();
 
-    if (power > 0) {
+    if (sanitizedPower > 0) {
       this.startEnergyTimer();
       return;
     }
@@ -759,5 +834,9 @@ module.exports = class ThermostatDevice extends BaseDevice {
 
   private roundEnergyValue(value: number): number {
     return Number(value.toFixed(6));
+  }
+
+  private roundPowerValue(value: number): number {
+    return Number(value.toFixed(1));
   }
 };

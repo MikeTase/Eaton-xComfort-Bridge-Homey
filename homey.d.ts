@@ -7,6 +7,8 @@ declare module 'homey' {
 
     export interface HomeyFlow {
         getDeviceTriggerCard(id: string): FlowCardTriggerDevice | null;
+        getActionCard(id: string): FlowCardAction | null;
+        getConditionCard(id: string): FlowCardCondition | null;
     }
 
     export interface HomeyAppContext {
@@ -66,5 +68,11 @@ declare module 'homey' {
     }
     export interface FlowCardTriggerDevice {
         trigger(device: Device, tokens?: any, state?: any): Promise<void>;
+    }
+    export interface FlowCardAction {
+        registerRunListener(listener: (args: any, state: any) => Promise<boolean> | boolean): this;
+    }
+    export interface FlowCardCondition {
+        registerRunListener(listener: (args: any, state: any) => Promise<boolean> | boolean): this;
     }
 }

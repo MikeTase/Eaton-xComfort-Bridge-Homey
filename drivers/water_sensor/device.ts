@@ -1,29 +1,64 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import { DeviceStateUpdate, XComfortDevice } from '../../lib/types';
+import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 
 module.exports = class WaterSensorDevice extends BaseDevice {
 
   async onDeviceReady() {
+    await this.ensureCapabilities();
+    this.registerCapabilityListeners();
+
     this.addManagedStateListener(this.deviceId, (_deviceId: string, state: DeviceStateUpdate) => {
-      this.updateState(state);
+      void this.updateState(state);
     });
 
-    this.applyDeviceSnapshot();
+    void this.applyDeviceSnapshot();
   }
 
-  private updateState(state: DeviceStateUpdate) {
+  private async ensureCapabilities(): Promise<void> {
+    if (this.isWaterGuard() && !this.hasCapability('onoff')) {
+      await this.addCapability('onoff').catch(this.error);
+    }
+  }
+
+  private registerCapabilityListeners(): void {
+    if (!this.hasCapability('onoff')) {
+      return;
+    }
+
+    this.registerCapabilityListener('onoff', async (value: boolean) => {
+      if (!this.bridge) {
+        throw new Error('Bridge offline');
+      }
+
+      await this.updateCapability('onoff', value);
+
+      try {
+        await this.bridge.switchDevice(this.deviceId, value);
+      } catch (error) {
+        await this.updateCapability('onoff', !value);
+        throw error;
+      }
+    });
+  }
+
+  private async updateState(state: DeviceStateUpdate): Promise<void> {
     const alarm = this.resolveAlarmState(state);
 
-    if (alarm !== undefined && this.hasCapability('alarm_water')) {
-      this.setCapabilityValue('alarm_water', alarm).catch(this.error);
+    if (alarm !== undefined) {
+      await this.updateCapability('alarm_water', alarm);
+    }
+
+    if (typeof state.switch === 'boolean' && this.hasCapability('onoff')) {
+      await this.updateCapability('onoff', state.switch);
     }
   }
 
   protected onBridgeChanged(): void {
-    this.applyDeviceSnapshot();
+    void this.applyDeviceSnapshot();
   }
 
-  private applyDeviceSnapshot(): void {
+  private async applyDeviceSnapshot(): Promise<void> {
     const device = this.bridge.getDevice(this.deviceId);
     if (!device) {
       return;
@@ -38,19 +73,20 @@ module.exports = class WaterSensorDevice extends BaseDevice {
     }
 
     if (Object.keys(snapshot).length > 0) {
-      this.updateState(snapshot);
+      await this.updateState(snapshot);
     }
   }
 
   private resolveAlarmState(state: { switch?: boolean; curstate?: unknown } | XComfortDevice): boolean | undefined {
-    if (typeof state.switch === 'boolean') {
-      return state.switch;
-    }
-
     if (typeof state.curstate === 'number') {
-      return state.curstate === 1;
+      return state.curstate !== 1;
     }
 
     return undefined;
+  }
+
+  private isWaterGuard(): boolean {
+    const settings = this.getSettings() as { deviceType?: number };
+    return Number(settings.deviceType) === DEVICE_TYPES.WATER_GUARD;
   }
 };
