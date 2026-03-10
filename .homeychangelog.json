@@ -79,5 +79,8 @@
   },
   "1.4.11": {
     "en": "sensor changes"
+  },
+  "1.4.13": {
+    "en": "Adds thermostat heating preset Flow support, estimated thermostat power fallback, and water guard on/off control with corrected alarm sync."
   }
 }
