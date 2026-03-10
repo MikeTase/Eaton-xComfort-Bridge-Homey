@@ -13,7 +13,8 @@
   "homepage": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey#readme",
   "scripts": {
     "build": "tsc",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "update-app-json": "npm run build && node ./.homeybuild/update_app_json.js"
   },
   "dependencies": {
     "ws": "^8.13.0"

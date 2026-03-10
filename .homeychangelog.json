@@ -118,5 +118,8 @@
   },
   "1.4.25": {
     "en": "Fix thermostat power usage so partial xComfort updates no longer make Homey drop to 0 W while heating is still active."
+  },
+  "1.4.26": {
+    "en": "Convert the remaining helper script to TypeScript and keep the update script runnable from the compiled build output."
   }
 }
