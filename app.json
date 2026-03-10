@@ -1,0 +1,700 @@
+{
+  "id": "eaton.xcomfort.bridge",
+  "name": {
+    "en": "Eaton xComfort"
+  },
+  "description": {
+    "en": "Seamless Eaton xComfort control for lights, shades, and heating."
+  },
+  "version": "1.4.26",
+  "category": [
+    "lights",
+    "climate"
+  ],
+  "tags": {
+    "en": [
+      "eaton",
+      "xcomfort",
+      "smart home",
+      "lighting",
+      "heating",
+      "shading",
+      "blinds",
+      "thermostat"
+    ]
+  },
+  "brandColor": "#005EB8",
+  "support": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey/issues",
+  "bugs": {
+    "url": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey/issues"
+  },
+  "source": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey",
+  "homeyCommunityTopicId": 839,
+  "images": {
+    "large": "assets/images/large.png",
+    "small": "assets/images/small.png"
+  },
+  "author": {
+    "name": "Mike Taselaar"
+  },
+  "compatibility": ">=12.0.1",
+  "sdk": 3,
+  "permissions": [],
+  "flow": {
+    "triggers": [
+      {
+        "id": "wall_switch_pressed",
+        "title": {
+          "en": "Wall switch pressed (any)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "event",
+            "type": "string",
+            "title": {
+              "en": "Event"
+            }
+          },
+          {
+            "name": "action",
+            "type": "string",
+            "title": {
+              "en": "Action"
+            }
+          },
+          {
+            "name": "button",
+            "type": "number",
+            "title": {
+              "en": "Button"
+            }
+          },
+          {
+            "name": "component_id",
+            "type": "string",
+            "title": {
+              "en": "Component ID"
+            }
+          },
+          {
+            "name": "component_model",
+            "type": "string",
+            "title": {
+              "en": "Component Model"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wall_switch_up",
+        "title": {
+          "en": "Wall switch pressed (up/on)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ]
+      },
+      {
+        "id": "wall_switch_down",
+        "title": {
+          "en": "Wall switch pressed (down/off)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ]
+      },
+      {
+        "id": "thermostat_button_on",
+        "title": {
+          "en": "Thermostat button pressed (right/on)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ]
+      },
+      {
+        "id": "thermostat_button_off",
+        "title": {
+          "en": "Thermostat button pressed (left/off)"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ]
+      },
+      {
+        "id": "xcomfort_preset_changed",
+        "title": {
+          "en": "Heating preset changed"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "preset",
+            "type": "string",
+            "title": {
+              "en": "Preset"
+            }
+          }
+        ]
+      }
+    ],
+    "conditions": [
+      {
+        "id": "xcomfort_preset_is",
+        "title": {
+          "en": "Heating preset is"
+        },
+        "titleFormatted": {
+          "en": "Heating preset is [[preset]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          },
+          {
+            "name": "preset",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "frost",
+                "label": {
+                  "en": "Frost"
+                }
+              },
+              {
+                "id": "eco",
+                "label": {
+                  "en": "Economy"
+                }
+              },
+              {
+                "id": "comfort",
+                "label": {
+                  "en": "Comfort"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "water_valve_is",
+        "title": {
+          "en": "Water valve is"
+        },
+        "titleFormatted": {
+          "en": "Water valve !{{is|is not}} open"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=water_sensor"
+          }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "set_xcomfort_preset",
+        "title": {
+          "en": "Set Heating preset"
+        },
+        "titleFormatted": {
+          "en": "Set heating preset to [[preset]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          },
+          {
+            "name": "preset",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "frost",
+                "label": {
+                  "en": "Frost"
+                }
+              },
+              {
+                "id": "eco",
+                "label": {
+                  "en": "Economy"
+                }
+              },
+              {
+                "id": "comfort",
+                "label": {
+                  "en": "Comfort"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "set_water_valve",
+        "title": {
+          "en": "Set water valve"
+        },
+        "titleFormatted": {
+          "en": "Set water valve to [[state]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=water_sensor"
+          },
+          {
+            "name": "state",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "closed",
+                "label": {
+                  "en": "Closed"
+                }
+              },
+              {
+                "id": "open",
+                "label": {
+                  "en": "Open"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "capabilities": {
+    "xcomfort_preset_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Heating preset"
+      },
+      "desc": {
+        "en": "Active xComfort heating preset"
+      },
+      "values": [
+        {
+          "id": "frost",
+          "title": {
+            "en": "Frost"
+          }
+        },
+        {
+          "id": "eco",
+          "title": {
+            "en": "Economy"
+          }
+        },
+        {
+          "id": "comfort",
+          "title": {
+            "en": "Comfort"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": true,
+      "uiComponent": "picker"
+    },
+    "xcomfort_heating_demand": {
+      "type": "number",
+      "title": {
+        "en": "Heating demand"
+      },
+      "units": {
+        "en": "%"
+      },
+      "desc": {
+        "en": "Current heating demand"
+      },
+      "insights": true,
+      "decimals": 1,
+      "min": 0,
+      "max": 100,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    }
+  },
+  "drivers": [
+    {
+      "id": "actuator",
+      "name": {
+        "en": "Actuator / Dimmer"
+      },
+      "class": "light",
+      "capabilities": [
+        "onoff",
+        "dim"
+      ],
+      "images": {
+        "large": "drivers/actuator/assets/images/large.png",
+        "small": "drivers/actuator/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select actuators and dimmers"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "door_window_sensor",
+      "name": {
+        "en": "Door / Window Sensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_contact"
+      ],
+      "images": {
+        "large": "drivers/door_window_sensor/assets/images/large.png",
+        "small": "drivers/door_window_sensor/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select door and window sensors"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "thermostat",
+      "name": {
+        "en": "Thermostat / Heating"
+      },
+      "class": "thermostat",
+      "capabilities": [
+        "measure_temperature",
+        "target_temperature",
+        "thermostat_mode",
+        "xcomfort_preset_mode"
+      ],
+      "capabilitiesOptions": {
+        "target_temperature": {
+          "min": 5,
+          "max": 40,
+          "step": 0.5
+        }
+      },
+      "images": {
+        "large": "drivers/thermostat/assets/images/large.png",
+        "small": "drivers/thermostat/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select thermostats"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "settings": [
+        {
+          "id": "room_id_override",
+          "type": "text",
+          "label": {
+            "en": "xComfort Room ID override"
+          },
+          "hint": {
+            "en": "Leave blank for automatic detection. Only set this if you see errors about NO linked room. E.g. 1"
+          },
+          "value": ""
+        },
+        {
+          "id": "estimated_active_power_watts",
+          "type": "number",
+          "label": {
+            "en": "Estimated active power (W)"
+          },
+          "hint": {
+            "en": "Optional fallback when xComfort does not report live power. When heating demand is available, Homey scales this value by the current demand percentage."
+          },
+          "value": 0,
+          "min": 0,
+          "max": 10000
+        }
+      ]
+    },
+    {
+      "id": "shading",
+      "name": {
+        "en": "Shading / Blinds"
+      },
+      "class": "windowcoverings",
+      "capabilities": [
+        "windowcoverings_state",
+        "windowcoverings_set"
+      ],
+      "images": {
+        "large": "drivers/shading/assets/images/large.png",
+        "small": "drivers/shading/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select shading devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "wall_switch",
+      "name": {
+        "en": "Wall Switch"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "onoff"
+      ],
+      "capabilitiesOptions": {
+        "onoff": {
+          "title": {
+            "en": "Last Pressed"
+          },
+          "insightsTitleTrue": {
+            "en": "Pressed Up"
+          },
+          "insightsTitleFalse": {
+            "en": "Pressed Down"
+          }
+        }
+      },
+      "images": {
+        "large": "drivers/wall_switch/assets/images/large.png",
+        "small": "drivers/wall_switch/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select wall switches"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "bridge_diagnostics",
+      "name": {
+        "en": "Bridge Diagnostics"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_power",
+        "alarm_heat",
+        "alarm_generic.cooling",
+        "onoff",
+        "alarm_generic",
+        "alarm_contact.windows",
+        "alarm_contact.doors",
+        "alarm_motion"
+      ],
+      "settings": [
+        {
+          "id": "bridge_name",
+          "type": "label",
+          "label": {
+            "en": "Bridge name"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_id",
+          "type": "label",
+          "label": {
+            "en": "Bridge ID"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_model",
+          "type": "label",
+          "label": {
+            "en": "Bridge model"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_firmware",
+          "type": "label",
+          "label": {
+            "en": "Firmware version"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_ip",
+          "type": "label",
+          "label": {
+            "en": "Bridge IP"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_scenes",
+          "type": "label",
+          "label": {
+            "en": "Scenes"
+          },
+          "value": "-"
+        }
+      ],
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Add bridge diagnostics"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "images": {
+        "large": "drivers/bridge_diagnostics/assets/images/large.png",
+        "small": "drivers/bridge_diagnostics/assets/images/small.png"
+      }
+    },
+    {
+      "id": "water_sensor",
+      "name": {
+        "en": "Water Sensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_water"
+      ],
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select water sensors"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "images": {
+        "large": "drivers/water_sensor/assets/images/large.png",
+        "small": "drivers/water_sensor/assets/images/small.png"
+      }
+    }
+  ]
+}

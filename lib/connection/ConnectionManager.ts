@@ -1,0 +1,464 @@
+/**
+ * Connection Manager for xComfort Bridge
+ *
+ * Handles WebSocket lifecycle:
+ * - Connection establishment
+ * - Reconnection with backoff
+ * - Heartbeat management
+ * - Message sending/receiving
+ *
+ * Extracted from XComfortConnection for single responsibility.
+ */
+
+import WebSocket from 'ws';
+import { PROTOCOL_CONFIG } from '../XComfortProtocol';
+import { Semaphore } from '../utils/Semaphore';
+import { Encryption } from '../crypto/Encryption';
+import type { EncryptionContext, LoggerFunction } from '../types';
+
+// ============================================================================
+// Retry Configuration
+// ============================================================================
+
+interface RetryConfig {
+  maxRetries: number;
+  ackTimeout: number; // ms to wait for ACK before retry
+  retryDelay: number; // ms between retries
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 5,    // Increased retry count for reliability
+  ackTimeout: 1000, // Reduced from 2000ms to 1000ms for responsiveness
+  retryDelay: 250,  // Reduced to 250ms for faster recovery
+};
+
+// ============================================================================
+// Module-specific Types (callbacks)
+// ============================================================================
+
+/** Callback for raw message received */
+type OnRawMessageFn = (data: Buffer, timestamp: number) => void;
+
+/** Callback for connection close */
+type OnCloseFn = (code: number, reason: string, shouldReconnect: boolean) => void;
+
+// ============================================================================
+// ConnectionManager Class
+// ============================================================================
+
+export class ConnectionManager {
+  private bridgeIp: string;
+  private ws: WebSocket | null = null;
+  private logger: LoggerFunction;
+  private encryptionContext: EncryptionContext | null = null;
+  private connectionEstablished: boolean = false;
+  private reconnecting: boolean = false;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private heartbeatSend?: () => void;
+  private lastMessageAt: number = Date.now();
+  private mc: number = 0;
+  private connectResolve?: () => void;
+
+  private onRawMessage?: OnRawMessageFn;
+  private onClose?: OnCloseFn;
+
+  private base64regex: RegExp = /^[A-Za-z0-9+/=]+$/;
+
+  // Retry mechanism: Map of mc -> resolve function for pending ACKs
+  private pendingAcks: Map<number, (acked: boolean) => void> = new Map();
+  private retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG;
+  private txSemaphore = new Semaphore(5); // Increased concurrency to 5 to prevent queue blocking
+
+  constructor(bridgeIp: string, logger?: LoggerFunction) {
+    this.bridgeIp = bridgeIp;
+    this.logger = logger || console.log;
+  }
+
+  /**
+   * Set callback for raw messages
+   */
+  setOnRawMessage(callback: OnRawMessageFn): void {
+    this.onRawMessage = callback;
+  }
+
+  /**
+   * Set callback for connection close
+   */
+  setOnClose(callback: OnCloseFn): void {
+    this.onClose = callback;
+  }
+
+  /**
+   * Set encryption context after key exchange
+   */
+  setEncryptionContext(context: EncryptionContext): void {
+    this.encryptionContext = context;
+  }
+
+  /**
+   * Check if connected and ready
+   */
+  isConnected(): boolean {
+    return !!(
+      this.encryptionContext &&
+      this.ws &&
+      this.ws.readyState === WebSocket.OPEN
+    );
+  }
+
+  /**
+   * Reconnecting status
+   */
+  isReconnecting(): boolean {
+      return this.reconnecting;
+  }
+
+  setReconnecting(value: boolean): void {
+      this.reconnecting = value;
+  }
+
+  /**
+   * Mark connection as established (for reconnection logic)
+   */
+  markEstablished(): void {
+    this.connectionEstablished = true;
+    this.resolveConnection();
+  }
+
+  /**
+   * Start 30s heartbeat loop to keep connection alive
+   */
+  public startHeartbeat(sendHeartbeat: () => void): void {
+    this.stopHeartbeat();
+    this.heartbeatSend = sendHeartbeat;
+    this.heartbeatInterval = setInterval(() => {
+      if (this.isConnected()) {
+        sendHeartbeat();
+      }
+    }, PROTOCOL_CONFIG.TIMEOUTS.HEARTBEAT);
+  }
+
+  /**
+   * Stop heartbeat loop
+   */
+  public stopHeartbeat(): void {
+    if (this.heartbeatInterval) {
+        clearInterval(this.heartbeatInterval);
+        this.heartbeatInterval = null;
+    }
+  }
+
+  public isHeartbeatRunning(): boolean {
+    return this.heartbeatInterval !== null;
+  }
+
+  public restartHeartbeat(): void {
+    if (this.heartbeatSend) {
+      this.startHeartbeat(this.heartbeatSend);
+    }
+  }
+
+  public markMessageReceived(ts: number = Date.now()): void {
+    this.lastMessageAt = ts;
+  }
+
+  public getLastMessageAt(): number {
+    return this.lastMessageAt;
+  }
+
+  /**
+   * Get next message counter value
+   */
+  nextMc(): number {
+    return ++this.mc;
+  }
+
+  /**
+   * Clear all pending ACKs with failure
+   */
+  private clearPendingAcks(): void {
+    if (this.pendingAcks.size > 0) {
+      this.logger(`[ConnectionManager] Clearing ${this.pendingAcks.size} pending ACKs due to disconnect`);
+      for (const [_mc, resolve] of this.pendingAcks) {
+        resolve(false);
+      }
+      this.pendingAcks.clear();
+    }
+  }
+
+  /**
+   * Reset message counter
+   */
+  resetMc(): void {
+    this.mc = 0;
+  }
+
+  /**
+   * Connect to the bridge
+   */
+  connect(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.connectionEstablished = false;
+
+        this.ws = new WebSocket(`ws://${this.bridgeIp}`, {
+          perMessageDeflate: false,
+        });
+
+        this.ws.on('open', () => {
+          this.logger('[ConnectionManager] WebSocket connected, awaiting handshake...');
+
+          // Set TCP_NODELAY
+          // Type assertion to access private socket property safely
+          const socket = (this.ws as unknown as { _socket?: { setNoDelay: (v: boolean) => void } })._socket;
+          if (socket) {
+            socket.setNoDelay(true);
+          }
+        });
+
+      this.ws.on('message', (data: Buffer) => {
+        const rawRecvTime = Date.now();
+        this.markMessageReceived(rawRecvTime);
+        this.onRawMessage?.(data, rawRecvTime);
+      });
+
+        this.ws.on('error', (err: Error) => {
+          this.logger(`[ConnectionManager] WebSocket error: ${err.message}`);
+          reject(err);
+        });
+
+        this.ws.on('close', (code: number, reason: Buffer) => {
+          const reasonStr = reason.toString() || 'No reason';
+          this.logger(
+            `[ConnectionManager] Connection closed. Code: ${code}, Reason: ${reasonStr}`
+          );
+
+          // Clear any pending ACKs immediately as they will never arrive
+          this.clearPendingAcks();
+
+          const wasEstablished = this.connectionEstablished;
+          const shouldReconnect = wasEstablished && !this.reconnecting;
+
+          // Mark connection as lost so retries can detect it
+          this.encryptionContext = null;
+          
+          this.onClose?.(code, reasonStr, shouldReconnect);
+        });
+
+        // Resolve is called externally when auth completes
+        this.connectResolve = resolve;
+
+      } catch (error) {
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Resolve the connection promise (called when auth completes)
+   */
+  resolveConnection(): void {
+    if (this.connectResolve) {
+      this.connectResolve();
+      this.connectResolve = undefined;
+    }
+  }
+
+  /**
+   * Send raw (unencrypted) message
+   */
+  sendRaw(data: string): void {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.logger('[ConnectionManager] Cannot send - WebSocket not open');
+      return;
+    }
+    this.ws.send(data);
+  }
+
+  /**
+   * Send encrypted message
+   */
+  async sendEncrypted(msg: Record<string, unknown>): Promise<boolean> {
+    if (!this.encryptionContext) {
+      this.logger('[ConnectionManager] Cannot send encrypted - no context');
+      return false;
+    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.logger('[ConnectionManager] Cannot send encrypted - socket closed');
+      return false;
+    }
+
+    try {
+      const payloadStr = JSON.stringify(msg);
+
+      const encrypted = Encryption.encryptMessage(
+        payloadStr,
+        this.encryptionContext.key,
+        this.encryptionContext.iv
+      );
+
+      this.ws.send(encrypted);
+      return true;
+    } catch (error) {
+      this.logger(`[ConnectionManager] Encryption error: ${error}`);
+      return false;
+    }
+  }
+
+  /**
+   * Decrypt message
+   */
+  decryptMessage(encryptedBase64: string): string {
+    if (!this.encryptionContext) {
+      throw new Error('No encryption context available');
+    }
+
+    try {
+      return Encryption.decryptMessage(
+        encryptedBase64,
+        this.encryptionContext.key,
+        this.encryptionContext.iv
+      );
+    } catch (error) {
+      throw new Error(`Decryption failed: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * Check if message looks encrypted (Base64)
+   * Requires minimum length to avoid false positives on short alphanumeric strings
+   */
+  isEncrypted(data: string): boolean {
+    const trimmed = data.trim();
+    return trimmed.length >= 24 && this.base64regex.test(trimmed);
+  }
+
+  /**
+   * Send message with retry and ACKwait
+   */
+  async sendWithRetry(msg: { mc: number; [key: string]: unknown }): Promise<boolean> {
+    const mc = msg.mc;
+    // const typeStr = msg.type_int ? ` (${msg.type_int})` : '';
+
+    return new Promise((resolve, reject) => {
+      let retries = 0;
+      let ackTimeoutTimer: NodeJS.Timeout | null = null;
+      let retryTimer: NodeJS.Timeout | null = null;
+      let releaseSemaphore: (() => void) | null = null;
+
+      const cleanup = () => {
+        if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
+        if (retryTimer) clearTimeout(retryTimer);
+        this.pendingAcks.delete(mc);
+        if (releaseSemaphore) {
+             releaseSemaphore();
+             releaseSemaphore = null; // Ensure only called once
+        }
+      };
+
+      const sendAttempt = async () => {
+        if (!this.isConnected()) {
+           cleanup();
+           reject(new Error('Connection lost'));
+           return;
+        }
+
+        // Send
+        const success = await this.sendEncrypted(msg);
+        if (!success) {
+           handleFailure();
+           return;
+        }
+
+        // Wait for ACK
+        this.pendingAcks.set(mc, (acked) => {
+           if (acked) {
+             cleanup();
+             resolve(true);
+           } else {
+             handleFailure();
+           }
+        });
+
+        // Set timeout
+        if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
+        ackTimeoutTimer = setTimeout(() => {
+           handleFailure();
+        }, this.retryConfig.ackTimeout);
+      };
+
+      const handleFailure = () => {
+         // Guard: prevent double invocation from both NACK callback and ack timeout
+         if (ackTimeoutTimer) {
+            clearTimeout(ackTimeoutTimer);
+            ackTimeoutTimer = null;
+         }
+         this.pendingAcks.delete(mc);
+
+         if (retries < this.retryConfig.maxRetries) {
+            retries++;
+            this.logger(`[ConnectionManager] Retry ${retries}/${this.retryConfig.maxRetries} for mc=${mc}`);
+            
+            retryTimer = setTimeout(() => {
+               sendAttempt();
+            }, this.retryConfig.retryDelay);
+         } else {
+            this.logger(`[ConnectionManager] Max retries reached for mc=${mc} after ${retries} retries`);
+            cleanup();
+            reject(new Error(`Max retries reached`));
+         }
+      };
+
+      // Acquire semaphore before starting first attempt
+      this.txSemaphore.acquire().then(() => {
+         releaseSemaphore = () => this.txSemaphore.release();
+         sendAttempt();
+      });
+    });
+  }
+
+  /**
+   * Handle incoming ACK for a specific MC
+   */
+  handleAck(mc: number): void {
+    const resolver = this.pendingAcks.get(mc);
+    if (resolver) {
+      resolver(true);
+      this.pendingAcks.delete(mc);
+    }
+  }
+
+  /**
+   * Handle incoming NACK (treat as failure -> retry)
+   */
+  handleNack(mc: number): void {
+    const resolver = this.pendingAcks.get(mc);
+    if (resolver) {
+      resolver(false); // Signal failure to trigger retry
+      // Don't delete yet, failure handler will do it or retry
+    }
+  }
+
+  cleanup(): void {
+    this.stopHeartbeat();
+    this.clearPendingAcks();
+    this.txSemaphore.drain();
+    this.connectionEstablished = false;
+    this.reconnecting = false;
+    this.connectResolve = undefined;
+    if (this.ws) {
+      this.ws.removeAllListeners();
+      // Add no-op error handler to prevent unhandled 'error' crash.
+      // When close() is called on a CONNECTING socket, the ws library
+      // emits 'error' asynchronously via process.nextTick (abortHandshake).
+      // Without a listener, Node.js treats it as an uncaught exception.
+      this.ws.on('error', () => {});
+      try {
+        this.ws.close();
+      } catch (e) {
+        // ignore
+      }
+      this.ws = null;
+    }
+  }
+}

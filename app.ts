@@ -1,0 +1,93 @@
+import * as Homey from 'homey';
+import { XComfortBridge } from './lib/connection/XComfortBridge';
+
+
+class XComfortApp extends Homey.App {
+  public bridge: XComfortBridge | null = null; // Public for drivers to access via app.bridge
+  private initToken = 0;
+  private settingsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+  async onInit() {
+    (this as any).setMaxListeners(50); // Each device listens for bridge_changed
+    this.log('Eaton xComfort App has been initialized');
+
+    // Attempt to load settings and connect
+    const ip = this.homey.settings.get('bridge_ip');
+    const authKey = this.homey.settings.get('bridge_auth_key');
+
+    if (ip && authKey) {
+      this.initBridge(ip, authKey);
+    } else {
+      this.log('Bridge configuration missing in Settings.');
+    }
+
+    this.homey.settings.on('set', (key: string) => {
+      if (key === 'bridge_ip' || key === 'bridge_auth_key') {
+        // Debounce: settings page saves IP and key separately,
+        // so we wait briefly to avoid double bridge reinit.
+        if (this.settingsDebounceTimer) clearTimeout(this.settingsDebounceTimer);
+        this.settingsDebounceTimer = setTimeout(async () => {
+          this.settingsDebounceTimer = null;
+          const newIp = this.homey.settings.get('bridge_ip');
+          const newKey = this.homey.settings.get('bridge_auth_key');
+          if (newIp && newKey) {
+            await this.initBridge(newIp, newKey);
+          } else {
+            this.resetBridge('Bridge configuration cleared in Settings.');
+          }
+        }, 500);
+      }
+    });
+  }
+
+  async initBridge(ip: string, authKey: string) {
+    const token = ++this.initToken;
+    this.resetBridge();
+
+    // Sanitize inputs
+    const cleanIp = ip.trim();
+    const cleanKey = authKey.replace(/[\s-]+/g, '');
+
+    this.log(`Initializing Bridge at '${cleanIp}'...`);
+    
+    // Pass this.log explicitly to the bridge
+    this.bridge = new XComfortBridge(cleanIp, cleanKey, this.log.bind(this));
+    this.emit('bridge_changed', this.bridge);
+    
+    // Subscribe to events for logging
+    this.bridge.on('connected', () => this.log('Bridge: Connected'));
+    this.bridge.on('disconnected', () => this.log('Bridge: Disconnected'));
+    this.bridge.on('reconnecting', () => this.log('Bridge: Reconnecting...'));
+    
+    try {
+      await this.bridge.init();
+      if (token === this.initToken) {
+        this.log('Bridge: Initialization started');
+      }
+    } catch (err) {
+      if (token === this.initToken) {
+        this.error('Bridge: Initialization failed', err);
+      }
+    }
+  }
+
+  private resetBridge(reason?: string) {
+    if (!this.bridge) {
+      if (reason) {
+        this.log(reason);
+      }
+      return;
+    }
+
+    if (reason) {
+      this.log(reason);
+    }
+
+    this.bridge.disconnect();
+    this.bridge.removeAllListeners();
+    this.bridge = null;
+    this.emit('bridge_changed', null);
+  }
+}
+
+module.exports = XComfortApp;

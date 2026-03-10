@@ -1,0 +1,125 @@
+{
+  "1.0.5": {
+    "en": "Updated images"
+  },
+  "1.0.6": {
+    "en": "added readme"
+  },
+  "1.0.7": {
+    "en": "Images"
+  },
+  "1.0.8": {
+    "en": "images"
+  },
+  "1.0.9": {
+    "en": "Logo"
+  },
+  "1.0.10": {
+    "en": "Image"
+  },
+  "1.0.11": {
+    "en": "Changed permisions"
+  },
+  "1.1.0": {
+    "en": "images"
+  },
+  "1.2.0": {
+    "en": "added functions "
+  },
+  "1.2.1": {
+    "en": "improved stability and images"
+  },
+  "1.2.3": {
+    "en": "removed dead coding"
+  },
+  "1.2.4": {
+    "en": "image quality"
+  },
+  "1.2.5": {
+    "en": "state monitoring improved for actuator "
+  },
+  "1.3.0": {
+    "en": "fixed unexpected crash"
+  },
+  "1.3.1": {
+    "en": "improved error handling"
+  },
+  "1.4.0": {
+    "en": "tuning"
+  },
+  "1.4.1": {
+    "en": "stability and type-safety improvements"
+  },
+  "1.4.2": {
+    "en": "Changed readme for IP"
+  },
+  "1.4.3": {
+    "en": "readme changed"
+  },
+  "1.4.4": {
+    "en": "stability"
+  },
+  "1.4.5": {
+    "en": "Added synced xComfort thermostat presets and room heating state, plus new temperature/humidity, door/window, and room status sensors with improved heater and button telemetry."
+  },
+  "1.4.6": {
+    "en": "Removed room and temperature/humidity sensor device types and corrected the door/window sensor images."
+  },
+  "1.4.7": {
+    "en": "Improved thermostat sensor sync and energy tracking, richer wall switch events, bridge diagnostics metadata, and better state restore after reconnect."
+  },
+  "1.4.8": {
+    "en": "Fixed thermostat room sync and preset control, and corrected water sensor alarm reset syncing."
+  },
+  "1.4.9": {
+    "en": "Added fallback thermostat"
+  },
+  "1.4.10": {
+    "en": "fallback thermostat"
+  },
+  "1.4.11": {
+    "en": "sensor changes"
+  },
+  "1.4.13": {
+    "en": "Adds thermostat heating preset Flow support, estimated thermostat power fallback, and water guard on/off control with corrected alarm sync."
+  },
+  "1.4.14": {
+    "en": "Improves shading position/state sync, adds thermostat heating-demand parsing from bridge metadata, and adds extra xComfort bridge message compatibility."
+  },
+  "1.4.15": {
+    "en": "Flows for water state"
+  },
+  "1.4.16": {
+    "en": "status water"
+  },
+  "1.4.17": {
+    "en": "removed energy reporting from devices that dont support it "
+  },
+  "1.4.18": {
+    "en": "stuck state"
+  },
+  "1.4.19": {
+    "en": "heater changes"
+  },
+  "1.4.20": {
+    "en": "wattage changes"
+  },
+  "1.4.21": {
+    "en": "Improved bridge state handling for wall switches and shading, added better direct update support, and improved metadata/home-data reliability."
+  },
+  "1.4.22": {
+    "en": "Improved state syncing for actuators, shading, wall switches, and room updates, with better direct update handling from the bridge."
+  },
+  "1.4.23": {
+    "en": "Fixed water sensor alarm state so Homey no longer shows a triggered alarm when the bridge reports no water alarm."
+  },
+  "1.4.24": {
+    "en": "Fix WaterGuard alarm sync so opening the water valve no longer triggers a false alarm in Homey."
+  },
+  "1.4.25": {
+    "en": "Fix thermostat power usage so partial xComfort updates no longer make Homey drop to 0 W while heating is still active."
+  },
+  "1.4.26": {
+    "en": "Convert the remaining helper script to TypeScript and keep the update script runnable from the compiled build output."
+  }
+}

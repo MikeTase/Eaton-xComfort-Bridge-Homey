@@ -1,0 +1,173 @@
+import { BaseDevice } from '../../lib/BaseDevice';
+import { DeviceStateUpdate, ShadingAction } from '../../lib/types';
+
+module.exports = class ShadingDevice extends BaseDevice {
+  private safetyActive: boolean = false;
+  private lastCurstate: number | null = null;
+  private lastPosition: number | null = null;
+
+  async onDeviceReady() {
+    const settings = this.getSettings();
+    const supportsPosition = Number(settings.shRuntime ?? 0) === 1;
+
+    if (!supportsPosition && this.hasCapability('windowcoverings_set')) {
+        await this.removeCapability('windowcoverings_set').catch(this.error);
+    }
+    
+    this.registerStateListener();
+    this.registerCapabilityListeners();
+    this.applyDeviceSnapshot();
+  }
+
+  private registerStateListener() {
+    this.addManagedStateListener(this.deviceId, (_id, data) => {
+        this.updateState(data);
+    });
+  }
+  
+  private updateState(data: DeviceStateUpdate) {
+      if (data.shSafety !== undefined) {
+          const isSafe = data.shSafety === 0;
+          this.safetyActive = !isSafe;
+          if (!isSafe) {
+              this.setUnavailable("Safety Lock Active (Wind/Rain)");
+          } else {
+              this.setAvailable();
+          }
+      }
+
+      // Track curstate for running/idle detection (matches HA ShadeState.current_state)
+      if (typeof data.curstate === 'number') {
+          this.lastCurstate = data.curstate;
+          if (this.hasCapability('windowcoverings_state')) {
+              this.setCapabilityValue(
+                  'windowcoverings_state',
+                  this.resolveWindowcoveringsState(this.lastPosition),
+              ).catch(this.error);
+          }
+      }
+      
+      if (data.shPos !== undefined || data.shadsClosed !== undefined || data.dimmvalue !== undefined) {
+          const previousPosition = this.lastPosition;
+          const pos = this.normalizePosition(data.shPos ?? data.shadsClosed ?? data.dimmvalue);
+          if (pos !== undefined && this.hasCapability('windowcoverings_set')) {
+              // Values > 1 are on the 0-100 scale, normalize to 0-1
+              this.setCapabilityValue('windowcoverings_set', pos).catch(this.error);
+              if (this.hasCapability('windowcoverings_state')) {
+                  this.setCapabilityValue(
+                      'windowcoverings_state',
+                      this.resolveWindowcoveringsState(pos, previousPosition),
+                  ).catch(this.error);
+              }
+          }
+          if (pos !== undefined) {
+              this.lastPosition = pos;
+          }
+      }
+  }
+
+  protected onBridgeChanged(): void {
+      this.applyDeviceSnapshot();
+  }
+
+  private applyDeviceSnapshot(): void {
+      const device = this.bridge.getDevice(this.deviceId);
+      if (!device) {
+          return;
+      }
+
+      const snapshot: DeviceStateUpdate = {};
+      if (typeof device.shSafety === 'number') {
+          snapshot.shSafety = device.shSafety;
+      }
+      if (typeof device.shPos === 'number') {
+          snapshot.shPos = device.shPos;
+      }
+      if (typeof device.shadsClosed === 'number') {
+          snapshot.shadsClosed = device.shadsClosed;
+      }
+      if (typeof device.dimmvalue === 'number') {
+          snapshot.dimmvalue = device.dimmvalue;
+      }
+      if (device.curstate !== undefined) {
+          snapshot.curstate = device.curstate;
+      }
+
+      if (Object.keys(snapshot).length > 0) {
+          this.updateState(snapshot);
+      }
+  }
+
+  private registerCapabilityListeners() {
+      // Position Set
+      if (this.hasCapability('windowcoverings_set')) {
+          this.registerCapabilityListener('windowcoverings_set', async (value) => {
+              if (this.safetyActive) throw new Error('Safety lock active');
+              
+              const numericId = Number(this.deviceId);
+              if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
+              if (this.hasCapability('windowcoverings_state')) {
+                  const state = value <= 0 ? 'up' : value >= 1 ? 'down' : 'idle';
+                  this.setCapabilityValue('windowcoverings_state', state).catch(this.error);
+              }
+              await this.bridge.controlShading(numericId, ShadingAction.GO_TO, value * 100);
+          });
+      }
+      
+      // State (Up/Down/Idle)
+      this.registerCapabilityListener('windowcoverings_state', async (value) => {
+           if (this.safetyActive) throw new Error('Safety lock active');
+           
+           let action = ShadingAction.STOP;
+           if (value === 'up') action = ShadingAction.OPEN;
+           if (value === 'down') action = ShadingAction.CLOSE;
+           
+           const numericId = Number(this.deviceId);
+           if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
+           this.setCapabilityValue('windowcoverings_state', value).catch(this.error);
+           await this.bridge.controlShading(numericId, action);
+      });
+  }
+
+  private normalizePosition(value?: number): number | undefined {
+      if (typeof value !== 'number' || Number.isNaN(value)) {
+          return undefined;
+      }
+
+      return Math.max(0, Math.min(1, value > 1 ? value / 100 : value));
+  }
+
+  private resolveWindowcoveringsState(
+      position: number | null,
+      previousPosition: number | null = this.lastPosition,
+  ): 'up' | 'idle' | 'down' {
+      switch (this.lastCurstate) {
+          case ShadingAction.OPEN:
+          case ShadingAction.STEP_OPEN:
+              return 'up';
+          case ShadingAction.CLOSE:
+          case ShadingAction.STEP_CLOSE:
+              return 'down';
+          case ShadingAction.STOP:
+              return 'idle';
+          case ShadingAction.GO_TO:
+              if (position !== null && previousPosition !== null && position !== previousPosition) {
+                  return position < previousPosition ? 'up' : 'down';
+              }
+              break;
+          default:
+              break;
+      }
+
+      if (position !== null) {
+          if (position <= 0) {
+              return 'up';
+          }
+          if (position >= 1) {
+              return 'down';
+          }
+      }
+
+      return 'idle';
+  }
+};
