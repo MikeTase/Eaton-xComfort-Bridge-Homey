@@ -70,5 +70,11 @@
   },
   "1.4.8": {
     "en": "Fixed thermostat room sync and preset control, and corrected water sensor alarm reset syncing."
+  },
+  "1.4.9": {
+    "en": "Added fallback thermostat"
+  },
+  "1.4.10": {
+    "en": "fallback thermostat"
   }
 }
