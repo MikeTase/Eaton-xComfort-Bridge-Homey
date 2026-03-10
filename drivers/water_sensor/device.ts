@@ -43,12 +43,12 @@ module.exports = class WaterSensorDevice extends BaseDevice {
   }
 
   private resolveAlarmState(state: { switch?: boolean; curstate?: unknown } | XComfortDevice): boolean | undefined {
-    if (typeof state.curstate === 'number') {
-      return state.curstate !== 1;
-    }
-
     if (typeof state.switch === 'boolean') {
       return state.switch;
+    }
+
+    if (typeof state.curstate === 'number') {
+      return state.curstate === 1;
     }
 
     return undefined;
