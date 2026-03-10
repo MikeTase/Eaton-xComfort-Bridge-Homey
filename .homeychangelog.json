@@ -91,5 +91,8 @@
   },
   "1.4.16": {
     "en": "status water"
+  },
+  "1.4.17": {
+    "en": "removed energy reporting from devices that dont support it "
   }
 }
