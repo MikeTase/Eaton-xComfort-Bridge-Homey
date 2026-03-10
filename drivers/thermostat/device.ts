@@ -266,6 +266,10 @@ module.exports = class ThermostatDevice extends BaseDevice {
       await this.updateCapability('measure_humidity', data.metadata.humidity);
     }
 
+    if (data.metadata?.heatingDemand !== undefined) {
+      await this.applyHeatingDemand(data.metadata.heatingDemand);
+    }
+
     if (typeof data.dimmvalue === 'number') {
       await this.applyHeatingDemand(data.dimmvalue);
     }

@@ -82,5 +82,8 @@
   },
   "1.4.13": {
     "en": "Adds thermostat heating preset Flow support, estimated thermostat power fallback, and water guard on/off control with corrected alarm sync."
+  },
+  "1.4.14": {
+    "en": "Improves shading position/state sync, adds thermostat heating-demand parsing from bridge metadata, and adds extra xComfort bridge message compatibility."
   }
 }

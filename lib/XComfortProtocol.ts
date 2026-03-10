@@ -49,6 +49,7 @@ export const MESSAGE_TYPES = {
   STATE_UPDATE: 310,
   ERROR_INFO: 295,
   SET_BRIDGE_STATE: 364,
+  PUBLISH_MAIN_ELECTRICAL_ENERGY_USAGE: 401,
 } as const;
 
 /**
@@ -65,6 +66,7 @@ export const DEVICE_TYPES = {
   TEMPERATURE_SENSOR: 200,
   DOOR_WINDOW_SENSOR: 202,
   WALL_SWITCH: 220,
+  TEMP_SENSOR: 410,
   HEATING_ACTUATOR: 440,
   HEATING_VALVE: 441,
   HEATING_WATER_VALVE: 442,
@@ -101,7 +103,9 @@ export const WS_CLOSE_CODES = {
 export const INFO_TEXT_CODES = {
   TEMPERATURE_STANDARD: '1222', // Standard temperature sensor reading (°C)
   HUMIDITY_STANDARD: '1223', // Standard humidity sensor reading (%)
-  TEMPERATURE_DIMMER: '1109', // Temperature from dimming actuator
+  TEMPERATURE_DIMMER: '1109', // Temperature from dimming actuator/heater
+  DIMM_VALUE: '1111', // Heating demand / Dimm value from info
+  DIMM_VALUE_ALT: '1225', // Heating demand (alternate code used by some firmware)
 } as const;
 
 /**

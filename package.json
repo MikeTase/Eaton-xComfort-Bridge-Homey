@@ -1,6 +1,6 @@
 {
   "name": "com.eaton.xcomfort",
-  "version": "1.4.4",
+  "version": "1.4.14",
   "description": "Eaton xComfort implementation for Homey",
   "main": "app.js",
   "repository": {

@@ -75,7 +75,11 @@ export enum ShadingAction {
   STOP = 2,
   STEP_OPEN = 3,
   STEP_CLOSE = 4,
-  GO_TO = 5
+  GO_TO = 5,
+  CALIBRATION = 10,
+  LOCK = 11,
+  UNLOCK = 12,
+  QUIT = 13
 }
 
 /**
@@ -94,8 +98,10 @@ export interface XComfortDevice {
   info?: InfoEntry[];
   
   // Shading specific
-  shRuntime?: number;
+  shadsClosed?: number;
+  shPos?: number;
   shSafety?: number;
+  shRuntime?: number;
   
   // Heating specific
   setpoint?: number;
@@ -164,6 +170,8 @@ export interface BridgeStatus {
   windowsOpen?: number;
   doorsOpen?: number;
   presence?: number;
+  shadsClosed?: number;
+  wgWaterOff?: number;
   [key: string]: unknown;
 }
 
@@ -189,8 +197,8 @@ export interface DeviceStateUpdate {
 
   // Shading
   shadsClosed?: number; 
+  shPos?: number;
   shSafety?: number;
-
   // Heating
   setpoint?: number;
   operationMode?: number | ClimateMode;
@@ -225,6 +233,7 @@ export interface RoomStateUpdate {
 export interface DeviceMetadata {
   temperature?: number;
   humidity?: number;
+  heatingDemand?: number; // Added from DIMM_VALUE info code
 }
 
 /**
@@ -279,8 +288,8 @@ export interface StateUpdateItem {
   
   // Shading specific
   shadsClosed?: number;
+  shPos?: number;
   shSafety?: number;
-
   // Heating specific
   setpoint?: number;
   currentMode?: number | ClimateMode;

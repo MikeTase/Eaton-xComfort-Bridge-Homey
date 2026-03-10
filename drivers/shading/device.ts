@@ -3,6 +3,7 @@ import { DeviceStateUpdate, ShadingAction } from '../../lib/types';
 
 module.exports = class ShadingDevice extends BaseDevice {
   private safetyActive: boolean = false;
+  private lastCurstate: number | null = null;
 
   async onDeviceReady() {
     const settings = this.getSettings();
@@ -33,9 +34,14 @@ module.exports = class ShadingDevice extends BaseDevice {
               this.setAvailable();
           }
       }
+
+      // Track curstate for running/idle detection (matches HA ShadeState.current_state)
+      if (typeof data.curstate === 'number') {
+          this.lastCurstate = data.curstate;
+      }
       
-      if (data.shadsClosed !== undefined || data.dimmvalue !== undefined) {
-          let pos = data.shadsClosed ?? data.dimmvalue;
+      if (data.shPos !== undefined || data.shadsClosed !== undefined || data.dimmvalue !== undefined) {
+          let pos = data.shPos ?? data.shadsClosed ?? data.dimmvalue;
           if (pos !== undefined && this.hasCapability('windowcoverings_set')) {
               // Values > 1 are on the 0-100 scale, normalize to 0-1
               if (pos > 1) pos = pos / 100;
@@ -68,11 +74,17 @@ module.exports = class ShadingDevice extends BaseDevice {
       if (typeof device.shSafety === 'number') {
           snapshot.shSafety = device.shSafety;
       }
+      if (typeof device.shPos === 'number') {
+          snapshot.shPos = device.shPos;
+      }
       if (typeof device.shadsClosed === 'number') {
           snapshot.shadsClosed = device.shadsClosed;
       }
       if (typeof device.dimmvalue === 'number') {
           snapshot.dimmvalue = device.dimmvalue;
+      }
+      if (device.curstate !== undefined) {
+          snapshot.curstate = device.curstate;
       }
 
       if (Object.keys(snapshot).length > 0) {

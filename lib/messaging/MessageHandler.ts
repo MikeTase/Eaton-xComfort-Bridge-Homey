@@ -154,6 +154,21 @@ export class MessageHandler {
       return true;
     }
 
+    if (msg.type_int === MESSAGE_TYPES.PUBLISH_MAIN_ELECTRICAL_ENERGY_USAGE) {
+      const payload = this.getPayloadObject(msg.payload);
+      if (payload && this.onBridgeStatusUpdate) {
+        // Extract power from energy usage message: { meterId, connectionState, power }
+        const status: BridgeStatus = {};
+        if (typeof payload.power === 'number') {
+          status.power = payload.power;
+        }
+        if (Object.keys(status).length > 0) {
+          this.onBridgeStatusUpdate(status);
+        }
+      }
+      return true;
+    }
+
     if (msg.type_int === MESSAGE_TYPES.SET_ALL_DATA) {
       const payload = this.getPayloadObject(msg.payload);
       if (payload) {
@@ -254,6 +269,10 @@ export class MessageHandler {
         }
         if (typeof device.shadsClosed === 'number') {
           update.shadsClosed = device.shadsClosed;
+          hasUpdate = true;
+        }
+        if (typeof device.shPos === 'number') {
+          update.shPos = device.shPos;
           hasUpdate = true;
         }
         if (typeof device.shSafety === 'number') {
@@ -358,6 +377,7 @@ export class MessageHandler {
               item.dimmvalue !== undefined ||
               item.setpoint !== undefined ||
               item.shadsClosed !== undefined ||
+              item.shPos !== undefined ||
               item.shSafety !== undefined ||
               item.curstate !== undefined ||
               item.power !== undefined
@@ -372,6 +392,7 @@ export class MessageHandler {
               if (item.power !== undefined) deviceUpdate.power = item.power;
               if (item.curstate !== undefined) deviceUpdate.curstate = item.curstate;
               if (item.shadsClosed !== undefined) deviceUpdate.shadsClosed = item.shadsClosed;
+              if (item.shPos !== undefined) deviceUpdate.shPos = item.shPos;
               if (item.shSafety !== undefined) deviceUpdate.shSafety = item.shSafety;
               if (item.setpoint !== undefined) deviceUpdate.setpoint = item.setpoint;
               if (item.operationMode !== undefined) deviceUpdate.operationMode = item.operationMode;

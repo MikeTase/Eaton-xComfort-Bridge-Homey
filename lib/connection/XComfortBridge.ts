@@ -545,7 +545,8 @@ export class XComfortBridge extends EventEmitter {
     const numericId = this.parseId(String(deviceId));
     const payload: Record<string, unknown> = {
       deviceId: numericId,
-      action: action,
+      state: action, // Match ha-xcomfort-bridge payload
+      action: action, // Fallback for backwards compatibility if needed
     };
     if (value !== undefined) {
       payload.value = value;
