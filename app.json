@@ -6,7 +6,7 @@
   "description": {
     "en": "Seamless Eaton xComfort control for lights, shades, and heating."
   },
-  "version": "1.4.14",
+  "version": "1.4.15",
   "category": [
     "lights",
     "climate"
@@ -163,48 +163,6 @@
             "title": {
               "en": "Preset"
             }
-          }
-        ]
-      }
-    ],
-    "conditions": [
-      {
-        "id": "xcomfort_preset_is",
-        "title": {
-          "en": "Heating preset is"
-        },
-        "titleFormatted": {
-          "en": "Heating preset is [[preset]]"
-        },
-        "args": [
-          {
-            "name": "device",
-            "type": "device",
-            "filter": "driver_id=thermostat"
-          },
-          {
-            "name": "preset",
-            "type": "dropdown",
-            "values": [
-              {
-                "id": "frost",
-                "label": {
-                  "en": "Frost"
-                }
-              },
-              {
-                "id": "eco",
-                "label": {
-                  "en": "Economy"
-                }
-              },
-              {
-                "id": "comfort",
-                "label": {
-                  "en": "Comfort"
-                }
-              }
-            ]
           }
         ]
       }
