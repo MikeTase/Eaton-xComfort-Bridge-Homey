@@ -241,96 +241,100 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   private async updateDeviceState(data: DeviceStateUpdate) {
+    const effectiveData = this.getEffectiveDeviceState(data);
+
     if (this.debug) {
-      this.log(`Thermostat device update:`, data);
+      this.log(`Thermostat device update:`, effectiveData);
     }
 
-    if (data.operationMode !== undefined) {
-      await this.applyPreset(this.toClimateMode(data.operationMode));
+    if (effectiveData.operationMode !== undefined) {
+      await this.applyPreset(this.toClimateMode(effectiveData.operationMode));
     }
 
-    if (data.tempState !== undefined) {
-      await this.applyClimateState(this.toClimateState(data.tempState));
+    if (effectiveData.tempState !== undefined) {
+      await this.applyClimateState(this.toClimateState(effectiveData.tempState));
     }
 
-    if (data.setpoint !== undefined && !this.roomStateBound) {
-      this.currentSetpoint = this.clampSetpoint(data.setpoint, this.getEffectivePreset());
+    if (effectiveData.setpoint !== undefined && !this.roomStateBound) {
+      this.currentSetpoint = this.clampSetpoint(effectiveData.setpoint, this.getEffectivePreset());
       await this.updateCapability('target_temperature', this.currentSetpoint);
-    } else if ((data.operationMode !== undefined || data.tempState !== undefined) && !this.roomStateBound) {
+    } else if ((effectiveData.operationMode !== undefined || effectiveData.tempState !== undefined) && !this.roomStateBound) {
       await this.syncDisplayedSetpoint();
     }
 
-    if (data.metadata?.temperature !== undefined) {
-      await this.updateCapability('measure_temperature', data.metadata.temperature);
+    if (effectiveData.metadata?.temperature !== undefined) {
+      await this.updateCapability('measure_temperature', effectiveData.metadata.temperature);
     }
 
-    if (data.metadata?.humidity !== undefined) {
+    if (effectiveData.metadata?.humidity !== undefined) {
       await this.ensureHumidityCapability();
-      await this.updateCapability('measure_humidity', data.metadata.humidity);
+      await this.updateCapability('measure_humidity', effectiveData.metadata.humidity);
     }
 
-    if (data.metadata?.heatingDemand !== undefined) {
-      await this.applyHeatingDemand(data.metadata.heatingDemand);
+    if (effectiveData.metadata?.heatingDemand !== undefined) {
+      await this.applyHeatingDemand(effectiveData.metadata.heatingDemand);
     }
 
-    if (typeof data.dimmvalue === 'number') {
-      await this.applyHeatingDemand(data.dimmvalue);
+    if (typeof effectiveData.dimmvalue === 'number') {
+      await this.applyHeatingDemand(effectiveData.dimmvalue);
     }
 
-    if (typeof data.power === 'number') {
-      await this.applyPowerMeasurement(data.power, 'live');
+    if (typeof effectiveData.power === 'number') {
+      await this.applyPowerMeasurement(effectiveData.power, 'live');
     } else {
       await this.refreshEstimatedPowerMeasurement();
     }
   }
 
   private async updateRoomState(data: RoomStateUpdate) {
+    const effectiveData = this.getEffectiveRoomState(data);
+
     if (this.debug) {
-      this.log(`Thermostat room update:`, data);
+      this.log(`Thermostat room update:`, effectiveData);
     }
 
-    if (Array.isArray(data.modes)) {
-      this.storeModeSetpoints(data.modes);
+    if (Array.isArray(effectiveData.modes)) {
+      this.storeModeSetpoints(effectiveData.modes);
     }
 
     let nextMode: ClimateMode | null = null;
-    if (data.currentMode !== undefined) {
-      nextMode = this.toClimateMode(data.currentMode);
+    if (effectiveData.currentMode !== undefined) {
+      nextMode = this.toClimateMode(effectiveData.currentMode);
     }
-    if (data.mode !== undefined) {
-      nextMode = this.toClimateMode(data.mode);
+    if (effectiveData.mode !== undefined) {
+      nextMode = this.toClimateMode(effectiveData.mode);
     }
     if (nextMode !== null) {
       await this.applyPreset(nextMode);
     }
 
-    if (data.state !== undefined) {
-      await this.applyClimateState(this.toClimateState(data.state));
+    if (effectiveData.state !== undefined) {
+      await this.applyClimateState(this.toClimateState(effectiveData.state));
     }
 
     const effectiveMode = nextMode ?? this.getEffectivePreset();
-    const incomingSetpoint = typeof data.setpoint === 'number' ? data.setpoint : undefined;
+    const incomingSetpoint = typeof effectiveData.setpoint === 'number' ? effectiveData.setpoint : undefined;
     const displaySetpoint = this.getDisplaySetpoint(incomingSetpoint, effectiveMode);
     if (displaySetpoint !== undefined) {
       this.currentSetpoint = this.clampSetpoint(displaySetpoint, effectiveMode);
       await this.updateCapability('target_temperature', this.currentSetpoint);
     }
 
-    if (typeof data.temp === 'number' && !this.linkedSensorTemperatureAvailable) {
-      await this.updateCapability('measure_temperature', data.temp);
+    if (typeof effectiveData.temp === 'number' && !this.linkedSensorTemperatureAvailable) {
+      await this.updateCapability('measure_temperature', effectiveData.temp);
     }
 
-    if (typeof data.humidity === 'number' && !this.linkedSensorHumidityAvailable) {
+    if (typeof effectiveData.humidity === 'number' && !this.linkedSensorHumidityAvailable) {
       await this.ensureHumidityCapability();
-      await this.updateCapability('measure_humidity', data.humidity);
+      await this.updateCapability('measure_humidity', effectiveData.humidity);
     }
 
-    if (typeof data.valve === 'number') {
-      await this.applyHeatingDemand(data.valve);
+    if (typeof effectiveData.valve === 'number') {
+      await this.applyHeatingDemand(effectiveData.valve);
     }
 
-    if (typeof data.power === 'number') {
-      await this.applyPowerMeasurement(data.power, 'live');
+    if (typeof effectiveData.power === 'number') {
+      await this.applyPowerMeasurement(effectiveData.power, 'live');
     } else {
       await this.refreshEstimatedPowerMeasurement();
     }
@@ -714,6 +718,72 @@ module.exports = class ThermostatDevice extends BaseDevice {
       await this.ensureHumidityCapability();
       await this.updateCapability('measure_humidity', data.metadata.humidity);
     }
+  }
+
+  private getEffectiveDeviceState(data: DeviceStateUpdate): DeviceStateUpdate {
+    const device = this.bridge.getDevice(this.deviceId);
+    if (!device) {
+      return data;
+    }
+
+    const metadataFromSnapshot = Array.isArray(device.info)
+      ? parseInfoMetadata(device.info as InfoEntry[])
+      : {};
+    const mergedMetadata = {
+      ...metadataFromSnapshot,
+      ...(data.metadata || {}),
+    };
+
+    const effectiveData: DeviceStateUpdate = {
+      ...data,
+      metadata: Object.keys(mergedMetadata).length > 0 ? mergedMetadata : undefined,
+    };
+
+    if (effectiveData.setpoint === undefined && typeof device.setpoint === 'number') {
+      effectiveData.setpoint = device.setpoint;
+    }
+    if (effectiveData.power === undefined && typeof device.power === 'number') {
+      effectiveData.power = device.power;
+    }
+    if (effectiveData.operationMode === undefined && device.operationMode !== undefined) {
+      effectiveData.operationMode = device.operationMode as number;
+    }
+    if (effectiveData.tempState === undefined && device.tempState !== undefined) {
+      effectiveData.tempState = device.tempState as number;
+    }
+    if (effectiveData.dimmvalue === undefined) {
+      const dimmvalue = device.dimmvalue;
+      if (typeof dimmvalue === 'number') {
+        effectiveData.dimmvalue = dimmvalue;
+      }
+    }
+
+    return effectiveData;
+  }
+
+  private getEffectiveRoomState(data: RoomStateUpdate): RoomStateUpdate {
+    const room = this.roomId ? this.bridge.getRoom(this.roomId) : undefined;
+    if (!room) {
+      return data;
+    }
+
+    return {
+      ...data,
+      setpoint: typeof data.setpoint === 'number' ? data.setpoint : room.setpoint,
+      temp: typeof data.temp === 'number' ? data.temp : room.temp,
+      humidity: typeof data.humidity === 'number' ? data.humidity : room.humidity,
+      power: typeof data.power === 'number' ? data.power : room.power,
+      valve: typeof data.valve === 'number' ? data.valve : room.valve,
+      currentMode: data.currentMode ?? room.currentMode,
+      mode: data.mode ?? room.mode,
+      state: data.state ?? room.state,
+      temperatureOnly: data.temperatureOnly ?? room.temperatureOnly,
+      modes: Array.isArray(data.modes) ? data.modes : room.modes,
+      raw: {
+        ...(room.raw || {}),
+        ...(data.raw || {}),
+      },
+    };
   }
 
   private async restoreEnergyState(): Promise<void> {

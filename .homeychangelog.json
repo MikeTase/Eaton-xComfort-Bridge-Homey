@@ -115,5 +115,8 @@
   },
   "1.4.24": {
     "en": "Fix WaterGuard alarm sync so opening the water valve no longer triggers a false alarm in Homey."
+  },
+  "1.4.25": {
+    "en": "Fix thermostat power usage so partial xComfort updates no longer make Homey drop to 0 W while heating is still active."
   }
 }
