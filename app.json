@@ -486,7 +486,9 @@
           "hint": {
             "en": "Optional fallback when xComfort does not report live power. When heating demand is available, Homey scales this value by the current demand percentage."
           },
-          "value": 0
+          "value": 0,
+          "min": 0,
+          "max": 10000
         }
       ]
     },
