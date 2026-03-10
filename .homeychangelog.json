@@ -121,5 +121,8 @@
   },
   "1.4.26": {
     "en": "Convert the remaining helper script to TypeScript and keep the update script runnable from the compiled build output."
+  },
+  "1.4.27": {
+    "en": "changes Thermo"
   }
 }
