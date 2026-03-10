@@ -67,5 +67,8 @@
   },
   "1.4.7": {
     "en": "Improved thermostat sensor sync and energy tracking, richer wall switch events, bridge diagnostics metadata, and better state restore after reconnect."
+  },
+  "1.4.8": {
+    "en": "Fixed thermostat room sync and preset control, and corrected water sensor alarm reset syncing."
   }
 }
