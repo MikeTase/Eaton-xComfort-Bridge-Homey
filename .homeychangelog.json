@@ -76,5 +76,8 @@
   },
   "1.4.10": {
     "en": "fallback thermostat"
+  },
+  "1.4.11": {
+    "en": "sensor changes"
   }
 }
