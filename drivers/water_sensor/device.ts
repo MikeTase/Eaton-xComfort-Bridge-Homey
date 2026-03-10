@@ -51,6 +51,17 @@ module.exports = class WaterSensorDevice extends BaseDevice {
 
     if (typeof state.switch === 'boolean' && this.hasCapability('onoff')) {
       await this.updateCapability('onoff', state.switch);
+
+      // When the valve is reopened (switch=true) and there is no curstate in
+      // this update, clear any active alarm.  In xComfort, reopening the valve
+      // means the alarm was acknowledged and resolved.
+      if (state.switch === true && alarm === undefined) {
+        const currentAlarm = this.getCapabilityValue('alarm_water');
+        if (currentAlarm === true) {
+          this.log('Clearing water alarm — valve reopened without active alarm indication');
+          await this.updateCapability('alarm_water', false);
+        }
+      }
     }
   }
 
@@ -74,6 +85,14 @@ module.exports = class WaterSensorDevice extends BaseDevice {
 
     if (Object.keys(snapshot).length > 0) {
       await this.updateState(snapshot);
+    }
+
+    // If the bridge reports no curstate at all, clear any stale alarm that
+    // persisted from a previous session.  A real alarm will be set again as
+    // soon as the bridge sends a curstate update.
+    if (device.curstate === undefined && this.getCapabilityValue('alarm_water') === true) {
+      this.log('Clearing stale water alarm — no alarm indication from bridge data');
+      await this.updateCapability('alarm_water', false);
     }
   }
 
