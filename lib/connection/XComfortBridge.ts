@@ -22,6 +22,7 @@ import type {
   XComfortComponent,
   XComfortDevice,
   XComfortRoom,
+  XComfortScene,
   DeviceStateCallback,
   RoomStateCallback,
   LoggerFunction,
@@ -64,10 +65,26 @@ export class XComfortBridge extends EventEmitter {
 
   // Debouncers
   private dimDebouncers = new Map<string, CommandDebouncer>();
+  private switchDebouncers = new Map<string, CommandDebouncer>();
+
+  // Coalescing of full-state refreshes (REQUEST_DEVICES). Many devices can
+  // independently ask for a refresh (e.g. actuator safety timers after a switch
+  // burst); without coalescing each fires a heavy SET_ALL_DATA round-trip and
+  // can overwhelm the bridge, causing NACKs/timeouts that delay other commands.
+  private deviceStatesInFlight: Promise<boolean> | null = null;
+  private lastDeviceStatesAt: number = 0;
+  private lastControlCommandAt: number = 0;
+  private deferredDeviceStatesTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly DEVICE_STATES_MIN_INTERVAL_MS = 2000;
+  private readonly CONTROL_QUIET_PERIOD_MS = 8000;
 
   constructor(bridgeIp: string, authKey: string, logger?: LoggerFunction) {
     super(); // Initialize EventEmitter
-    this.setMaxListeners(50); // Each device adds connected+disconnected listeners
+    // Each device adds connected/disconnected (and sometimes devices_loaded /
+    // bridge_status / bridge_info) listeners — power users with 25+ devices
+    // already hit the default cap of 10. 200 gives comfortable headroom while
+    // preserving Node's leak warning for genuinely runaway listener growth.
+    this.setMaxListeners(200);
     this.bridgeIp = bridgeIp;
     this.authKey = authKey;
     this.logger = logger || console.log;
@@ -167,8 +184,11 @@ export class XComfortBridge extends EventEmitter {
     });
 
     this.messageHandler.setOnBridgeStatusUpdate((status) => {
-      this.lastBridgeStatus = status;
-      this.emit('bridge_status', status);
+      this.lastBridgeStatus = {
+        ...(this.lastBridgeStatus || {}),
+        ...status,
+      };
+      this.emit('bridge_status', this.lastBridgeStatus);
     });
 
     this.messageHandler.setOnHomeDataUpdate((payload) => {
@@ -306,13 +326,12 @@ export class XComfortBridge extends EventEmitter {
     if (!this.allowReconnect) return;
     if (this.connectionManager.isReconnecting()) return;
 
-    // Stop reconnecting after too many consecutive failures
+    // After many failures, keep retrying slowly instead of requiring an app
+    // restart. Bridges can come back hours later after power/network work.
     const MAX_RECONNECT_ATTEMPTS = 30;
     if (this.reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
-      this.logger(`[XComfortBridge-ERROR] Maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Giving up. Please check bridge power/network and restart the app.`);
+      this.logger(`[XComfortBridge] Maximum reconnection attempts (${MAX_RECONNECT_ATTEMPTS}) reached. Continuing with slow background retries.`);
       this.emit('max_reconnect_reached');
-      this.connectionManager.setReconnecting(false);
-      return;
     }
 
     this.connectionManager.setReconnecting(true);
@@ -324,7 +343,9 @@ export class XComfortBridge extends EventEmitter {
     // - After 10 failures: extend to 120 seconds (give bridge time to clean up sessions)
     // - After 20 failures: extend to 300 seconds
     let maxDelay: number;
-    if (this.reconnectAttempt > 20) {
+    if (this.reconnectAttempt >= MAX_RECONNECT_ATTEMPTS) {
+      maxDelay = 600000; // 10 minutes
+    } else if (this.reconnectAttempt > 20) {
       maxDelay = 300000; // 5 minutes
     } else if (this.reconnectAttempt > 10) {
       maxDelay = 120000; // 2 minutes
@@ -428,6 +449,17 @@ export class XComfortBridge extends EventEmitter {
     // Try authenticator first (for auth flow messages)
     if (this.authenticator.handleEncryptedMessage(msg)) return;
 
+    // The bridge declines a new session while it still holds a previous one
+    // (common right after it abnormally dropped us under load). Reconnecting
+    // immediately just gets declined again, so bias the backoff longer to give
+    // the bridge time to release the stale session. The socket close that
+    // follows will trigger the (now slower) reconnect.
+    if (msg.type_int === MESSAGE_TYPES.CONNECTION_DECLINED) {
+      this.logger('[XComfortBridge] Connection declined by bridge (stale session) — backing off before reconnecting');
+      this.reconnectAttempt = Math.max(this.reconnectAttempt, 5);
+      return;
+    }
+
     // Then message handler (for data/state messages) — deferred to allow ACK I/O to flush
     setImmediate(() => {
       this.messageHandler.processMessage(msg).then((handled) => {
@@ -435,7 +467,7 @@ export class XComfortBridge extends EventEmitter {
           this.logger(`[XComfortBridge] Unhandled encrypted message type: ${msg.type_int}`);
         }
       }).catch((err) => {
-        console.error('[XComfortBridge] Message processing error:', err);
+        this.logger('[XComfortBridge] Message processing error:', err);
       });
     });
   }
@@ -488,6 +520,14 @@ export class XComfortBridge extends EventEmitter {
     return this.deviceStateManager.getComponent(compId);
   }
 
+  getScenes(): XComfortScene[] {
+    return this.deviceStateManager.getAllScenes();
+  }
+
+  getScene(sceneId: string): XComfortScene | undefined {
+    return this.deviceStateManager.getScene(sceneId);
+  }
+
   getLastBridgeStatus(): BridgeStatus | null {
     return this.lastBridgeStatus;
   }
@@ -500,25 +540,79 @@ export class XComfortBridge extends EventEmitter {
   // Public API - Device Control
   // ===========================================================================
 
-  async switchDevice(deviceId: string | number, switchState: boolean, onSend?: (timestamp: number) => void): Promise<boolean> {
-    const payload = { 
-        deviceId: this.parseId(String(deviceId)), 
-        switch: switchState ? 1 : 0 // Use 1/0 instead of boolean to prevent bridge 1006 disconnects
+  async switchDevice(deviceId: string | number, switchState: boolean): Promise<boolean> {
+    const deviceIdStr = String(deviceId);
+
+    // Per-device coalescing (same pattern as dimDevice). Rapid toggles of one
+    // light — from a Flow, a group, a slider crossing zero, or fast taps —
+    // otherwise become one bridge command each and flood the bridge, which
+    // responds by NACKing and dropping the connection (1006). Leading-edge
+    // debounce sends the first toggle instantly and collapses the rest to the
+    // final state, so the bridge only ever sees the outcome.
+    let debouncer = this.switchDebouncers.get(deviceIdStr);
+    if (!debouncer) {
+      debouncer = new CommandDebouncer();
+      this.switchDebouncers.set(deviceIdStr, debouncer);
+    }
+
+    const result = await debouncer.run(async () => {
+      return this.sendControlMessage({
+        type_int: MESSAGE_TYPES.DEVICE_SWITCH,
+        mc: this.connectionManager.nextMc(),
+        payload: {
+          deviceId: this.parseId(deviceIdStr),
+          switch: switchState ? 1 : 0,
+        },
+      });
+    });
+
+    // Superseded by a newer toggle — report success so the UI doesn't revert.
+    return result ?? true;
+  }
+
+  async switchRoom(roomId: string | number, switchState: boolean): Promise<boolean> {
+    const payload = {
+      roomId: this.parseId(String(roomId)),
+      switch: switchState ? 1 : 0,
     };
 
-    const ts = Date.now();
-    if (onSend) onSend(ts);
-
-    return this.connectionManager.sendWithRetry({
-      type_int: MESSAGE_TYPES.DEVICE_SWITCH,
+    return this.sendControlMessage({
+      type_int: MESSAGE_TYPES.ROOM_SWITCH,
       mc: this.connectionManager.nextMc(),
       payload,
     });
   }
 
-  async dimDevice(deviceId: string | number, dimmValue: number, onSend?: (timestamp: number) => void): Promise<boolean | undefined> {
+  async activateScene(sceneId: string | number): Promise<boolean> {
+    return this.sendControlMessage({
+      type_int: MESSAGE_TYPES.ACTIVATE_SCENE,
+      mc: this.connectionManager.nextMc(),
+      payload: { sceneId: this.parseId(String(sceneId)) },
+    });
+  }
+
+  async setRemoteAccess(allowed: boolean): Promise<boolean> {
+    const result = await this.connectionManager.sendWithRetry({
+      type_int: MESSAGE_TYPES.SET_REMOTE_CONFIG,
+      mc: this.connectionManager.nextMc(),
+      payload: { remoteAllowed: allowed },
+    });
+
+    this.lastBridgeInfo = {
+      ...this.lastBridgeInfo,
+      remoteAllowed: allowed,
+      raw: {
+        ...(this.lastBridgeInfo.raw || {}),
+        remoteAllowed: allowed,
+      },
+    };
+    this.emit('bridge_info', this.lastBridgeInfo);
+    return result;
+  }
+
+  async dimDevice(deviceId: string | number, dimmValue: number): Promise<boolean | undefined> {
     const deviceIdStr = String(deviceId);
-    
+
     // Get or create debouncer for this device
     let debouncer = this.dimDebouncers.get(deviceIdStr);
     if (!debouncer) {
@@ -528,12 +622,12 @@ export class XComfortBridge extends EventEmitter {
 
     return debouncer.run(async () => {
         let targetVal = dimmValue;
-        
+
         // If target is 0, switch off explicitly via switchDevice (which handles 0/1 logic)
         if (targetVal === 0) {
-            return this.switchDevice(deviceId, false, onSend);
+            return this.switchDevice(deviceId, false);
         }
-        
+
         targetVal = Math.max(
           PROTOCOL_CONFIG.LIMITS.DIM_MIN,
           Math.min(PROTOCOL_CONFIG.LIMITS.DIM_MAX, targetVal)
@@ -546,11 +640,7 @@ export class XComfortBridge extends EventEmitter {
           payload: { deviceId: this.parseId(deviceIdStr), dimmvalue: targetVal },
         };
 
-        const ts = Date.now();
-        if (onSend) onSend(ts);
-
-        // Use sendWithRetry regardless of old implementation, to ensure delivery
-        return this.connectionManager.sendWithRetry(msg);
+        return this.sendControlMessage(msg);
     });
   }
 
@@ -618,22 +708,74 @@ export class XComfortBridge extends EventEmitter {
   // Public API - State Refresh
   // ===========================================================================
 
+  private async sendControlMessage(msg: { mc: number; [key: string]: unknown }): Promise<boolean> {
+    this.markControlCommand();
+    try {
+      return await this.connectionManager.sendWithRetry(msg);
+    } finally {
+      this.markControlCommand();
+    }
+  }
+
+  private markControlCommand(): void {
+    this.lastControlCommandAt = Date.now();
+  }
+
+  private scheduleDeferredDeviceStates(waitMs: number): void {
+    if (this.deferredDeviceStatesTimer) {
+      clearTimeout(this.deferredDeviceStatesTimer);
+    }
+
+    this.deferredDeviceStatesTimer = setTimeout(() => {
+      this.deferredDeviceStatesTimer = null;
+      this.requestDeviceStates().catch((error) => {
+        this.logger(`[XComfortBridge] Deferred device state refresh failed: ${(error as Error).message}`);
+      });
+    }, waitMs);
+  }
+
   async requestDeviceStates(): Promise<boolean> {
     if (!this.connectionManager.isConnected()) {
       // this.logger('[XComfortBridge] Cannot request states - not connected');
       return false;
     }
 
-    try {
-      await this.connectionManager.sendWithRetry({
-        type_int: MESSAGE_TYPES.REQUEST_DEVICES,
-        mc: this.connectionManager.nextMc(),
-        payload: {},
-      });
+    // Full state refreshes can take several seconds to ACK. Keep them behind
+    // recent user controls so a safety refresh cannot block the next light tap.
+    const quietWaitMs = this.CONTROL_QUIET_PERIOD_MS - (Date.now() - this.lastControlCommandAt);
+    if (quietWaitMs > 0) {
+      this.scheduleDeferredDeviceStates(quietWaitMs);
       return true;
-    } catch {
-      return false;
     }
+
+    // Already refreshing — share the in-flight request instead of issuing another.
+    if (this.deviceStatesInFlight) {
+      return this.deviceStatesInFlight;
+    }
+
+    // Recently refreshed — a fresh SET_ALL_DATA is already on its way / just
+    // arrived, so skip to avoid hammering the bridge. Reported as success.
+    if (Date.now() - this.lastDeviceStatesAt < this.DEVICE_STATES_MIN_INTERVAL_MS) {
+      return true;
+    }
+
+    this.lastDeviceStatesAt = Date.now();
+    this.deviceStatesInFlight = (async () => {
+      try {
+        await this.connectionManager.sendWithRetry({
+          type_int: MESSAGE_TYPES.REQUEST_DEVICES,
+          mc: this.connectionManager.nextMc(),
+          payload: {},
+        });
+        return true;
+      } catch {
+        return false;
+      } finally {
+        this.deviceStatesInFlight = null;
+      }
+    })();
+
+    return this.deviceStatesInFlight;
   }
 
   // ===========================================================================
@@ -655,6 +797,12 @@ export class XComfortBridge extends EventEmitter {
       : Array.isArray(payload.scenes)
         ? payload.scenes.length
         : this.lastBridgeInfo.homeScenesCount;
+    const remoteAllowed = typeof payload.remoteAllowed === 'boolean'
+      ? payload.remoteAllowed
+      : this.lastBridgeInfo.remoteAllowed;
+    const remoteOnline = typeof payload.remoteOnline === 'boolean'
+      ? payload.remoteOnline
+      : this.lastBridgeInfo.remoteOnline;
 
     this.lastBridgeInfo = {
       ...this.lastBridgeInfo,
@@ -663,6 +811,8 @@ export class XComfortBridge extends EventEmitter {
       bridgeType,
       bridgeModel: this.resolveBridgeModel(bridgeType),
       homeScenesCount: typeof directScenes === 'number' ? directScenes : this.lastBridgeInfo.homeScenesCount,
+      remoteAllowed,
+      remoteOnline,
       raw: {
         ...(this.lastBridgeInfo.raw || {}),
         ...payload,
@@ -691,12 +841,17 @@ export class XComfortBridge extends EventEmitter {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    if (this.deferredDeviceStatesTimer) {
+      clearTimeout(this.deferredDeviceStatesTimer);
+      this.deferredDeviceStatesTimer = null;
+    }
     this.messageHandler.cleanup();
     this.connectionManager.cleanup();
     this.connectionManager.setReconnecting(false);
     this.connectionState = 'disconnected';
     this.reconnectAttempt = 0;
     this.dimDebouncers.clear();
+    this.switchDebouncers.clear();
     this.removeAllListeners();
   }
 

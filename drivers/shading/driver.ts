@@ -14,7 +14,7 @@ module.exports = class ShadingDriver extends BaseDriver {
     
     const filtered = devices.filter((device) => {
       const devType = device.devType ?? 0;
-      const id = device.deviceId;
+      const id = `${this.getItemBridgeId(device) || ''}:${device.deviceId}`;
       
       if (!id || seenIds.has(id)) return false;
       seenIds.add(id);
@@ -22,21 +22,19 @@ module.exports = class ShadingDriver extends BaseDriver {
       return devType === DEVICE_TYPES.SHADING_ACTUATOR;
     });
 
-    return filtered.map((device) => {
-      const baseName = device.name || `Shading ${device.deviceId}`;
-      const deviceId = device.deviceId;
+    const candidates = filtered.map((device) => {
+      const baseName = this.getDisplayNameWithBridge(device.name || `Shading ${device.deviceId}`, device);
       
       return {
         name: baseName,
-        data: {
-          id: `shading_${deviceId}`,
-          deviceId: deviceId
-        },
+        data: this.getBridgeDeviceData('shading', device),
         settings: {
           shRuntime: device.shRuntime
         }
       };
     });
+
+    return this.filterUnpairedPairingDevices(candidates);
   }
   
   async onPairListDevices() {

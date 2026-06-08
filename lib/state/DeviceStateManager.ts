@@ -9,6 +9,7 @@ import type {
   XComfortComponent,
   XComfortDevice,
   XComfortRoom,
+  XComfortScene,
   InfoEntry,
   DeviceMetadata,
   DeviceStateUpdate,
@@ -29,6 +30,7 @@ export class DeviceStateManager {
   private components: Map<string, XComfortComponent> = new Map();
   private listeners: Map<string, DeviceStateCallback[]> = new Map();
   private rooms: Map<string, XComfortRoom> = new Map();
+  private scenes: Map<string, XComfortScene> = new Map();
   private roomListeners: Map<string, RoomStateCallback[]> = new Map();
 
   constructor(logger?: LoggerFunction) {
@@ -117,6 +119,32 @@ export class DeviceStateManager {
   }
 
   /**
+   * Add or update a scene in the state manager
+   */
+  setScene(scene: XComfortScene): void {
+    const sceneId = String(scene.sceneId);
+    const existing = this.scenes.get(sceneId);
+    const merged: XComfortScene = {
+      ...(existing || {}),
+      ...scene,
+      sceneId,
+    };
+
+    if (existing?.raw || scene.raw) {
+      merged.raw = {
+        ...(existing?.raw || {}),
+        ...(scene.raw || {}),
+      };
+    }
+
+    this.scenes.set(sceneId, merged);
+  }
+
+  deleteScene(sceneId: string | number): void {
+    this.scenes.delete(String(sceneId));
+  }
+
+  /**
    * Get a device by ID
    */
   getDevice(deviceId: string | number): XComfortDevice | undefined {
@@ -156,6 +184,14 @@ export class DeviceStateManager {
    */
   getAllRooms(): XComfortRoom[] {
     return Array.from(this.rooms.values());
+  }
+
+  getScene(sceneId: string | number): XComfortScene | undefined {
+    return this.scenes.get(String(sceneId));
+  }
+
+  getAllScenes(): XComfortScene[] {
+    return Array.from(this.scenes.values());
   }
 
   /**
@@ -231,7 +267,7 @@ export class DeviceStateManager {
         try {
           callback(id, stateData);
         } catch (error) {
-          console.error(
+          this.logger(
             `[DeviceStateManager] Error in state listener for device ${id}:`,
             error
           );
@@ -253,7 +289,7 @@ export class DeviceStateManager {
         try {
           callback(id, stateData);
         } catch (error) {
-          console.error(
+          this.logger(
             `[DeviceStateManager] Error in room state listener for room ${id}:`,
             error
           );

@@ -14,7 +14,9 @@ import type {
   RoomStateUpdate,
   BridgeStatus,
   LoggerFunction,
+  XComfortDevice,
   XComfortRoom,
+  XComfortScene,
   RoomModeSetpoint,
   InfoEntry,
 } from '../types';
@@ -146,6 +148,26 @@ export class MessageHandler {
       return true;
     }
 
+    if (
+      msg.type_int === MESSAGE_TYPES.SET_SCENE ||
+      msg.type_int === MESSAGE_TYPES.SET_SCENE_ID
+    ) {
+      const payload = this.getPayloadObject(msg.payload);
+      if (payload) {
+        this.processScenePayload(payload);
+      }
+      return true;
+    }
+
+    if (msg.type_int === MESSAGE_TYPES.SCENE_DELETED) {
+      const payload = this.getPayloadObject(msg.payload);
+      const sceneId = payload?.sceneId;
+      if (typeof sceneId === 'string' || typeof sceneId === 'number') {
+        this.deviceStateManager.deleteScene(sceneId);
+      }
+      return true;
+    }
+
     if (msg.type_int === MESSAGE_TYPES.SET_BRIDGE_STATE) {
       const payload = this.getPayloadObject(msg.payload);
       if (payload && this.onBridgeStatusUpdate) {
@@ -161,6 +183,12 @@ export class MessageHandler {
         const status: BridgeStatus = {};
         if (typeof payload.power === 'number') {
           status.power = payload.power;
+        }
+        if (typeof payload.meterId === 'number' || typeof payload.meterId === 'string') {
+          status.meterId = payload.meterId;
+        }
+        if (typeof payload.connectionState === 'number') {
+          status.connectionState = payload.connectionState;
         }
         if (Object.keys(status).length > 0) {
           this.onBridgeStatusUpdate(status);
@@ -215,16 +243,22 @@ export class MessageHandler {
     const homePayload = payload.home && typeof payload.home === 'object' && !Array.isArray(payload.home)
       ? payload.home as Record<string, unknown>
       : payload;
+    const bridgeInfoPayload: Record<string, unknown> = { ...homePayload };
+    ['homeScenes', 'scenes', 'remoteAllowed', 'remoteOnline'].forEach((key) => {
+      if (bridgeInfoPayload[key] === undefined && payload[key] !== undefined) {
+        bridgeInfoPayload[key] = payload[key];
+      }
+    });
 
     const homeName = typeof homePayload.name === 'string' ? homePayload.name : 'unnamed';
     this.logger(`[MessageHandler] Home data received: ${homeName}`);
-    this.onHomeDataUpdate?.(homePayload);
+    this.onHomeDataUpdate?.(bridgeInfoPayload);
 
-    if (payload.devices) {
-      this.processDeviceData({ devices: payload.devices });
-    }
     if (payload.comps) {
       this.processDeviceData({ comps: payload.comps });
+    }
+    if (payload.devices) {
+      this.processDeviceData({ devices: payload.devices });
     }
     if (payload.scenes) {
       this.processDeviceData({ scenes: payload.scenes });
@@ -357,6 +391,16 @@ export class MessageHandler {
       });
     }
 
+    if (payload.scenes && Array.isArray(payload.scenes)) {
+      payload.scenes.forEach((scenePayload) => {
+        if (!scenePayload || typeof scenePayload !== 'object' || Array.isArray(scenePayload)) {
+          return;
+        }
+
+        this.processScenePayload(scenePayload as Record<string, unknown>);
+      });
+    }
+
     if (payload.lastItem) {
       // this.logger('[MessageHandler] Device discovery complete!');
       this.onDeviceListComplete?.();
@@ -386,7 +430,7 @@ export class MessageHandler {
               this.logger(`[MessageHandler] Raw item for device ${deviceId}: ${JSON.stringify(item)}`);
             }
 
-            if (
+            const hasStateField = (
               item.switch !== undefined ||
               item.dimmvalue !== undefined ||
               item.setpoint !== undefined ||
@@ -396,7 +440,9 @@ export class MessageHandler {
               item.curstate !== undefined ||
               item.errorState !== undefined ||
               item.power !== undefined
-            ) {
+            );
+
+            if (hasStateField) {
               if (item.switch !== undefined) {
                   deviceUpdate.switch = (item.switch === true || item.switch === 1);
               } else if (item.curstate !== undefined && (item.curstate === 0 || item.curstate === 1)) {
@@ -413,11 +459,19 @@ export class MessageHandler {
               if (item.setpoint !== undefined) deviceUpdate.setpoint = item.setpoint;
               if (item.operationMode !== undefined) deviceUpdate.operationMode = item.operationMode;
               if (item.tempState !== undefined) deviceUpdate.tempState = item.tempState;
+            }
 
-            } else if (item.info && Array.isArray(item.info)) {
+            // Parse info[] independently — a single update item may contain BOTH
+            // state fields AND info metadata (e.g. temp/humidity from a dimming
+            // heater that also reports power). Previously this was an else-if,
+            // which caused metadata to be silently dropped on combined updates.
+            if (item.info && Array.isArray(item.info)) {
               const metadata = this.deviceStateManager.parseInfoMetadata(item.info);
               if (Object.keys(metadata).length > 0) {
-                deviceUpdate.metadata = metadata;
+                deviceUpdate.metadata = {
+                  ...(deviceUpdate.metadata || {}),
+                  ...metadata,
+                };
               }
               deviceInfoUpdates.set(deviceId, item.info);
             }
@@ -469,7 +523,7 @@ export class MessageHandler {
           // snapshots (used on reconnect) always reflect the latest state.
           const device = this.deviceStateManager.getDevice(deviceId);
           if (device) {
-            const patch: Record<string, unknown> = {};
+            const patch: Partial<XComfortDevice> = {};
             if (updateData.switch !== undefined) patch.switch = updateData.switch;
             if (updateData.dimmvalue !== undefined) patch.dimmvalue = updateData.dimmvalue;
             if (updateData.power !== undefined) patch.power = updateData.power;
@@ -484,7 +538,7 @@ export class MessageHandler {
             if (deviceInfoUpdates.has(deviceId)) patch.info = deviceInfoUpdates.get(deviceId);
 
             if (Object.keys(patch).length > 0) {
-              this.deviceStateManager.setDevice({ ...device, ...patch } as any);
+              this.deviceStateManager.setDevice({ ...device, ...patch });
             }
           }
 
@@ -534,7 +588,7 @@ export class MessageHandler {
         });
       }
     } catch (error) {
-      console.error(`[MessageHandler] Error processing state update:`, error);
+      this.logger(`[MessageHandler] Error processing state update:`, error);
     }
   }
 
@@ -621,6 +675,36 @@ export class MessageHandler {
     };
 
     return room;
+  }
+
+  private processScenePayload(payload: Record<string, unknown>): void {
+    const scene = this.normalizeScenePayload(payload);
+    if (!scene.sceneId) {
+      return;
+    }
+
+    this.deviceStateManager.setScene(scene);
+  }
+
+  private normalizeScenePayload(payload: Record<string, unknown>): XComfortScene {
+    const sceneId = String(payload.sceneId ?? payload.id ?? '');
+    const devices = Array.isArray(payload.devices)
+      ? payload.devices.filter((item): item is Record<string, unknown> => {
+        return !!item && typeof item === 'object' && !Array.isArray(item);
+      })
+      : undefined;
+
+    return {
+      ...payload,
+      sceneId,
+      name: typeof payload.name === 'string' ? payload.name : `Scene ${sceneId}`,
+      order: typeof payload.order === 'number' ? payload.order : undefined,
+      show: typeof payload.show === 'boolean' ? payload.show : undefined,
+      icon: typeof payload.icon === 'string' ? payload.icon : undefined,
+      deviceCount: devices ? devices.length : undefined,
+      devices,
+      raw: payload,
+    };
   }
 
   private normalizeComponentPayload(payload: Record<string, unknown>): {

@@ -1,17 +1,23 @@
+import * as Homey from 'homey';
 import { BaseDriver } from '../../lib/BaseDriver';
 import { XComfortDevice, XComfortRoom } from '../../lib/types';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { resolveThermostatRoomId } from '../../lib/utils/resolveThermostatRoomId';
 
+/** A thermostat device that may expose preset-mode control. */
+interface PresetDevice extends Homey.Device {
+  setPresetModeAction?(preset: string): Promise<void>;
+}
+
 module.exports = class ThermostatDriver extends BaseDriver {
   async onInit() {
     super.onInit();
-    
+
     // Register custom flow action for preset
     const setPresetAction = this.homey.flow.getActionCard('set_xcomfort_preset');
     if (setPresetAction) {
-      setPresetAction.registerRunListener(async (args: any) => {
-        const device = args.device as any;
+      setPresetAction.registerRunListener(async (args: { device: PresetDevice; preset?: unknown }) => {
+        const device = args.device;
         const preset = this.normalizePresetArgument(args.preset);
         if (!preset) {
           throw new Error('No xComfort preset selected');
@@ -26,8 +32,8 @@ module.exports = class ThermostatDriver extends BaseDriver {
     // Register custom flow condition
     const presetCondition = this.homey.flow.getConditionCard('xcomfort_preset_is');
     if (presetCondition) {
-      presetCondition.registerRunListener(async (args: any) => {
-        const device = args.device as any;
+      presetCondition.registerRunListener(async (args: { device: Homey.Device; preset?: unknown }) => {
+        const device = args.device;
         const current = device.getCapabilityValue('xcomfort_preset_mode');
         const preset = this.normalizePresetArgument(args.preset);
         return preset ? current === preset : false;
@@ -52,7 +58,7 @@ module.exports = class ThermostatDriver extends BaseDriver {
 
   private async listUnpairedDevices() {
     const devices = await this.getDevicesFromBridge();
-    const rooms = this.getBridge().getRooms();
+    const rooms = await this.getRoomsFromBridge();
     const formattedDevices = this.formatForPairing(devices, rooms);
     return formattedDevices;
   }
@@ -62,7 +68,7 @@ module.exports = class ThermostatDriver extends BaseDriver {
     
     const filtered = devices.filter((device) => {
       const devType = device.devType ?? 0;
-      const id = device.deviceId;
+      const id = `${this.getItemBridgeId(device) || ''}:${device.deviceId}`;
       
       if (!id || seenIds.has(id)) return false;
       seenIds.add(id);
@@ -74,20 +80,20 @@ module.exports = class ThermostatDriver extends BaseDriver {
       );
     });
 
-    return filtered.map((device) => {
+    const candidates = filtered.map((device) => {
       const baseName = device.name || `Device ${device.deviceId}`;
       const roomName = device.roomName;
-      const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
+      const displayName = this.getDisplayNameWithBridge(roomName ? `${roomName} - ${baseName}` : baseName, device);
       
-      const deviceId = device.deviceId;
       const deviceType = device.devType ?? 0;
-      const roomId = resolveThermostatRoomId(device, rooms);
+      const bridgeId = this.getItemBridgeId(device);
+      const bridgeRooms = bridgeId ? rooms.filter((room) => this.getItemBridgeId(room) === bridgeId) : rooms;
+      const roomId = resolveThermostatRoomId(device, bridgeRooms);
       
       return {
         name: displayName,
         data: {
-          id: `thermostat_${deviceId}`,
-          deviceId: deviceId,
+          ...this.getBridgeDeviceData('thermostat', device),
           ...(roomId ? { roomId } : {})
         },
         settings: {
@@ -95,6 +101,8 @@ module.exports = class ThermostatDriver extends BaseDriver {
         }
       };
     });
+
+    return this.filterUnpairedPairingDevices(candidates);
   }
   
   async onPairListDevices() {

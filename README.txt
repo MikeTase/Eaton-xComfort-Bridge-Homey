@@ -1,9 +1,11 @@
-This app lets you control Eaton xComfort devices via the xComfort Bridge.
+Control Eaton xComfort devices from Homey through one or more xComfort Bridges.
 
-It supports switching and dimming actuators, shading control (open/close/stop with optional position), thermostat setpoints with synced Frost/Economy/Comfort presets, door and window sensors, wall switch button events, water sensors, and bridge diagnostics.
+Supported addable device types include Actuator / Dimmer, Shading / Blinds, Thermostat / Heating, Door / Window Sensor, Binary Input, Motion Sensor, Wall Switch, and Water Sensor.
 
-Configuration: Open App Settings in Homey, enter the Bridge IP Address and Bridge Auth Key (found on the back of the bridge), and the app will connect automatically. Important: The auth key on the bridge is printed with dashes and spaces between letters and numbers (e.g. XXXX-XXXX-XXXX), but must be entered without dashes or spaces (e.g. XXXXXXXXXXXX) in the app settings. The app also normalizes the key automatically when saved. For stability, reserve the bridge IP in your router (DHCP reservation).
+Use Flow actions to activate xComfort scenes by name, switch all lights in an xComfort room by name, set heating presets, control supported water valves, and reset calculated energy meters.
 
-Adding devices: Open the Devices tab, click Add Device, choose Eaton xComfort, pick a device type, then wait for the list to load and select devices to add. Supported device types include Actuator or Dimmer, Shading or Blinds, Thermostat or Heating, Wall Switch, Water Sensor, and Bridge Diagnostics.
+Configuration: Open App Settings in Homey, add one or more bridges, and enter each bridge IP address or hostname plus the auth key from the bridge. Dashes and spaces in auth keys are accepted and removed automatically when saved. For stability, reserve each bridge IP in your router with a DHCP reservation.
 
-Troubleshooting: Ensure the Bridge works in the official Eaton app, verify the IP address and Auth Key, and confirm the bridge is reachable on your Homey network.
+Adding devices: Open the Devices tab, click Add Device, choose Eaton xComfort, pick a supported device type, then wait for the list to load and select devices to add.
+
+Troubleshooting: Ensure the bridge works in the official Eaton app, verify the IP address/hostname and auth key, and confirm the bridge is reachable from Homey on the local network.

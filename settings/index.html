@@ -4,61 +4,66 @@
         <script type="text/javascript" src="/homey.js" data-origin="settings"></script>
         <style>
             body { font-family: sans-serif; padding: 16px; }
-            .field.row { margin: 8px 0; }
             .hint { color: #666; font-size: 12px; margin-top: 4px; }
             .status { margin-top: 12px; min-height: 18px; }
             .status.ok { color: #0a7f3f; }
             .status.err { color: #b00020; }
-            .row-inline { display: flex; align-items: center; gap: 8px; }
+            .bridge-row {
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 12px;
+                margin: 10px 0;
+            }
+            .field { margin: 8px 0; }
+            label { display: block; font-size: 13px; margin-bottom: 4px; }
+            input { box-sizing: border-box; width: 100%; }
+            .actions { display: flex; gap: 8px; margin-top: 12px; }
+            .row-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
         </style>
     </head>
     <body>
         <h1 data-i18n="settings.title">Eaton xComfort</h1>
-        <p data-i18n="settings.intro">Please enter the IP address and Auth Key of your Eaton xComfort Bridge.</p>
-        
+        <p data-i18n="settings.intro">Configure one or more xComfort Bridge connections.</p>
+
         <fieldset>
-            <legend data-i18n="settings.connection">Connection Details</legend>
-            <div class="field row">
-                <label for="bridge_ip" data-i18n="settings.bridge_ip">IP Address</label>
-                <input id="bridge_ip" type="text" placeholder="192.168.1.x" autocomplete="off" />
-                <div class="hint" data-i18n="settings.bridge_ip_hint">Tip: reserve this IP in your router to keep it stable.</div>
-            </div>
-            <div class="field row">
-                <label for="bridge_auth_key" data-i18n="settings.bridge_auth_key">Auth Key</label>
-                <div class="row-inline">
-                    <input id="bridge_auth_key" type="password" placeholder="e.g. A1B2-C3D4-..." autocomplete="off" />
-                    <button id="toggle_key" type="button" class="button" data-i18n="settings.show">Show</button>
-                </div>
-                <div class="hint">Dashes and spaces are accepted and removed automatically when saved.</div>
-            </div>
+            <legend data-i18n="settings.connection">Bridge Connections</legend>
+            <div id="bridges"></div>
+            <button id="add_bridge" type="button">Add Bridge</button>
+            <div class="hint">Dashes and spaces in auth keys are accepted and removed automatically when saved.</div>
         </fieldset>
 
-        <button id="save" class="button-primary" data-i18n="settings.save" disabled>Save Settings</button>
+        <div class="actions">
+            <button id="save" class="button-primary" disabled data-i18n="settings.save">Save Settings</button>
+        </div>
         <div id="status" class="status"></div>
 
         <script type="text/javascript">
             function onHomeyReady(Homey) {
                 Homey.ready();
 
-                var ipInput = document.getElementById('bridge_ip');
-                var keyInput = document.getElementById('bridge_auth_key');
+                var bridgesEl = document.getElementById('bridges');
+                var addButton = document.getElementById('add_bridge');
                 var saveButton = document.getElementById('save');
-                var toggleButton = document.getElementById('toggle_key');
                 var statusEl = document.getElementById('status');
+                var bridges = [];
 
                 function setStatus(text, isError) {
                     statusEl.textContent = text || '';
                     statusEl.className = 'status ' + (isError ? 'err' : 'ok');
                 }
 
-                function isValidIp(str) {
-                    // Accept IPv4 addresses and hostnames
+                function sanitizeId(value, index) {
+                    var base = String(value || ('bridge_' + (index + 1))).toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '_')
+                        .replace(/^_+|_+$/g, '');
+                    return base || ('bridge_' + (index + 1));
+                }
+
+                function isValidHost(str) {
                     var ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
                     var hostname = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
                     if (ipv4.test(str)) {
-                        // Validate each octet is 0-255
-                        var octets = str.split('.');
-                        return octets.every(function(o) {
+                        return str.split('.').every(function(o) {
                             var n = parseInt(o, 10);
                             return n >= 0 && n <= 255;
                         });
@@ -66,58 +71,158 @@
                     return hostname.test(str);
                 }
 
-                function validate() {
-                    var ip = (ipInput.value || '').trim();
-                    var key = (keyInput.value || '').trim();
-                    saveButton.disabled = !(ip.length > 0 && key.length > 0 && isValidIp(ip));
+                function normalizeBridge(entry, index) {
+                    var name = (entry.name || ('xComfort Bridge ' + (index + 1))).trim();
+                    var ip = (entry.ip || '').trim();
+                    var authKey = (entry.authKey || entry.auth_key || '').replace(/[\s-]+/g, '');
+                    return {
+                        id: sanitizeId(entry.id || name || ip, index),
+                        name: name,
+                        ip: ip,
+                        authKey: authKey
+                    };
                 }
 
-                // Load existing settings
-                Homey.get('bridge_ip', function(err, value) {
-                    if (value) ipInput.value = value;
-                    validate();
-                });
-                
-                Homey.get('bridge_auth_key', function(err, value) {
-                    if (value) keyInput.value = value;
-                    validate();
-                });
-
-                // Save button handler
-                saveButton.addEventListener('click', function() {
-                    var ip = (ipInput.value || '').trim();
-                    var key = (keyInput.value || '').replace(/[\s-]+/g, '');
-
-                    if (!ip || !key) {
-                        setStatus(Homey.__('settings.fill_required') || 'Please fill in both fields.', true);
-                        return;
+                function parseBridges(value) {
+                    if (Array.isArray(value)) {
+                        return value;
                     }
+                    if (typeof value === 'string') {
+                        try {
+                            var parsed = JSON.parse(value);
+                            return Array.isArray(parsed) ? parsed : [];
+                        } catch (e) {
+                            return [];
+                        }
+                    }
+                    return [];
+                }
 
-                    Homey.set('bridge_ip', ip, function(err) {
-                        if (err) {
-                            setStatus(Homey.__('settings.save_error') || 'Error saving IP address.', true);
+                function validate() {
+                    var valid = bridges.length > 0 && bridges.every(function(bridge) {
+                        return bridge.name.trim().length > 0
+                            && bridge.ip.trim().length > 0
+                            && isValidHost(bridge.ip.trim())
+                            && bridge.authKey.trim().length > 0;
+                    });
+                    saveButton.disabled = !valid;
+                }
+
+                function render() {
+                    bridgesEl.innerHTML = '';
+                    bridges.forEach(function(bridge, index) {
+                        var row = document.createElement('div');
+                        row.className = 'bridge-row';
+
+                        row.innerHTML =
+                            '<div class="field">' +
+                                '<label>Name</label>' +
+                                '<input data-field="name" type="text" autocomplete="off" />' +
+                            '</div>' +
+                            '<div class="field">' +
+                                '<label>IP Address or Hostname</label>' +
+                                '<input data-field="ip" type="text" placeholder="192.168.1.x" autocomplete="off" />' +
+                            '</div>' +
+                            '<div class="field">' +
+                                '<label>Auth Key</label>' +
+                                '<input data-field="authKey" type="password" placeholder="e.g. A1B2-C3D4-..." autocomplete="off" />' +
+                            '</div>' +
+                            '<div class="row-actions">' +
+                                '<button type="button" data-action="remove">Remove</button>' +
+                            '</div>';
+
+                        row.querySelector('[data-field="name"]').value = bridge.name;
+                        row.querySelector('[data-field="ip"]').value = bridge.ip;
+                        row.querySelector('[data-field="authKey"]').value = bridge.authKey;
+
+                        row.querySelectorAll('input').forEach(function(input) {
+                            input.addEventListener('input', function() {
+                                var field = input.getAttribute('data-field');
+                                bridges[index][field] = input.value;
+                                if (field === 'name') {
+                                    bridges[index].id = sanitizeId(bridges[index].id || input.value, index);
+                                }
+                                validate();
+                            });
+                        });
+
+                        row.querySelector('[data-action="remove"]').addEventListener('click', function() {
+                            bridges.splice(index, 1);
+                            if (!bridges.length) {
+                                bridges.push(normalizeBridge({}, 0));
+                            }
+                            render();
+                            validate();
+                        });
+
+                        bridgesEl.appendChild(row);
+                    });
+                }
+
+                function loadSettings() {
+                    Homey.get('bridges', function(err, value) {
+                        var savedBridges = parseBridges(value);
+                        if (savedBridges.length) {
+                            bridges = savedBridges.map(normalizeBridge);
+                            render();
+                            validate();
                             return;
                         }
-                        Homey.set('bridge_auth_key', key, function(err) {
-                            if (err) {
-                                setStatus(Homey.__('settings.save_error') || 'Error saving auth key.', true);
-                                return;
-                            }
-                            setStatus(Homey.__('settings.saved') || 'Settings saved!', false);
+
+                        Homey.get('bridge_ip', function(ipErr, ip) {
+                            Homey.get('bridge_auth_key', function(keyErr, key) {
+                                if (ip && key) {
+                                    bridges = [normalizeBridge({
+                                        id: 'default',
+                                        name: 'xComfort Bridge',
+                                        ip: ip,
+                                        authKey: key
+                                    }, 0)];
+                                } else {
+                                    bridges = [normalizeBridge({}, 0)];
+                                }
+                                render();
+                                validate();
+                            });
                         });
+                    });
+                }
+
+                addButton.addEventListener('click', function() {
+                    bridges.push(normalizeBridge({}, bridges.length));
+                    render();
+                    validate();
+                });
+
+                saveButton.addEventListener('click', function() {
+                    var normalized = bridges.map(normalizeBridge);
+                    var seen = {};
+                    normalized = normalized.map(function(bridge, index) {
+                        var baseId = sanitizeId(bridge.id, index);
+                        var id = baseId;
+                        var suffix = 2;
+                        while (seen[id]) {
+                            id = baseId + '_' + suffix++;
+                        }
+                        seen[id] = true;
+                        bridge.id = id;
+                        bridge.authKey = bridge.authKey.replace(/[\s-]+/g, '');
+                        return bridge;
+                    });
+
+                    Homey.set('bridges', normalized, function(err) {
+                        if (err) {
+                            setStatus(Homey.__('settings.save_error') || 'Error saving bridge settings.', true);
+                            return;
+                        }
+                        bridges = normalized;
+                        render();
+                        validate();
+                        setStatus(Homey.__('settings.saved') || 'Settings saved!', false);
                     });
                 });
 
-                toggleButton.addEventListener('click', function() {
-                    var isPassword = keyInput.type === 'password';
-                    keyInput.type = isPassword ? 'text' : 'password';
-                    toggleButton.textContent = isPassword
-                        ? (Homey.__('settings.hide') || 'Hide')
-                        : (Homey.__('settings.show') || 'Show');
-                });
-
-                ipInput.addEventListener('input', validate);
-                keyInput.addEventListener('input', validate);
+                loadSettings();
             }
         </script>
     </body>

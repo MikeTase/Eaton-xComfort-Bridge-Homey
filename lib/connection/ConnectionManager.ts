@@ -27,9 +27,9 @@ interface RetryConfig {
 }
 
 const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 5,    // Increased retry count for reliability
-  ackTimeout: 1000, // Reduced from 2000ms to 1000ms for responsiveness
-  retryDelay: 250,  // Reduced to 250ms for faster recovery
+  maxRetries: 0,
+  ackTimeout: 10000,
+  retryDelay: 600,
 };
 
 // ============================================================================
@@ -65,9 +65,20 @@ export class ConnectionManager {
   private base64regex: RegExp = /^[A-Za-z0-9+/=]+$/;
 
   // Retry mechanism: Map of mc -> resolve function for pending ACKs
-  private pendingAcks: Map<number, (acked: boolean) => void> = new Map();
+  private pendingAcks: Map<number, (acked: boolean, aborted?: boolean) => void> = new Map();
   private retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG;
-  private txSemaphore = new Semaphore(5); // Increased concurrency to 5 to prevent queue blocking
+  private txSemaphore = new Semaphore(1);
+
+  // Outbound command pacing. The xComfort bridge NACKs and abnormally drops
+  // (1006) the connection when hit with a burst of commands (e.g. an "all
+  // lights off" scene). We keep commands ACK-serialized and do not add a fixed
+  // clean-path delay; the next command is sent as soon as the previous one ACKs.
+  // A NACK or timeout applies a separate cooldown before the next command.
+  private lastSendAt: number = 0;
+  private bridgeBackoffUntil: number = 0;
+  private readonly MIN_SEND_GAP_MS = 0;
+  private readonly NACK_BACKOFF_MS = 2500;
+  private readonly SLOW_ACK_LOG_MS = 1000;
 
   constructor(bridgeIp: string, logger?: LoggerFunction) {
     this.bridgeIp = bridgeIp;
@@ -180,7 +191,7 @@ export class ConnectionManager {
     if (this.pendingAcks.size > 0) {
       this.logger(`[ConnectionManager] Clearing ${this.pendingAcks.size} pending ACKs due to disconnect`);
       for (const [_mc, resolve] of this.pendingAcks) {
-        resolve(false);
+        resolve(false, true);
       }
       this.pendingAcks.clear();
     }
@@ -198,6 +209,22 @@ export class ConnectionManager {
    */
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Guard against double-settling: 'open' may be followed by 'error',
+      // or 'error' by 'close', and the auth flow may resolve concurrently.
+      let settled = false;
+      const safeResolve = () => {
+        if (settled) return;
+        settled = true;
+        this.connectResolve = undefined;
+        resolve();
+      };
+      const safeReject = (err: Error) => {
+        if (settled) return;
+        settled = true;
+        this.connectResolve = undefined;
+        reject(err);
+      };
+
       try {
         this.connectionEstablished = false;
 
@@ -224,7 +251,7 @@ export class ConnectionManager {
 
         this.ws.on('error', (err: Error) => {
           this.logger(`[ConnectionManager] WebSocket error: ${err.message}`);
-          reject(err);
+          safeReject(err);
         });
 
         this.ws.on('close', (code: number, reason: Buffer) => {
@@ -233,23 +260,27 @@ export class ConnectionManager {
             `[ConnectionManager] Connection closed. Code: ${code}, Reason: ${reasonStr}`
           );
 
+          // Mark connection as lost so retries can detect it
+          this.encryptionContext = null;
+
           // Clear any pending ACKs immediately as they will never arrive
           this.clearPendingAcks();
 
           const wasEstablished = this.connectionEstablished;
           const shouldReconnect = wasEstablished && !this.reconnecting;
 
-          // Mark connection as lost so retries can detect it
-          this.encryptionContext = null;
-          
+          // If the connection promise hasn't been settled yet, reject it now —
+          // the caller is still waiting for the handshake.
+          safeReject(new Error(`WebSocket closed before handshake (${code})`));
+
           this.onClose?.(code, reasonStr, shouldReconnect);
         });
 
         // Resolve is called externally when auth completes
-        this.connectResolve = resolve;
+        this.connectResolve = safeResolve;
 
       } catch (error) {
-        reject(error);
+        safeReject(error as Error);
       }
     });
   }
@@ -333,61 +364,141 @@ export class ConnectionManager {
     return trimmed.length >= 24 && this.base64regex.test(trimmed);
   }
 
+  private describeMessageTarget(msg: { [key: string]: unknown }): string {
+    const payload = msg.payload;
+    if (!payload || typeof payload !== 'object') {
+      return '';
+    }
+
+    const record = payload as Record<string, unknown>;
+    for (const key of ['deviceId', 'roomId', 'sceneId']) {
+      const value = record[key];
+      if (value !== undefined && value !== null) {
+        return ` ${key}=${String(value)}`;
+      }
+    }
+
+    return '';
+  }
+
   /**
-   * Send message with retry and ACKwait
+   * Send message with retry and ACK wait.
+   *
+   * The bridge accepts command bursts poorly: many in-flight DEVICE_SWITCH
+   * commands lead to NACKs and abnormal 1006 disconnects. Keep only one
+   * ACK-waiting command active at a time; after a NACK or timeout, apply a
+   * short shared cooldown before the next queued command.
    */
   async sendWithRetry(msg: { mc: number; [key: string]: unknown }): Promise<boolean> {
     const mc = msg.mc;
-    // const typeStr = msg.type_int ? ` (${msg.type_int})` : '';
+    const typeStr = typeof msg.type_int === 'number' ? ` type=${msg.type_int}` : '';
+    const targetStr = this.describeMessageTarget(msg);
 
     return new Promise((resolve, reject) => {
       let retries = 0;
       let ackTimeoutTimer: NodeJS.Timeout | null = null;
       let retryTimer: NodeJS.Timeout | null = null;
       let releaseSemaphore: (() => void) | null = null;
+      let settled = false;
+      let lastAttemptSentAt = 0;
 
       const cleanup = () => {
         if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
         if (retryTimer) clearTimeout(retryTimer);
         this.pendingAcks.delete(mc);
         if (releaseSemaphore) {
-             releaseSemaphore();
-             releaseSemaphore = null; // Ensure only called once
+          releaseSemaphore();
+          releaseSemaphore = null;
         }
       };
 
+      const finishResolve = (value: boolean) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(value);
+      };
+
+      const finishReject = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+
       const sendAttempt = async () => {
+        if (settled) {
+          return;
+        }
+
+        // Honor the bridge cooldown under the semaphore so queued commands do
+        // not stampede immediately after a NACK/timeout.
+        const sinceLast = Date.now() - this.lastSendAt;
+        const gapWait = sinceLast < this.MIN_SEND_GAP_MS ? this.MIN_SEND_GAP_MS - sinceLast : 0;
+        const backoffWait = Math.max(0, this.bridgeBackoffUntil - Date.now());
+        const waitMs = Math.max(gapWait, backoffWait);
+        if (waitMs > 0) {
+          await new Promise<void>((resolve) => setTimeout(resolve, waitMs));
+        }
+
+        if (settled) {
+          return;
+        }
+
         if (!this.isConnected()) {
-           cleanup();
-           reject(new Error('Connection lost'));
-           return;
+          finishReject(new Error('Connection lost'));
+          return;
         }
 
-        // Send
+        lastAttemptSentAt = Date.now();
         const success = await this.sendEncrypted(msg);
+        this.lastSendAt = Date.now();
+
+        if (settled) {
+          return;
+        }
         if (!success) {
-           handleFailure();
-           return;
+          handleFailure();
+          return;
         }
 
-        // Wait for ACK
-        this.pendingAcks.set(mc, (acked) => {
-           if (acked) {
-             cleanup();
-             resolve(true);
-           } else {
-             handleFailure();
-           }
+        // Wait for ACK (concurrent across commands, keyed by mc)
+        this.pendingAcks.set(mc, (acked, aborted) => {
+          if (settled) {
+            return;
+          }
+          if (aborted) {
+            finishReject(new Error('Connection lost'));
+            return;
+          }
+          if (acked) {
+            const ackMs = Date.now() - lastAttemptSentAt;
+            if (ackMs >= this.SLOW_ACK_LOG_MS) {
+              this.logger(`[ConnectionManager] Slow ACK for mc=${mc}${typeStr}${targetStr} after ${ackMs}ms`);
+            }
+            finishResolve(true);
+          } else {
+            if (ackTimeoutTimer) {
+              clearTimeout(ackTimeoutTimer);
+              ackTimeoutTimer = null;
+            }
+            this.pendingAcks.delete(mc);
+            this.bridgeBackoffUntil = Date.now() + this.NACK_BACKOFF_MS;
+            this.logger(`[ConnectionManager] NACK for mc=${mc}${typeStr}${targetStr}; cooling down ${this.NACK_BACKOFF_MS}ms without retry`);
+            finishReject(new Error('Bridge rejected command'));
+          }
         });
 
-        // Set timeout
         if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
         ackTimeoutTimer = setTimeout(() => {
-           handleFailure();
+          handleFailure();
         }, this.retryConfig.ackTimeout);
       };
 
       const handleFailure = () => {
+         if (settled) {
+            return;
+         }
          // Guard: prevent double invocation from both NACK callback and ack timeout
          if (ackTimeoutTimer) {
             clearTimeout(ackTimeoutTimer);
@@ -397,22 +508,26 @@ export class ConnectionManager {
 
          if (retries < this.retryConfig.maxRetries) {
             retries++;
-            this.logger(`[ConnectionManager] Retry ${retries}/${this.retryConfig.maxRetries} for mc=${mc}`);
-            
+            this.logger(`[ConnectionManager] Retry ${retries}/${this.retryConfig.maxRetries} for mc=${mc}${typeStr}`);
+
             retryTimer = setTimeout(() => {
-               sendAttempt();
+               if (!settled) {
+                  void sendAttempt();
+               }
             }, this.retryConfig.retryDelay);
          } else {
-            this.logger(`[ConnectionManager] Max retries reached for mc=${mc} after ${retries} retries`);
-            cleanup();
-            reject(new Error(`Max retries reached`));
+            const reason = retries === 0 ? 'No ACK before timeout' : 'Max retries reached';
+            this.logger(`[ConnectionManager] ${reason} for mc=${mc}${typeStr}${targetStr} after ${retries} retries`);
+            this.bridgeBackoffUntil = Date.now() + this.NACK_BACKOFF_MS;
+            finishReject(new Error(reason));
          }
       };
 
-      // Acquire semaphore before starting first attempt
       this.txSemaphore.acquire().then(() => {
-         releaseSemaphore = () => this.txSemaphore.release();
-         sendAttempt();
+        releaseSemaphore = () => this.txSemaphore.release();
+        void sendAttempt();
+      }).catch((error) => {
+        finishReject(error instanceof Error ? error : new Error('Connection lost'));
       });
     });
   }
@@ -429,20 +544,25 @@ export class ConnectionManager {
   }
 
   /**
-   * Handle incoming NACK (treat as failure -> retry)
+   * Handle incoming NACK.
+   *
+   * A NACK means the bridge received the frame but rejected it, usually because
+   * it is busy or rate-limited. Retrying immediately amplifies that backpressure
+   * and can force the bridge into a 1006 disconnect, so fail this command and
+   * let the queue move on.
    */
   handleNack(mc: number): void {
     const resolver = this.pendingAcks.get(mc);
     if (resolver) {
-      resolver(false); // Signal failure to trigger retry
-      // Don't delete yet, failure handler will do it or retry
+      resolver(false);
     }
   }
 
   cleanup(): void {
     this.stopHeartbeat();
+    this.encryptionContext = null;
     this.clearPendingAcks();
-    this.txSemaphore.drain();
+    this.txSemaphore.drain(new Error('Connection lost'));
     this.connectionEstablished = false;
     this.reconnecting = false;
     this.connectResolve = undefined;
@@ -455,7 +575,7 @@ export class ConnectionManager {
       this.ws.on('error', () => {});
       try {
         this.ws.close();
-      } catch (e) {
+      } catch {
         // ignore
       }
       this.ws = null;

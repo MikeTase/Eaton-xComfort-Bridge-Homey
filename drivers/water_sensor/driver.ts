@@ -1,6 +1,12 @@
+import * as Homey from 'homey';
 import { BaseDriver } from '../../lib/BaseDriver';
 import { XComfortDevice } from '../../lib/types';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
+
+/** A water-sensor device that may expose valve control. */
+interface WaterValveDevice extends Homey.Device {
+  setValveState?(open: boolean): Promise<void>;
+}
 
 module.exports = class WaterSensorDriver extends BaseDriver {
   async onInit() {
@@ -8,8 +14,8 @@ module.exports = class WaterSensorDriver extends BaseDriver {
 
     const setValveAction = this.homey.flow.getActionCard('set_water_valve');
     if (setValveAction) {
-      setValveAction.registerRunListener(async (args: any) => {
-        const device = args.device as any;
+      setValveAction.registerRunListener(async (args: { device: WaterValveDevice; state?: string }) => {
+        const device = args.device;
         const open = args.state === 'open';
         if (typeof device.setValveState === 'function') {
           await device.setValveState(open);
@@ -22,8 +28,8 @@ module.exports = class WaterSensorDriver extends BaseDriver {
 
     const valveCondition = this.homey.flow.getConditionCard('water_valve_is');
     if (valveCondition) {
-      valveCondition.registerRunListener(async (args: any) => {
-        const device = args.device as any;
+      valveCondition.registerRunListener(async (args: { device: Homey.Device }) => {
+        const device = args.device;
         if (!device.hasCapability('onoff')) {
           throw new Error('This device does not support valve control');
         }
@@ -44,29 +50,28 @@ module.exports = class WaterSensorDriver extends BaseDriver {
 
     const filtered = devices.filter((device) => {
       const devType = device.devType ?? 0;
-      const id = device.deviceId;
+      const id = `${this.getItemBridgeId(device) || ''}:${device.deviceId}`;
       if (!id || seenIds.has(String(id))) return false;
       if (devType !== DEVICE_TYPES.WATER_GUARD && devType !== DEVICE_TYPES.WATER_SENSOR) return false;
       seenIds.add(String(id));
       return true;
     });
 
-    return filtered.map((device) => {
+    const candidates = filtered.map((device) => {
       const baseName = device.name || `Water Sensor ${device.deviceId}`;
       const roomName = device.roomName;
-      const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
+      const displayName = this.getDisplayNameWithBridge(roomName ? `${roomName} - ${baseName}` : baseName, device);
 
       return {
         name: displayName,
-        data: {
-          id: `water_${device.deviceId}`,
-          deviceId: device.deviceId,
-        },
+        data: this.getBridgeDeviceData('water', device),
         settings: {
           deviceType: device.devType ?? 0,
         },
       };
     });
+
+    return this.filterUnpairedPairingDevices(candidates);
   }
 
   async onPairListDevices() {

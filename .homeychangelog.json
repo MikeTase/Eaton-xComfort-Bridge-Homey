@@ -124,5 +124,53 @@
   },
   "1.4.27": {
     "en": "changes Thermo"
+  },
+  "1.4.28": {
+    "en": "Improved bridge reliability and thermostat handling, fixed combined state+metadata updates, and made dimming more responsive."
+  },
+  "1.4.29": {
+    "en": "Added Binary Input, Temperature Sensor, and Motion Sensor support for additional xComfort sensor channels; improved door/window sensor detection using bridge component type mapping."
+  },
+  "1.4.30": {
+    "en": "Added Room Status sensors with room temperature, humidity, heating demand, power, calculated room energy, lights-on counts, and open window/door counts; improved temperature/humidity pairing and thermostat heating demand visibility."
+  },
+  "1.4.31": {
+    "en": "Added support for configuring multiple xComfort Bridges and pairing devices, room status sensors, and diagnostics from each bridge while keeping existing single-bridge devices compatible."
+  },
+  "1.4.32": {
+    "en": "Improved bridge diagnostics by preserving full status across main power updates, added calculated main-meter energy, initialized multiple bridges in parallel, improved sensor pairing diagnostics, and added clearer wall switch pairing names."
+  },
+  "1.4.33": {
+    "en": "Fixed pairing lists so already-installed devices are hidden when adding new devices, including legacy single-bridge devices and newer multi-bridge device IDs."
+  },
+  "1.4.34": {
+    "en": "Added xComfort scenes, appliance/load support, updated binary input and motion classifications, remote access diagnostics, heating valve details, improved pairing speed, and slow background reconnect retries."
+  },
+  "1.4.35": {
+    "en": "Updated motion and binary input artwork, improved motion sensor icon, and removed appliance and temperature sensor from new device pairing."
+  },
+  "1.4.39": {
+    "en": "Improved actuator command reliability, fixed the motion sensor icon, and cleaned up the Add Device list metadata."
+  },
+  "1.4.48": {
+    "en": "Restored stable actuator switching and added paced light command handling for safer bulk on/off actions."
+  },
+  "1.4.49": {
+    "en": "Improved release validation and cleaned up lint warnings for a more reliable app build."
+  },
+  "1.4.50": {
+    "en": "Improve actuator switching stability by preventing bridge command bursts during all-lights actions."
+  },
+  "1.4.51": {
+    "en": "Improved actuator switching stability and bridge connection handling; reduced retry storms during busy bridge responses."
+  },
+  "1.4.52": {
+    "en": "Restore Bridge Diagnostics as an addable device while keeping Room Status hidden from pairing."
+  },
+  "1.4.53": {
+    "en": "Align README and metadata with current addable devices; clean up hidden legacy scene pairing."
+  },
+  "1.4.54": {
+    "en": "Hide Bridge Diagnostics from the add-device pairing flow."
   }
 }

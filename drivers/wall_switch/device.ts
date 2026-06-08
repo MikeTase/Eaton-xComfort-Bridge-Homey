@@ -15,8 +15,12 @@ module.exports = class WallSwitchDevice extends BaseDevice {
   private triggerPressed: Homey.FlowCardTriggerDevice | null = null;
   private debug: boolean = false;
   private hasSeenInitialButtonState: boolean = false;
+  private lastButtonEmitState: boolean | null = null;
+  private lastButtonEmitAt: number = 0;
   private companionSensorId: string | null = null;
+  private companionSensorListener?: (deviceId: string, state: DeviceStateUpdate) => void;
   private onDevicesLoaded?: () => void;
+  private readonly buttonDedupeWindowMs = 300;
 
   async onDeviceReady() {
     this.debug = process.env.XCOMFORT_DEBUG === '1';
@@ -105,18 +109,28 @@ module.exports = class WallSwitchDevice extends BaseDevice {
   private async bindCompanionSensor(): Promise<void> {
     const sensorId = this.findCompanionSensorId();
     if (!sensorId) {
+      if (this.companionSensorId && this.companionSensorListener) {
+        this.removeManagedStateListener(this.companionSensorId, this.companionSensorListener);
+        this.companionSensorId = null;
+        this.companionSensorListener = undefined;
+      }
       return;
     }
 
     if (this.companionSensorId !== sensorId) {
+      if (this.companionSensorId && this.companionSensorListener) {
+        this.removeManagedStateListener(this.companionSensorId, this.companionSensorListener);
+      }
+
       this.companionSensorId = sensorId;
       const boundSensorId = sensorId;
-      this.addManagedStateListener(boundSensorId, (_deviceId: string, state: DeviceStateUpdate) => {
+      this.companionSensorListener = (_deviceId: string, state: DeviceStateUpdate) => {
         if (this.companionSensorId !== boundSensorId) {
           return;
         }
         void this.applySensorMetadata(state.metadata);
-      });
+      };
+      this.addManagedStateListener(boundSensorId, this.companionSensorListener);
     }
 
     await this.applyCompanionSensorSnapshot(sensorId);
@@ -191,6 +205,10 @@ module.exports = class WallSwitchDevice extends BaseDevice {
       return;
     }
 
+    if (this.isFastDuplicateButtonEvent(pressedState)) {
+      return;
+    }
+
     if (pressedState) {
       triggerUp?.trigger(this, {}, {}).catch(this.error);
     } else {
@@ -223,6 +241,19 @@ module.exports = class WallSwitchDevice extends BaseDevice {
         component_model: componentModel,
       },
     ).catch(this.error);
+  }
+
+  private isFastDuplicateButtonEvent(pressedState: boolean): boolean {
+    const now = Date.now();
+    const isDuplicate = this.lastButtonEmitState === pressedState
+      && now - this.lastButtonEmitAt < this.buttonDedupeWindowMs;
+
+    if (!isDuplicate) {
+      this.lastButtonEmitState = pressedState;
+      this.lastButtonEmitAt = now;
+    }
+
+    return isDuplicate;
   }
 
   private resolveSwitchState(state: { switch?: boolean; curstate?: unknown } | XComfortDevice): boolean | undefined {

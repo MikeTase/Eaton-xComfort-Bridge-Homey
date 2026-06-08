@@ -40,9 +40,14 @@ export const MESSAGE_TYPES = {
   DIAGNOSTICS: 243,
 
   // Device Control Messages
+  SET_SCENE: 261,
   DEVICE_DIM: 280,
   DEVICE_SWITCH: 281,
   DEVICE_SHADE: 282,
+  ROOM_DIM: 283,
+  ROOM_SWITCH: 284,
+  ACTIVATE_SCENE: 285,
+  SET_REMOTE_CONFIG: 288,
   SET_HEATING_STATE: 353,
   SET_DEVICE_SHADING_STATE: 355,
   SET_DEVICE_ALARM_STATE: 356,
@@ -51,7 +56,9 @@ export const MESSAGE_TYPES = {
   // Response/Data Messages
   SET_DEVICE_STATE: 291,
   SET_ROOM_STATE: 293,
+  SCENE_DELETED: 298,
   SET_ALL_DATA: 300,
+  SET_SCENE_ID: 302,
   SET_HOME_DATA: 303,
   STATE_UPDATE: 310,
   ERROR_INFO: 295,
@@ -69,11 +76,18 @@ export const DEVICE_TYPES = {
   // Shading
   SHADING_ACTUATOR: 102,
   
-  // Heating / Sensors
-  TEMPERATURE_SENSOR: 200,
+  // Sensors / inputs
+  MOTION_SENSOR: 200,
+  ROCKER_SENSOR: 201,
+  SWITCH: 202,
   DOOR_WINDOW_SENSOR: 202,
+  ROCKER_BINARY_INPUT: 211,
+  ROCKER: 220,
   WALL_SWITCH: 220,
+
+  // Heating / temperature
   TEMP_SENSOR: 410,
+  TEMPERATURE_SENSOR: 410,
   HEATING_ACTUATOR: 440,
   HEATING_VALVE: 441,
   HEATING_WATER_VALVE: 442,
@@ -90,7 +104,14 @@ export const COMPONENT_TYPES = {
   PUSH_BUTTON_1_CHANNEL: 1,
   PUSH_BUTTON_2_CHANNEL: 2,
   PUSH_BUTTON_4_CHANNEL: 3,
+  BINARY_INPUT_230V: 19,
+  BINARY_INPUT_BATTERY: 20,
+  TEMPERATURE_SENSOR: 23,
+  MOTION_SENSOR: 29,
   REMOTE_CONTROL_2_CHANNEL: 48,
+  REMOTE_CONTROL_12_CHANNEL: 49,
+  ROUTER_ACTUATOR: 52,
+  HEATING_VALVE: 65,
   MULTI_HEATING_ACTUATOR: 71,
   LIGHT_SWITCH_ACTUATOR: 74,
   DOOR_WINDOW_SENSOR: 76,
@@ -104,6 +125,28 @@ export const COMPONENT_TYPES = {
   PUSH_BUTTON_MULTI_SENSOR_1_CHANNEL: 87,
   PUSH_BUTTON_MULTI_SENSOR_2_CHANNEL: 88,
   PUSH_BUTTON_MULTI_SENSOR_4_CHANNEL: 89,
+  WEATHER_STATION: 90,
+} as const;
+
+/**
+ * Device usage values used by switching/dimming actuators.
+ */
+export const DEVICE_USAGE = {
+  LIGHT: 0,
+  LOAD: 1,
+  SUM_HEATING: 2,
+  SHADING: 3,
+  WATER: 4,
+  ROUTING: 5,
+  WATER_HEATING: 6,
+  VEHICLE_CHARGER: 7,
+  HIGH_LOAD_APPLIANCE: 8,
+  HEATING: 23,
+  COOLING: 24,
+  HEATING_COOLING: 25,
+  SWITCH_HEATING_COOLING: 26,
+  SWITCH_COOLING: 27,
+  SWITCH_HEATING: 28,
 } as const;
 
 /**
@@ -119,9 +162,18 @@ export const WS_CLOSE_CODES = {
 export const INFO_TEXT_CODES = {
   TEMPERATURE_STANDARD: '1222', // Standard temperature sensor reading (°C)
   HUMIDITY_STANDARD: '1223', // Standard humidity sensor reading (%)
-  TEMPERATURE_DIMMER: '1109', // Temperature from dimming actuator/heater
-  DIMM_VALUE: '1111', // Heating demand / Dimm value from info
-  DIMM_VALUE_ALT: '1225', // Heating demand (alternate code used by some firmware)
+  DEVICE_TEMPERATURE: '1109', // Internal device/heater temperature (°C)
+  TEMPERATURE_DIMMER: '1109', // Backwards-compatible alias
+  SIGNAL_STRENGTH: '1111',
+  BATTERY_LEVEL_0: '1113',
+  BATTERY_LEVEL_25: '1114',
+  BATTERY_LEVEL_50: '1115',
+  BATTERY_LEVEL_75: '1116',
+  BATTERY_LEVEL_100: '1117',
+  BATTERY_LEVEL_UNKNOWN: '1118',
+  MAINS_POWERED: '1119',
+  PT1000_TEMPERATURE: '1224',
+  DIMM_VALUE: '1225', // Heating demand / valve position from info
 } as const;
 
 /**

@@ -1,6 +1,6 @@
 import { BaseDriver } from '../../lib/BaseDriver';
-import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { XComfortDevice } from '../../lib/types';
+import { getClassificationSettings, getDisplayName, isDoorWindowSensorDevice } from '../../lib/utils/deviceClassification';
 
 module.exports = class DoorWindowSensorDriver extends BaseDriver {
   async onPairListDevices() {
@@ -11,36 +11,36 @@ module.exports = class DoorWindowSensorDriver extends BaseDriver {
   private formatForPairing(devices: XComfortDevice[]) {
     const seenIds = new Set<string>();
 
-    return devices
+    const candidates = devices
       .filter((device) => {
         const deviceId = String(device.deviceId || '');
-        if (!deviceId || seenIds.has(deviceId)) {
+        const uniqueId = `${this.getItemBridgeId(device) || ''}:${deviceId}`;
+        if (!deviceId || seenIds.has(uniqueId)) {
           return false;
         }
 
-        const devType = Number(device.devType ?? 0);
-        if (devType !== DEVICE_TYPES.DOOR_WINDOW_SENSOR) {
+        const bridge = this.getBridge(this.getItemBridgeId(device));
+        const component = device.compId !== undefined ? bridge.getComponent(String(device.compId)) : undefined;
+        if (!isDoorWindowSensorDevice(device, component)) {
           return false;
         }
 
-        seenIds.add(deviceId);
+        seenIds.add(uniqueId);
         return true;
       })
       .map((device) => {
-        const baseName = device.name || `Sensor ${device.deviceId}`;
-        const roomName = device.roomName;
-        const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
-
+        const bridge = this.getBridge(this.getItemBridgeId(device));
+        const component = device.compId !== undefined ? bridge.getComponent(String(device.compId)) : undefined;
         return {
-          name: displayName,
+          name: this.getDisplayNameWithBridge(getDisplayName(device, 'Sensor'), device),
           data: {
-            id: `door_window_${device.deviceId}`,
-            deviceId: String(device.deviceId),
+            ...this.getBridgeDeviceData('door_window', device),
+            ...(device.compId !== undefined ? { componentId: String(device.compId) } : {}),
           },
-          settings: {
-            deviceType: Number(device.devType ?? 0),
-          },
+          settings: getClassificationSettings(device, component),
         };
       });
+
+    return this.filterUnpairedPairingDevices(candidates);
   }
 };

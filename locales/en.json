@@ -1,8 +1,8 @@
 {
     "settings": {
         "title": "Eaton xComfort",
-        "intro": "Configure your xComfort Bridge connection.",
-        "connection": "Connection Details",
+        "intro": "Configure one or more xComfort Bridge connections.",
+        "connection": "Bridge Connections",
         "bridge_ip": "IP Address",
         "bridge_auth_key": "Auth Key",
         "bridge_ip_hint": "Tip: reserve this IP in your router to keep it stable.",

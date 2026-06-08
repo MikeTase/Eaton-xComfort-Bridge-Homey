@@ -1,8 +1,9 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate } from '../../lib/types';
+import { EnergyTracker } from '../../lib/utils/EnergyTracker';
 
-module.exports = class ActuatorDevice extends BaseDevice {
+class ActuatorDevice extends BaseDevice {
     private onDeviceUpdate!: (deviceId: string, state: DeviceStateUpdate) => void;
     private safetyTimer: NodeJS.Timeout | null = null;
 
@@ -11,11 +12,18 @@ module.exports = class ActuatorDevice extends BaseDevice {
     private pendingSwitchTimestamp: number = 0;
     private readonly STATE_UPDATE_GRACE_PERIOD = 3000; // ms
 
-    // Energy tracking
-    private energyKwh: number = 0;
-    private lastEnergyAt: number | null = null;
-    private lastPowerW: number = 0;
-    private energyTimer: NodeJS.Timeout | null = null;
+    // Energy tracking — live capability update on every sample, throttled persist.
+    private energy = new EnergyTracker(
+        async (kwh) => {
+            await this.ensureEnergyCapability();
+            await this.updateCapability('meter_power', kwh);
+        },
+        {
+            onPersist: async (kwh) => {
+                await this.setStoreValue('meterPowerKwh', kwh).catch(this.error);
+            },
+        },
+    );
 
     /** Whether this device actually reports power data. */
     private deviceReportsPower: boolean = false;
@@ -101,6 +109,14 @@ module.exports = class ActuatorDevice extends BaseDevice {
         this.registerCapabilityListener('onoff', async (value) => {
             if (!this.bridge) return;
             try {
+                const currentState = this.getCapabilityValue('onoff');
+                if (currentState === value && this.pendingSwitchState === null) {
+                    if (!value && this.hasCapability('dim')) {
+                        this.setCapabilityValue('dim', 0).catch(() => {});
+                    }
+                    return;
+                }
+
                 this.setCapabilityValue('onoff', value).catch(() => {});
                 this.setPendingState(value);
 
@@ -111,9 +127,15 @@ module.exports = class ActuatorDevice extends BaseDevice {
                         this.syncImplicitDimOnState();
                     }
                 }
-                
-                await this.bridge.switchDevice(resolveDeviceId(), value);
-                this.startSafetyTimer(value);
+
+                const bridge = this.bridge;
+                void bridge.switchDevice(resolveDeviceId(), value)
+                    .then(() => this.startSafetyTimer(value))
+                    .catch((err) => {
+                        this.error(`[Actuator] Error sending onoff command for ${this.deviceId}:`, err);
+                        this.pendingSwitchState = null;
+                        this.setCapabilityValue('onoff', !value).catch(() => {});
+                    });
             } catch (err) {
                 this.error(`[Actuator] Error sending onoff command for ${this.deviceId}:`, err);
                 this.pendingSwitchState = null;
@@ -128,14 +150,33 @@ module.exports = class ActuatorDevice extends BaseDevice {
                 if (value === 0) {
                     this.setCapabilityValue('onoff', false).catch(() => {});
                     this.setPendingState(false);
-                    await this.bridge.switchDevice(resolveDeviceId(), false);
-                    this.startSafetyTimer(false);
+                    const bridge = this.bridge;
+                    void bridge.switchDevice(resolveDeviceId(), false)
+                        .then(() => this.startSafetyTimer(false))
+                        .catch((err) => {
+                            this.error(`[Actuator] Error sending dim command for ${this.deviceId}:`, err);
+                            this.pendingSwitchState = null;
+                            const currentDim = this.getCapabilityValue('dim');
+                            if (currentDim !== null && currentDim !== value) {
+                                this.setCapabilityValue('dim', currentDim).catch(() => {});
+                            }
+                            this.setCapabilityValue('onoff', true).catch(() => {});
+                        });
                 } else {
                     const dimValue = Math.max(1, Math.round(value * 99));
                     this.setCapabilityValue('onoff', true).catch(() => {});
                     this.setPendingState(true);
-                    await this.bridge.dimDevice(resolveDeviceId(), dimValue);
-                    this.startSafetyTimer(true);
+                    const bridge = this.bridge;
+                    void bridge.dimDevice(resolveDeviceId(), dimValue)
+                        .then(() => this.startSafetyTimer(true))
+                        .catch((err) => {
+                            this.error(`[Actuator] Error sending dim command for ${this.deviceId}:`, err);
+                            this.pendingSwitchState = null;
+                            const currentDim = this.getCapabilityValue('dim');
+                            if (currentDim !== null && currentDim !== value) {
+                                this.setCapabilityValue('dim', currentDim).catch(() => {});
+                            }
+                        });
                 }
             } catch (err) {
                 this.error(`[Actuator] Error sending dim command for ${this.deviceId}:`, err);
@@ -222,9 +263,9 @@ module.exports = class ActuatorDevice extends BaseDevice {
 
         // Device has stored energy history — it genuinely reports power
         this.deviceReportsPower = true;
-        this.energyKwh = storedValue;
+        this.energy.restore(storedValue);
         await this.ensureEnergyCapability();
-        await this.updateCapability('meter_power', this.roundEnergyValue(this.energyKwh));
+        await this.updateCapability('meter_power', this.energy.getKwh());
     }
 
     /**
@@ -270,67 +311,16 @@ module.exports = class ActuatorDevice extends BaseDevice {
 
         await this.ensurePowerCapability();
         await this.updateCapability('measure_power', power);
-
-        this.integrateEnergy(Date.now());
-        this.lastPowerW = power;
-        await this.persistEnergyReading();
-
-        if (power > 0) {
-            this.startEnergyTimer();
-            return;
-        }
-
-        this.stopEnergyTimer();
+        await this.energy.applyPower(power);
     }
 
-    private integrateEnergy(now: number): void {
-        if (this.lastEnergyAt !== null && now > this.lastEnergyAt && this.lastPowerW > 0) {
-            const elapsedMs = now - this.lastEnergyAt;
-            this.energyKwh += (this.lastPowerW * elapsedMs) / 3600000000;
-        }
-
-        this.lastEnergyAt = now;
-    }
-
-    private startEnergyTimer(): void {
-        if (this.energyTimer) {
-            return;
-        }
-
-        this.energyTimer = setInterval(() => {
-            this.integrateEnergy(Date.now());
-            void this.persistEnergyReading();
-        }, 60000);
-    }
-
-    private stopEnergyTimer(): void {
-        if (!this.energyTimer) {
-            return;
-        }
-
-        clearInterval(this.energyTimer);
-        this.energyTimer = null;
-    }
-
-    private flushEnergyTracking(): void {
-        this.integrateEnergy(Date.now());
-        this.stopEnergyTimer();
-        void this.persistEnergyReading();
-    }
-
-    private async persistEnergyReading(): Promise<void> {
-        await this.ensureEnergyCapability();
-        const roundedValue = this.roundEnergyValue(this.energyKwh);
-        await this.updateCapability('meter_power', roundedValue);
-        await this.setStoreValue('meterPowerKwh', roundedValue).catch(this.error);
-    }
-
-    private roundEnergyValue(value: number): number {
-        return Number(value.toFixed(6));
+    /** Reset the cumulative energy meter to zero (used by the Flow action). */
+    public async resetEnergyMeter(): Promise<void> {
+        await this.energy.reset();
     }
 
     onDeleted() {
-        this.flushEnergyTracking();
+        this.energy.flush();
         if (this.safetyTimer) {
             clearTimeout(this.safetyTimer);
             this.safetyTimer = null;
@@ -338,3 +328,6 @@ module.exports = class ActuatorDevice extends BaseDevice {
         super.onDeleted();
     }
 }
+
+export default ActuatorDevice;
+module.exports = ActuatorDevice;

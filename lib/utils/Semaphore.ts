@@ -1,6 +1,9 @@
 export class Semaphore {
     private permits: number;
-    private queue: Array<(value: void | PromiseLike<void>) => void> = [];
+    private queue: Array<{
+        resolve: (value: void | PromiseLike<void>) => void;
+        reject: (reason?: unknown) => void;
+    }> = [];
 
     constructor(permits: number = 1) {
         this.permits = permits;
@@ -12,28 +15,28 @@ export class Semaphore {
             return;
         }
 
-        return new Promise<void>((resolve) => {
-            this.queue.push(resolve);
+        return new Promise<void>((resolve, reject) => {
+            this.queue.push({ resolve, reject });
         });
     }
 
     release(): void {
         if (this.queue.length > 0) {
-            const resolve = this.queue.shift();
-            if (resolve) resolve();
+            const waiter = this.queue.shift();
+            if (waiter) waiter.resolve();
         } else {
             this.permits++;
         }
     }
 
     /**
-     * Drain all queued waiters by resolving them immediately.
-     * This prevents orphaned promises when the owner is being destroyed.
+     * Drain all queued waiters by rejecting them.
+     * This prevents orphaned promises without granting extra permits.
      */
-    drain(): void {
+    drain(reason: Error = new Error('Semaphore drained')): void {
         while (this.queue.length > 0) {
-            const resolve = this.queue.shift();
-            if (resolve) resolve();
+            const waiter = this.queue.shift();
+            if (waiter) waiter.reject(reason);
         }
     }
 }

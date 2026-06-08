@@ -6,7 +6,7 @@
   "description": {
     "en": "Seamless Eaton xComfort control for lights, shades, and heating."
   },
-  "version": "1.4.27",
+  "version": "1.4.54",
   "category": [
     "lights",
     "climate"
@@ -299,6 +299,126 @@
             ]
           }
         ]
+      },
+      {
+        "id": "activate_xcomfort_scene",
+        "title": {
+          "en": "Activate xComfort scene"
+        },
+        "titleFormatted": {
+          "en": "Activate [[device]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=scene"
+          }
+        ]
+      },
+      {
+        "id": "switch_xcomfort_room_lights",
+        "title": {
+          "en": "Switch xComfort room lights"
+        },
+        "titleFormatted": {
+          "en": "Switch room lights [[state]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=room_status"
+          },
+          {
+            "name": "state",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "on",
+                "label": {
+                  "en": "On"
+                }
+              },
+              {
+                "id": "off",
+                "label": {
+                  "en": "Off"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "reset_energy_meter",
+        "title": {
+          "en": "Reset energy meter"
+        },
+        "titleFormatted": {
+          "en": "Reset energy meter of [[device]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "capabilities=meter_power"
+          }
+        ]
+      },
+      {
+        "id": "activate_scene_by_name",
+        "title": {
+          "en": "Activate scene by name"
+        },
+        "titleFormatted": {
+          "en": "Activate scene [[scene]]"
+        },
+        "args": [
+          {
+            "name": "scene",
+            "type": "autocomplete",
+            "placeholder": {
+              "en": "Scene"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switch_room_lights_by_name",
+        "title": {
+          "en": "Switch room lights by name"
+        },
+        "titleFormatted": {
+          "en": "Switch room [[room]] lights [[state]]"
+        },
+        "args": [
+          {
+            "name": "room",
+            "type": "autocomplete",
+            "placeholder": {
+              "en": "Room"
+            }
+          },
+          {
+            "name": "state",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "on",
+                "label": {
+                  "en": "On"
+                }
+              },
+              {
+                "id": "off",
+                "label": {
+                  "en": "Off"
+                }
+              }
+            ]
+          }
+        ]
       }
     ]
   },
@@ -353,6 +473,125 @@
       "getable": true,
       "setable": false,
       "uiComponent": "sensor"
+    },
+    "xcomfort_device_temperature": {
+      "type": "number",
+      "title": {
+        "en": "Device temperature"
+      },
+      "units": {
+        "en": "°C"
+      },
+      "desc": {
+        "en": "Internal xComfort heating device temperature"
+      },
+      "insights": true,
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_valve_position": {
+      "type": "number",
+      "title": {
+        "en": "Valve position"
+      },
+      "units": {
+        "en": "%"
+      },
+      "desc": {
+        "en": "Current heating valve position"
+      },
+      "insights": true,
+      "decimals": 1,
+      "min": 0,
+      "max": 100,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_lights_on": {
+      "type": "number",
+      "title": {
+        "en": "Lights on"
+      },
+      "desc": {
+        "en": "Number of lights currently on in the xComfort room"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_windows_open": {
+      "type": "number",
+      "title": {
+        "en": "Open windows"
+      },
+      "desc": {
+        "en": "Number of open windows in the xComfort room"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_doors_open": {
+      "type": "number",
+      "title": {
+        "en": "Open doors"
+      },
+      "desc": {
+        "en": "Number of open doors in the xComfort room"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_current_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Current heating mode"
+      },
+      "desc": {
+        "en": "Current xComfort room heating mode"
+      },
+      "values": [
+        {
+          "id": "unknown",
+          "title": {
+            "en": "Unknown"
+          }
+        },
+        {
+          "id": "frost",
+          "title": {
+            "en": "Frost"
+          }
+        },
+        {
+          "id": "eco",
+          "title": {
+            "en": "Economy"
+          }
+        },
+        {
+          "id": "comfort",
+          "title": {
+            "en": "Comfort"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": false,
+      "uiComponent": "picker"
     }
   },
   "drivers": [
@@ -391,6 +630,25 @@
       ]
     },
     {
+      "id": "appliance",
+      "name": {
+        "en": "Appliance / Load"
+      },
+      "class": "socket",
+      "capabilities": [
+        "onoff",
+        "dim"
+      ],
+      "deprecated": true,
+      "images": {
+        "large": "drivers/appliance/assets/images/large.png",
+        "small": "drivers/appliance/assets/images/small.png"
+      },
+      "platforms": [
+        "local"
+      ]
+    },
+    {
       "id": "door_window_sensor",
       "name": {
         "en": "Door / Window Sensor"
@@ -424,6 +682,124 @@
       ]
     },
     {
+      "id": "binary_input",
+      "name": {
+        "en": "Binary Input"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_generic"
+      ],
+      "capabilitiesOptions": {
+        "alarm_generic": {
+          "title": {
+            "en": "Input Active"
+          }
+        }
+      },
+      "images": {
+        "large": "drivers/binary_input/assets/images/large.png",
+        "small": "drivers/binary_input/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select binary inputs"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "motion_sensor",
+      "name": {
+        "en": "Motion Sensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_motion"
+      ],
+      "images": {
+        "large": "drivers/motion_sensor/assets/images/large.png",
+        "small": "drivers/motion_sensor/assets/images/small.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select motion sensors"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "temperature_sensor",
+      "name": {
+        "en": "Temperature Sensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_humidity"
+      ],
+      "deprecated": true,
+      "images": {
+        "large": "drivers/temperature_sensor/assets/images/large.png",
+        "small": "drivers/temperature_sensor/assets/images/small.png"
+      },
+      "platforms": [
+        "local"
+      ]
+    },
+    {
+      "id": "room_status",
+      "name": {
+        "en": "Room Status"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_humidity",
+        "xcomfort_heating_demand",
+        "measure_power",
+        "meter_power",
+        "xcomfort_lights_on",
+        "xcomfort_windows_open",
+        "xcomfort_doors_open",
+        "xcomfort_current_mode"
+      ],
+      "deprecated": true,
+      "images": {
+        "large": "drivers/room_status/assets/images/large.png",
+        "small": "drivers/room_status/assets/images/small.png"
+      },
+      "platforms": [
+        "local"
+      ]
+    },
+    {
       "id": "thermostat",
       "name": {
         "en": "Thermostat / Heating"
@@ -433,7 +809,8 @@
         "measure_temperature",
         "target_temperature",
         "thermostat_mode",
-        "xcomfort_preset_mode"
+        "xcomfort_preset_mode",
+        "xcomfort_heating_demand"
       ],
       "capabilitiesOptions": {
         "target_temperature": {
@@ -531,7 +908,7 @@
       "name": {
         "en": "Wall Switch"
       },
-      "class": "sensor",
+      "class": "button",
       "capabilities": [
         "onoff"
       ],
@@ -573,6 +950,49 @@
       ]
     },
     {
+      "id": "scene",
+      "name": {
+        "en": "xComfort Scene"
+      },
+      "class": "other",
+      "capabilities": [
+        "onoff"
+      ],
+      "deprecated": true,
+      "capabilitiesOptions": {
+        "onoff": {
+          "title": {
+            "en": "Activate"
+          }
+        }
+      },
+      "settings": [
+        {
+          "id": "scene_order",
+          "type": "label",
+          "label": {
+            "en": "Scene order"
+          },
+          "value": "-"
+        },
+        {
+          "id": "scene_devices",
+          "type": "label",
+          "label": {
+            "en": "Devices"
+          },
+          "value": "-"
+        }
+      ],
+      "images": {
+        "large": "drivers/scene/assets/images/large.png",
+        "small": "drivers/scene/assets/images/small.png"
+      },
+      "platforms": [
+        "local"
+      ]
+    },
+    {
       "id": "bridge_diagnostics",
       "name": {
         "en": "Bridge Diagnostics"
@@ -581,6 +1001,7 @@
       "capabilities": [
         "measure_temperature",
         "measure_power",
+        "meter_power",
         "alarm_heat",
         "alarm_generic.cooling",
         "onoff",
@@ -589,6 +1010,7 @@
         "alarm_contact.doors",
         "alarm_motion"
       ],
+      "deprecated": true,
       "settings": [
         {
           "id": "bridge_name",
@@ -637,22 +1059,6 @@
             "en": "Scenes"
           },
           "value": "-"
-        }
-      ],
-      "pair": [
-        {
-          "id": "list_devices",
-          "template": "list_devices",
-          "navigation": {
-            "next": "add_devices"
-          },
-          "title": {
-            "en": "Add bridge diagnostics"
-          }
-        },
-        {
-          "id": "add_devices",
-          "template": "add_devices"
         }
       ],
       "platforms": [

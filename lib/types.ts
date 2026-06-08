@@ -96,6 +96,9 @@ export interface XComfortDevice {
   compType?: number;
   componentName?: string;
   info?: InfoEntry[];
+  switch?: boolean;
+  curstate?: unknown;
+  errorState?: unknown;
   
   // Shading specific
   shadsClosed?: number;
@@ -149,12 +152,24 @@ export interface XComfortRoom {
   [key: string]: unknown;
 }
 
+export interface XComfortScene {
+  sceneId: string;
+  name: string;
+  order?: number;
+  show?: boolean;
+  icon?: string;
+  deviceCount?: number;
+  devices?: Array<Record<string, unknown>>;
+  raw?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 /**
  * Info entry for device metadata (temperature, humidity, etc.)
  */
 export interface InfoEntry {
   text: string;
-  value: string | number;
+  value?: string | number;
 }
 
 /**
@@ -163,6 +178,8 @@ export interface InfoEntry {
 export interface BridgeStatus {
   tempOutside?: number;
   power?: number;
+  meterId?: number | string;
+  connectionState?: number;
   heatingOn?: number;
   coolingOn?: number;
   lightsOn?: number;
@@ -183,6 +200,8 @@ export interface BridgeInfo {
   firmwareVersion?: string;
   ipAddress?: string;
   homeScenesCount?: number;
+  remoteAllowed?: boolean;
+  remoteOnline?: boolean;
   raw?: Record<string, unknown>;
 }
 
@@ -235,6 +254,11 @@ export interface DeviceMetadata {
   temperature?: number;
   humidity?: number;
   heatingDemand?: number; // Added from DIMM_VALUE info code
+  deviceTemperature?: number;
+  valvePosition?: number;
+  signalStrength?: number;
+  batteryLevel?: number;
+  batteryPowered?: boolean;
 }
 
 /**

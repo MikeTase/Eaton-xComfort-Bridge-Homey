@@ -2,6 +2,7 @@
 import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { XCOMFORT_CAPABILITIES } from '../../lib/XComfortCapabilities';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
+import { EnergyTracker } from '../../lib/utils/EnergyTracker';
 import { parseInfoMetadata } from '../../lib/utils/parseInfoMetadata';
 import { resolveThermostatRoomId } from '../../lib/utils/resolveThermostatRoomId';
 import {
@@ -11,7 +12,6 @@ import {
   InfoEntry,
   RoomModeSetpoint,
   RoomStateUpdate,
-  XComfortDevice,
   XComfortRoom,
 } from '../../lib/types';
 
@@ -50,15 +50,27 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private targetRangeKey: string | null = null;
   private modeSetpoints: Map<ClimateMode, number> = new Map();
   private linkedSensorId: string | null = null;
+  private linkedSensorListener?: (deviceId: string, data: DeviceStateUpdate) => void;
   private linkedSensorTemperatureAvailable: boolean = false;
   private linkedSensorHumidityAvailable: boolean = false;
-  private energyKwh: number = 0;
-  private lastEnergyAt: number | null = null;
-  private lastPowerW: number = 0;
+  private energy = new EnergyTracker(
+    async (kwh) => {
+      await this.ensureEnergyCapability();
+      await this.updateCapability('meter_power', kwh);
+    },
+    {
+      onPersist: async (kwh) => {
+        await this.setStoreValue('meterPowerKwh', kwh).catch(this.error);
+      },
+    },
+  );
   private currentHeatingDemand: number | null = null;
   private lastPowerSource: 'none' | 'live' | 'estimated' = 'none';
-  private energyTimer: NodeJS.Timeout | null = null;
   private onDevicesLoaded?: () => void;
+  private rcTouchHasSeenInitialButtonState: boolean = false;
+  private rcTouchLastButtonEmitState: boolean | null = null;
+  private rcTouchLastButtonEmitAt: number = 0;
+  private readonly rcTouchButtonDedupeWindowMs = 300;
 
   async onDeviceReady() {
     this.debug = process.env.XCOMFORT_DEBUG === '1';
@@ -112,8 +124,13 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
   }
 
+  /** Reset the cumulative energy meter to zero (used by the Flow action). */
+  public async resetEnergyMeter(): Promise<void> {
+    await this.energy.reset();
+  }
+
   onDeleted(): void {
-    this.flushEnergyTracking();
+    this.energy.flush();
     if (this.onDevicesLoaded) {
       this.bridge.removeListener('devices_loaded', this.onDevicesLoaded);
       this.onDevicesLoaded = undefined;
@@ -165,13 +182,40 @@ module.exports = class ThermostatDevice extends BaseDevice {
         if (this.debug) {
           this.log(`Virtual Rocker update:`, data);
         }
+
+        if (typeof data.switch !== 'boolean') {
+          return;
+        }
+
+        if (!this.rcTouchHasSeenInitialButtonState) {
+          this.rcTouchHasSeenInitialButtonState = true;
+          return;
+        }
+
+        if (this.isFastDuplicateRcTouchButtonEvent(data.switch)) {
+          return;
+        }
+
         if (data.switch === true) {
           triggerOn?.trigger(this, {}, {}).catch(this.error);
-        } else if (data.switch === false) {
+        } else {
           triggerOff?.trigger(this, {}, {}).catch(this.error);
         }
       });
     }
+  }
+
+  private isFastDuplicateRcTouchButtonEvent(pressedState: boolean): boolean {
+    const now = Date.now();
+    const isDuplicate = this.rcTouchLastButtonEmitState === pressedState
+      && now - this.rcTouchLastButtonEmitAt < this.rcTouchButtonDedupeWindowMs;
+
+    if (!isDuplicate) {
+      this.rcTouchLastButtonEmitState = pressedState;
+      this.rcTouchLastButtonEmitAt = now;
+    }
+
+    return isDuplicate;
   }
 
   private async tryBindRoomState(): Promise<void> {
@@ -275,8 +319,18 @@ module.exports = class ThermostatDevice extends BaseDevice {
       await this.applyHeatingDemand(effectiveData.metadata.heatingDemand);
     }
 
+    if (effectiveData.metadata?.deviceTemperature !== undefined) {
+      await this.ensureDeviceTemperatureCapability();
+      await this.updateCapability(XCOMFORT_CAPABILITIES.DEVICE_TEMPERATURE, effectiveData.metadata.deviceTemperature);
+    }
+
+    if (effectiveData.metadata?.valvePosition !== undefined) {
+      await this.applyValvePosition(effectiveData.metadata.valvePosition);
+    }
+
     if (typeof effectiveData.dimmvalue === 'number') {
       await this.applyHeatingDemand(effectiveData.dimmvalue);
+      await this.applyValvePosition(effectiveData.dimmvalue);
     }
 
     await this.syncPowerMeasurement(typeof data.power === 'number' ? data.power : undefined);
@@ -327,6 +381,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
 
     if (typeof effectiveData.valve === 'number') {
       await this.applyHeatingDemand(effectiveData.valve);
+      await this.applyValvePosition(effectiveData.valve);
     }
 
     await this.syncPowerMeasurement(typeof data.power === 'number' ? data.power : undefined);
@@ -399,7 +454,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
       return;
     }
 
-    const nextState = this.getPresetState(targetMode);
+    const nextState = this.getPresetState();
     const currentMode = this.getEffectivePreset(targetMode);
     const currentSetpoint = this.clampSetpoint(this.getModeSetpoint(currentMode), currentMode);
     const newSetpoint = this.clampSetpoint(this.getModeSetpoint(targetMode), targetMode);
@@ -443,6 +498,18 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private async ensureHeatingDemandCapability(): Promise<void> {
     if (!this.hasCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND)) {
       await this.addCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND).catch(this.error);
+    }
+  }
+
+  private async ensureDeviceTemperatureCapability(): Promise<void> {
+    if (!this.hasCapability(XCOMFORT_CAPABILITIES.DEVICE_TEMPERATURE)) {
+      await this.addCapability(XCOMFORT_CAPABILITIES.DEVICE_TEMPERATURE).catch(this.error);
+    }
+  }
+
+  private async ensureValvePositionCapability(): Promise<void> {
+    if (!this.hasCapability(XCOMFORT_CAPABILITIES.VALVE_POSITION)) {
+      await this.addCapability(XCOMFORT_CAPABILITIES.VALVE_POSITION).catch(this.error);
     }
   }
 
@@ -542,9 +609,9 @@ module.exports = class ThermostatDevice extends BaseDevice {
     return this.currentPreset !== ClimateMode.Unknown ? this.currentPreset : fallback;
   }
 
-  private getPresetState(mode: ClimateMode): ClimateState {
-    // xComfort presets are heating presets, so preset changes should always
-    // drive the room into a heating state instead of preserving Homey's generic
+  private getPresetState(): ClimateState {
+    // xComfort presets are heating presets, so preset changes always drive
+    // the room into a heating state instead of preserving Homey's generic
     // cooling mode semantics.
     return ClimateState.HeatingManual;
   }
@@ -619,12 +686,12 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   private fromThermostatModeCapability(value: ThermostatModeCapability): ClimateState {
+    // 'cool' is rejected upstream by the thermostat_mode capability listener,
+    // so it never reaches this function.
     switch (value) {
       case 'auto':
         return ClimateState.HeatingAuto;
       case 'heat':
-        return ClimateState.HeatingManual;
-      case 'cool':
         return ClimateState.HeatingManual;
       case 'off':
       default:
@@ -635,6 +702,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private async tryBindRoomSensor(room?: XComfortRoom): Promise<void> {
     const sensorId = this.resolveRoomSensorId(room);
     if (!sensorId || sensorId === this.deviceId) {
+      this.clearLinkedSensorListener();
       this.linkedSensorId = null;
       this.linkedSensorTemperatureAvailable = false;
       this.linkedSensorHumidityAvailable = false;
@@ -642,19 +710,28 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
 
     if (this.linkedSensorId !== sensorId) {
+      this.clearLinkedSensorListener();
       this.linkedSensorId = sensorId;
       this.linkedSensorTemperatureAvailable = false;
       this.linkedSensorHumidityAvailable = false;
       const boundSensorId = sensorId;
-      this.addManagedStateListener(boundSensorId, (_id, data) => {
+      this.linkedSensorListener = (_id, data) => {
         if (this.linkedSensorId !== boundSensorId) {
           return;
         }
         void this.updateLinkedSensorState(data);
-      });
+      };
+      this.addManagedStateListener(boundSensorId, this.linkedSensorListener);
     }
 
     await this.applyLinkedSensorSnapshot(sensorId);
+  }
+
+  private clearLinkedSensorListener(): void {
+    if (this.linkedSensorId && this.linkedSensorListener) {
+      this.removeManagedStateListener(this.linkedSensorId, this.linkedSensorListener);
+    }
+    this.linkedSensorListener = undefined;
   }
 
   private resolveRoomSensorId(room?: XComfortRoom): string | null {
@@ -784,9 +861,9 @@ module.exports = class ThermostatDevice extends BaseDevice {
       return;
     }
 
-    this.energyKwh = storedValue;
+    this.energy.restore(storedValue);
     await this.ensureEnergyCapability();
-    await this.updateCapability('meter_power', this.roundEnergyValue(this.energyKwh));
+    await this.updateCapability('meter_power', this.energy.getKwh());
   }
 
   private async applyHeatingDemand(value: number): Promise<void> {
@@ -795,6 +872,12 @@ module.exports = class ThermostatDevice extends BaseDevice {
     await this.ensureHeatingDemandCapability();
     await this.updateCapability(XCOMFORT_CAPABILITIES.HEATING_DEMAND, normalizedDemand);
     await this.refreshEstimatedPowerMeasurement();
+  }
+
+  private async applyValvePosition(value: number): Promise<void> {
+    const normalizedPosition = Math.max(0, Math.min(100, value));
+    await this.ensureValvePositionCapability();
+    await this.updateCapability(XCOMFORT_CAPABILITIES.VALVE_POSITION, normalizedPosition);
   }
 
   private async refreshEstimatedPowerMeasurement(overrideWatts?: number): Promise<void> {
@@ -873,68 +956,10 @@ module.exports = class ThermostatDevice extends BaseDevice {
     this.lastPowerSource = source;
     await this.ensurePowerCapability();
     await this.updateCapability('measure_power', sanitizedPower);
-
-    this.integrateEnergy(Date.now());
-    this.lastPowerW = sanitizedPower;
-    await this.persistEnergyReading();
-
-    if (sanitizedPower > 0) {
-      this.startEnergyTimer();
-      return;
-    }
-
-    this.stopEnergyTimer();
-  }
-
-  private integrateEnergy(now: number): void {
-    if (this.lastEnergyAt !== null && now > this.lastEnergyAt && this.lastPowerW > 0) {
-      const elapsedMs = now - this.lastEnergyAt;
-      this.energyKwh += (this.lastPowerW * elapsedMs) / 3600000000;
-    }
-
-    this.lastEnergyAt = now;
-  }
-
-  private startEnergyTimer(): void {
-    if (this.energyTimer) {
-      return;
-    }
-
-    this.energyTimer = setInterval(() => {
-      this.integrateEnergy(Date.now());
-      void this.persistEnergyReading();
-    }, 60000);
-  }
-
-  private stopEnergyTimer(): void {
-    if (!this.energyTimer) {
-      return;
-    }
-
-    clearInterval(this.energyTimer);
-    this.energyTimer = null;
-  }
-
-  private flushEnergyTracking(): void {
-    this.integrateEnergy(Date.now());
-    this.stopEnergyTimer();
-    void this.persistEnergyReading();
-  }
-
-  private async persistEnergyReading(): Promise<void> {
-    await this.ensureEnergyCapability();
-    const roundedValue = this.roundEnergyValue(this.energyKwh);
-    await this.updateCapability('meter_power', roundedValue);
-    await this.setStoreValue('meterPowerKwh', roundedValue).catch(this.error);
-  }
-
-  private roundEnergyValue(value: number): number {
-    return Number(value.toFixed(6));
+    await this.energy.applyPower(sanitizedPower);
   }
 
   private roundPowerValue(value: number): number {
     return Number(value.toFixed(1));
   }
 };
-
-

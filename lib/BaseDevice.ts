@@ -1,10 +1,12 @@
 import * as Homey from 'homey';
 import { XComfortBridge } from './connection/XComfortBridge';
-import type { DeviceStateUpdate, DeviceStateCallback, RoomStateCallback } from './types';
+import type { DeviceStateCallback, RoomStateCallback } from './types';
 
 // Define the shape of our specific App class
 interface XComfortApp extends Homey.App {
     bridge: XComfortBridge | null;
+    getBridge?: (bridgeId?: string | null) => XComfortBridge | null;
+    getDefaultBridgeId?: () => string | null;
 }
 
 /**
@@ -18,8 +20,9 @@ export abstract class BaseDevice extends Homey.Device {
 
     /** Cached device ID from getData().deviceId */
     private _deviceId: string | null = null;
+    private _bridgeId: string | null | undefined = undefined;
 
-    private onAppBridgeChanged?: (bridge: XComfortBridge | null) => void;
+    private onAppBridgeChanged?: (bridgeIdOrBridge: string | XComfortBridge | null, bridgeMaybe?: XComfortBridge | null) => void;
     private isDeviceReadyInitialized: boolean = false;
     private onBridgeConnected?: () => void;
     private onBridgeDisconnected?: () => void;
@@ -46,7 +49,24 @@ export abstract class BaseDevice extends Homey.Device {
             this.setUnavailable('Bridge disconnected');
         };
 
-        this.onAppBridgeChanged = (newBridge) => {
+        const resolveAppBridge = () => {
+            if (typeof app.getBridge === 'function') {
+                return app.getBridge(this.bridgeId);
+            }
+            return app.bridge;
+        };
+
+        this.onAppBridgeChanged = (bridgeIdOrBridge, bridgeMaybe) => {
+            let newBridge: XComfortBridge | null;
+            if (typeof bridgeIdOrBridge === 'string') {
+                if (bridgeIdOrBridge !== this.bridgeId) {
+                    return;
+                }
+                newBridge = bridgeMaybe || null;
+            } else {
+                newBridge = bridgeIdOrBridge;
+            }
+
             const oldBridge = this.bridge;
 
             if (oldBridge) {
@@ -108,8 +128,9 @@ export abstract class BaseDevice extends Homey.Device {
         };
         app.on('bridge_changed', this.onAppBridgeChanged);
 
-        if (app.bridge) {
-            this.onAppBridgeChanged(app.bridge);
+        const initialBridge = resolveAppBridge();
+        if (initialBridge) {
+            this.onAppBridgeChanged(this.bridgeId, initialBridge);
         } else {
             this.setUnavailable('Bridge not connected');
             this.error('Bridge instance not found in App');
@@ -146,6 +167,20 @@ export abstract class BaseDevice extends Homey.Device {
         return this._deviceId;
     }
 
+    protected get bridgeId(): string | null {
+        if (this._bridgeId === undefined) {
+            const data = this.getData() as { bridgeId?: string };
+            if (data.bridgeId) {
+                this._bridgeId = data.bridgeId;
+            } else {
+                const app = this.homey.app as unknown as XComfortApp;
+                this._bridgeId = typeof app.getDefaultBridgeId === 'function' ? app.getDefaultBridgeId() : null;
+            }
+        }
+
+        return this._bridgeId || null;
+    }
+
     /**
      * Register a device-state listener that is automatically:
      * - rebound when the bridge reconnects
@@ -154,6 +189,23 @@ export abstract class BaseDevice extends Homey.Device {
     protected addManagedStateListener(deviceId: string, callback: DeviceStateCallback): void {
         this.bridge.addDeviceStateListener(deviceId, callback);
         this.managedListeners.push({ deviceId, callback });
+    }
+
+    /**
+     * Remove a managed device-state listener.
+     */
+    protected removeManagedStateListener(deviceId: string, callback?: DeviceStateCallback): void {
+        const listeners = this.managedListeners.filter((listener) => {
+            return listener.deviceId === deviceId && (!callback || listener.callback === callback);
+        });
+        if (this.bridge) {
+            for (const entry of listeners) {
+                this.bridge.removeDeviceStateListener(deviceId, entry.callback);
+            }
+        }
+        this.managedListeners = this.managedListeners.filter((listener) => {
+            return !(listener.deviceId === deviceId && (!callback || listener.callback === callback));
+        });
     }
 
     /**
@@ -181,13 +233,25 @@ export abstract class BaseDevice extends Homey.Device {
 
     /**
      * Safely update a capability value (no-ops if capability doesn't exist).
+     *
+     * Skips the write entirely when the capability already holds the target
+     * value — this avoids redundant SDK round-trips and spurious Flow/Insights
+     * re-evaluations under the frequent state updates the bridge emits.
      */
     protected async updateCapability(capabilityId: string, value: string | number | boolean | null): Promise<void> {
-        if (this.hasCapability(capabilityId)) {
-            await this.setCapabilityValue(capabilityId, value).catch(err => {
-                this.error(`Failed to update capability ${capabilityId}:`, err);
-            });
+        if (!this.hasCapability(capabilityId)) {
+            return;
         }
+        try {
+            if (this.getCapabilityValue(capabilityId) === value) {
+                return;
+            }
+        } catch {
+            // Reading the current value failed — fall through and write it.
+        }
+        await this.setCapabilityValue(capabilityId, value).catch(err => {
+            this.error(`Failed to update capability ${capabilityId}:`, err);
+        });
     }
 
     // ── Lifecycle ───────────────────────────────────────────────────────

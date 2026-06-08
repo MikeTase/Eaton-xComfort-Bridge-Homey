@@ -1,17 +1,26 @@
-/// <reference path="../../homey.d.ts" />
 import { BaseDevice } from '../../lib/BaseDevice';
 import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { BridgeInfo, BridgeStatus } from '../../lib/types';
+import { EnergyTracker } from '../../lib/utils/EnergyTracker';
 
 module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
   private onBridgeStatus?: (status: BridgeStatus) => void;
   private onBridgeInfo?: (info: BridgeInfo) => void;
+  private energy = new EnergyTracker(async (kwh) => {
+    if (!this.isPowerDiagnostic()) {
+      return;
+    }
+    await this.ensureCapability('meter_power');
+    await this.updateCapability('meter_power', kwh);
+    await this.setStoreValue('bridgeMeterPowerKwh', kwh).catch(this.error);
+  });
 
   async onDeviceReady() {
     await this.applyCapabilityProfile();
+    await this.restoreEnergyState();
 
     this.onBridgeStatus = (status: BridgeStatus) => {
-      this.updateFromStatus(status);
+      void this.updateFromStatus(status);
     };
     this.onBridgeInfo = (info: BridgeInfo) => {
       void this.updateFromInfo(info);
@@ -22,12 +31,22 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
 
     const lastStatus = this.bridge.getLastBridgeStatus?.();
     if (lastStatus) {
-      this.updateFromStatus(lastStatus);
+      await this.updateFromStatus(lastStatus);
     }
 
     const lastInfo = this.bridge.getLastBridgeInfo?.();
     if (lastInfo) {
       await this.updateFromInfo(lastInfo);
+    }
+
+    if (this.isRemoteAccessDiagnostic()) {
+      this.registerCapabilityListener('onoff', async (value) => {
+        if (!this.bridge) {
+          throw new Error('Bridge offline');
+        }
+
+        await this.bridge.setRemoteAccess(Boolean(value));
+      });
     }
   }
 
@@ -40,6 +59,7 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
       desiredCaps.add('measure_temperature');
     } else if (kind === 'power') {
       desiredCaps.add('measure_power');
+      desiredCaps.add('meter_power');
     } else if (kind === 'heat') {
       desiredCaps.add('alarm_heat');
       options.push({ cap: 'alarm_heat', opts: { title: { en: 'Heating Active' } } });
@@ -59,6 +79,12 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
     } else if (kind === 'presence') {
       desiredCaps.add('alarm_motion');
       options.push({ cap: 'alarm_motion', opts: { title: { en: 'Presence Detected' } } });
+    } else if (kind === 'remote_access') {
+      desiredCaps.add('onoff');
+      options.push({ cap: 'onoff', opts: { title: { en: 'Remote Access Allowed' } } });
+    } else if (kind === 'remote_online') {
+      desiredCaps.add('alarm_generic');
+      options.push({ cap: 'alarm_generic', opts: { title: { en: 'Remote Access Online' } } });
     }
 
     const current = new Set(this.getCapabilities());
@@ -81,14 +107,28 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
     }
   }
 
-  private updateFromStatus(status: BridgeStatus) {
+  private async restoreEnergyState(): Promise<void> {
+    if (!this.isPowerDiagnostic()) {
+      return;
+    }
+
+    await this.ensureCapability('meter_power');
+    const storedValue = this.getStoreValue('bridgeMeterPowerKwh');
+    if (typeof storedValue === 'number' && Number.isFinite(storedValue) && storedValue > 0) {
+      this.energy.restore(storedValue);
+    }
+    await this.updateCapability('meter_power', this.energy.getKwh());
+  }
+
+  private async updateFromStatus(status: BridgeStatus): Promise<void> {
     const toBool = (value?: number) => (value !== undefined ? value > 0 : undefined);
 
     if (typeof status.tempOutside === 'number' && this.hasCapability('measure_temperature')) {
       this.setCapabilityValue('measure_temperature', status.tempOutside).catch(this.error);
     }
     if (typeof status.power === 'number' && this.hasCapability('measure_power')) {
-      this.setCapabilityValue('measure_power', status.power).catch(this.error);
+      await this.setCapabilityValue('measure_power', status.power).catch(this.error);
+      await this.energy.applyPower(status.power);
     }
 
     const heatingOn = toBool(status.heatingOn);
@@ -128,6 +168,14 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
   }
 
   private async updateFromInfo(info: BridgeInfo): Promise<void> {
+    if (typeof info.remoteAllowed === 'boolean' && this.isRemoteAccessDiagnostic() && this.hasCapability('onoff')) {
+      await this.setCapabilityValue('onoff', info.remoteAllowed).catch(this.error);
+    }
+
+    if (typeof info.remoteOnline === 'boolean' && this.isRemoteOnlineDiagnostic() && this.hasCapability('alarm_generic')) {
+      await this.setCapabilityValue('alarm_generic', info.remoteOnline).catch(this.error);
+    }
+
     const nextSettings = {
       bridge_name: info.name || '-',
       bridge_id: info.id || '-',
@@ -147,6 +195,9 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
   }
 
   onDeleted() {
+    if (this.isPowerDiagnostic()) {
+      this.energy.flush();
+    }
     if (this.bridge && this.onBridgeStatus) {
       this.bridge.removeListener('bridge_status', this.onBridgeStatus);
     }
@@ -167,11 +218,29 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
     }
     const lastStatus = newBridge.getLastBridgeStatus?.();
     if (lastStatus) {
-      this.updateFromStatus(lastStatus);
+      void this.updateFromStatus(lastStatus);
     }
     const lastInfo = newBridge.getLastBridgeInfo?.();
     if (lastInfo) {
       void this.updateFromInfo(lastInfo);
+    }
+  }
+
+  private isPowerDiagnostic(): boolean {
+    return String(this.getData()?.kind || '') === 'power';
+  }
+
+  private isRemoteAccessDiagnostic(): boolean {
+    return String(this.getData()?.kind || '') === 'remote_access';
+  }
+
+  private isRemoteOnlineDiagnostic(): boolean {
+    return String(this.getData()?.kind || '') === 'remote_online';
+  }
+
+  private async ensureCapability(capabilityId: string): Promise<void> {
+    if (!this.hasCapability(capabilityId)) {
+      await this.addCapability(capabilityId).catch(this.error);
     }
   }
 };

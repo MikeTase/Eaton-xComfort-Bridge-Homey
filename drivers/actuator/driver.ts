@@ -1,4 +1,5 @@
 import { BaseDriver } from '../../lib/BaseDriver';
+import { DEVICE_USAGE } from '../../lib/XComfortProtocol';
 import { XComfortDevice } from '../../lib/types';
 
 module.exports = class ActuatorDriver extends BaseDriver {
@@ -17,23 +18,23 @@ module.exports = class ActuatorDriver extends BaseDriver {
     
     // Filter for Switching (100) and Dimming (101) Actuators
     const filtered = devices.filter((device) => {
-      // Prioritize explicit devType, fallback to checking other props if needed
-      // XComfortDevice interface defines devType as optional number
-      const devType = device.devType ?? 0;
-      const id = device.deviceId;
-      
-      if (!id || seenIds.has(id)) return false;
-      seenIds.add(id);
+	      // Prioritize explicit devType, fallback to checking other props if needed
+	      // XComfortDevice interface defines devType as optional number
+	      const devType = device.devType ?? 0;
+	      const usage = typeof device.usage === 'number' ? device.usage : DEVICE_USAGE.LIGHT;
+	      const id = `${this.getItemBridgeId(device) || ''}:${device.deviceId}`;
+	      
+	      if (!id || seenIds.has(id)) return false;
+	      seenIds.add(id);
 
-      return devType === 100 || devType === 101;
-    });
+	      return (devType === 100 || devType === 101) && usage === DEVICE_USAGE.LIGHT;
+	    });
 
-    return filtered.map((device) => {
+    const candidates = filtered.map((device) => {
       const baseName = device.name || `Device ${device.deviceId}`;
       const roomName = device.roomName;
-      const displayName = roomName ? `${roomName} - ${baseName}` : baseName;
+      const displayName = this.getDisplayNameWithBridge(roomName ? `${roomName} - ${baseName}` : baseName, device);
       
-      const deviceId = device.deviceId;
       const deviceType = device.devType ?? 0;
 
       // devType 100 = Switching, 101 = Dimming
@@ -42,16 +43,15 @@ module.exports = class ActuatorDriver extends BaseDriver {
       
       return {
         name: displayName,
-        data: {
-          id: `actuator_${deviceId}`,
-          deviceId: deviceId
-        },
+        data: this.getBridgeDeviceData('actuator', device),
         settings: {
           deviceType,
           dimmable
         }
       };
     });
+
+    return this.filterUnpairedPairingDevices(candidates);
   }
 
   async onPairListDevices() {
