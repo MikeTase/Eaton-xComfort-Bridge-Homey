@@ -15,3 +15,15 @@ drivers/weather_station/pair/
 drivers/actuator/pair/select_devices.html
 drivers/wall_switch/pair/select_devices.html
 *.swp
+
+# Dev-only files — not needed at runtime on Homey.
+# (README.txt / README.<lang>.txt and .homeychangelog.json stay: the App Store uses them.)
+test/
+eslint.config.mjs
+update_app_json.js
+CHANGELOG.md
+README.md
+package-lock.json
+.claude/
+.vscode/
+.prettierrc.json

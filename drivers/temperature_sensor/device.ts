@@ -26,21 +26,8 @@ module.exports = class TemperatureSensorDevice extends BaseDevice {
   }
 
   private async applyMetadata(metadata?: DeviceMetadata): Promise<void> {
-    if (!metadata) {
-      return;
-    }
-
+    // applySensorMetadata already ensures and updates the temperature and
+    // humidity capabilities (plus battery/signal) from this metadata.
     await this.applySensorMetadata(metadata);
-
-    if (typeof metadata.temperature === 'number') {
-      await this.updateCapability('measure_temperature', metadata.temperature);
-    }
-
-    if (typeof metadata.humidity === 'number') {
-      if (!this.hasCapability('measure_humidity')) {
-        await this.addCapability('measure_humidity').catch(this.error);
-      }
-      await this.updateCapability('measure_humidity', metadata.humidity);
-    }
   }
 };

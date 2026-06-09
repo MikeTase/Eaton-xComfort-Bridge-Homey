@@ -19,7 +19,7 @@ module.exports = class RoomStatusDevice extends BaseDevice {
 
   private energy = new EnergyTracker(
     async (kwh) => {
-      await this.ensureCapability('meter_power');
+      await this.ensureDeviceCapability('meter_power');
       await this.updateCapability('meter_power', kwh);
     },
     {
@@ -60,7 +60,7 @@ module.exports = class RoomStatusDevice extends BaseDevice {
     const storedValue = this.getStoreValue('roomMeterPowerKwh');
     if (typeof storedValue === 'number' && Number.isFinite(storedValue) && storedValue > 0) {
       this.energy.restore(storedValue);
-      await this.ensureCapability('meter_power');
+      await this.ensureDeviceCapability('meter_power');
       await this.updateCapability('meter_power', this.energy.getKwh());
     }
   }
@@ -129,12 +129,12 @@ module.exports = class RoomStatusDevice extends BaseDevice {
   private async ensureCapabilitiesForState(state: RoomStateUpdate): Promise<void> {
     for (const { field, capability } of FIELD_CAPABILITY_MAP) {
       if (state[field] !== undefined) {
-        await this.ensureCapability(capability);
+        await this.ensureDeviceCapability(capability);
       }
     }
 
     if (state.mode !== undefined) {
-      await this.ensureCapability('xcomfort_current_mode');
+      await this.ensureDeviceCapability('xcomfort_current_mode');
     }
   }
 
@@ -170,7 +170,7 @@ module.exports = class RoomStatusDevice extends BaseDevice {
     }
 
     for (const cap of desiredCaps) {
-      await this.ensureCapability(cap);
+      await this.ensureDeviceCapability(cap);
     }
   }
 

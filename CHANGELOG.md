@@ -16,6 +16,8 @@
 - Added German, Norwegian, Swedish, and Danish translations.
 - Declared the local platform and LAN connectivity in the app manifest for all drivers.
 - Added unit tests for command debouncing, the send semaphore, and energy history parsing.
+- Halved the installed app size (8.3 MB → 4.2 MB) by optimizing all PNG images and excluding development-only files (tests, lockfile, lint config, changelog) from the app bundle.
+- Removed duplicated capability helpers and redundant temperature/humidity update code in sensor devices.
 
 ## 1.5.2 - 2026-06-09
 

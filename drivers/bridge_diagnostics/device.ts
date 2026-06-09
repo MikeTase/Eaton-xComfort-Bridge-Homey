@@ -10,7 +10,7 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
     if (!this.isPowerDiagnostic()) {
       return;
     }
-    await this.ensureCapability('meter_power');
+    await this.ensureDeviceCapability('meter_power');
     await this.updateCapability('meter_power', kwh);
     await this.setStoreValue('bridgeMeterPowerKwh', kwh).catch(this.error);
   });
@@ -112,7 +112,7 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
       return;
     }
 
-    await this.ensureCapability('meter_power');
+    await this.ensureDeviceCapability('meter_power');
     const storedValue = this.getStoreValue('bridgeMeterPowerKwh');
     if (typeof storedValue === 'number' && Number.isFinite(storedValue) && storedValue > 0) {
       this.energy.restore(storedValue);
