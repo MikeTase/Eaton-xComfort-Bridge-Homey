@@ -1,0 +1,77 @@
+{
+    "settings": {
+        "title": "Eaton xComfort",
+        "intro": "Configure one or more xComfort Bridge connections.",
+        "connection": "Bridge Connections",
+        "add_bridge": "Add Bridge",
+        "auth_key_hint": "Device auth key dashes and spaces are accepted and removed automatically when saved.",
+        "diagnostics": "Diagnostics",
+        "diagnostics_hint": "Generate a redacted support export for configured bridges and discovered xComfort data.",
+        "generate_diagnostics": "Generate Diagnostics",
+        "download": "Download",
+        "generating_diagnostics": "Generating diagnostics...",
+        "name": "Name",
+        "bridge_ip": "IP Address",
+        "bridge_host": "IP Address or Hostname",
+        "bridge_auth_key": "Auth Key",
+        "bridge_ip_hint": "Tip: reserve this IP in your router to keep it stable.",
+        "login_mode": "Login Mode",
+        "device_auth_key": "Device auth key",
+        "user_password": "User/password",
+        "username": "Username",
+        "password": "Password",
+        "password_placeholder": "Bridge user password",
+        "auth_key_placeholder": "e.g. A1B2-C3D4-...",
+        "password_hint": "Use the password for the named bridge user account.",
+        "auth_key_mode_hint": "Use the device auth code shown in the Eaton xComfort Bridge app.",
+        "remote_access": "Remote Access",
+        "remote_unchanged": "Leave unchanged",
+        "remote_allow": "Allow remote access",
+        "remote_block": "Block remote access",
+        "remote_access_hint": "Optional bridge preference, applied after the bridge connects.",
+        "remove": "Remove",
+        "save": "Save Settings",
+        "show": "Show",
+        "hide": "Hide",
+        "saved": "Settings saved!",
+        "save_error": "Error saving bridge settings.",
+        "fill_required": "Please fill in both fields."
+    },
+    "pair": {
+        "common": {
+            "add_selected": "Add selected",
+            "loading_devices": "Loading devices...",
+            "still_loading": "Still loading...",
+            "no_devices": "No devices found.",
+            "unable_to_load": "Unable to load devices.",
+            "unnamed": "Unnamed"
+        },
+        "actuator": {
+            "title": "Select actuators and dimmers"
+        },
+        "binary_input": {
+            "title": "Select binary inputs"
+        },
+        "door_window_sensor": {
+            "title": "Select door and window sensors"
+        },
+        "energy_meter": {
+            "title": "Select energy meters"
+        },
+        "motion_sensor": {
+            "title": "Select motion sensors"
+        },
+        "shading": {
+            "title": "Select shading devices"
+        },
+        "thermostat": {
+            "title": "Select thermostats"
+        },
+        "wall_switch": {
+            "title": "Select wall switches"
+        },
+        "water_sensor": {
+            "title": "Select water sensors"
+        }
+    }
+}

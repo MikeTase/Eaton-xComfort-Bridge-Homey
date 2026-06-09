@@ -1,0 +1,77 @@
+{
+    "settings": {
+        "title": "Eaton xComfort",
+        "intro": "Configureer een of meer xComfort Bridge-verbindingen.",
+        "connection": "Bridge-verbindingen",
+        "add_bridge": "Bridge toevoegen",
+        "auth_key_hint": "Streepjes en spaties in de apparaat-authenticatiesleutel worden automatisch verwijderd bij het opslaan.",
+        "diagnostics": "Diagnose",
+        "diagnostics_hint": "Genereer een opgeschoonde support-export voor ingestelde bridges en gevonden xComfort-data.",
+        "generate_diagnostics": "Diagnose genereren",
+        "download": "Downloaden",
+        "generating_diagnostics": "Diagnose wordt gegenereerd...",
+        "name": "Naam",
+        "bridge_ip": "IP-adres",
+        "bridge_host": "IP-adres of hostnaam",
+        "bridge_auth_key": "Authenticatiesleutel",
+        "bridge_ip_hint": "Tip: reserveer dit IP-adres in je router zodat het stabiel blijft.",
+        "login_mode": "Inlogmethode",
+        "device_auth_key": "Apparaat-authenticatiesleutel",
+        "user_password": "Gebruiker/wachtwoord",
+        "username": "Gebruikersnaam",
+        "password": "Wachtwoord",
+        "password_placeholder": "Bridge-gebruikerswachtwoord",
+        "auth_key_placeholder": "bijv. A1B2-C3D4-...",
+        "password_hint": "Gebruik het wachtwoord van het bridge-gebruikersaccount.",
+        "auth_key_mode_hint": "Gebruik de apparaatcode die in de Eaton xComfort Bridge-app staat.",
+        "remote_access": "Toegang op afstand",
+        "remote_unchanged": "Ongewijzigd laten",
+        "remote_allow": "Toegang op afstand toestaan",
+        "remote_block": "Toegang op afstand blokkeren",
+        "remote_access_hint": "Optionele bridge-voorkeur, toegepast nadat de bridge verbonden is.",
+        "remove": "Verwijderen",
+        "save": "Instellingen opslaan",
+        "show": "Tonen",
+        "hide": "Verbergen",
+        "saved": "Instellingen opgeslagen!",
+        "save_error": "Fout bij het opslaan van de bridge-instellingen.",
+        "fill_required": "Vul alle verplichte velden in."
+    },
+    "pair": {
+        "common": {
+            "add_selected": "Geselecteerde toevoegen",
+            "loading_devices": "Apparaten laden...",
+            "still_loading": "Nog aan het laden...",
+            "no_devices": "Geen apparaten gevonden.",
+            "unable_to_load": "Apparaten laden is mislukt.",
+            "unnamed": "Naamloos"
+        },
+        "actuator": {
+            "title": "Actuatoren en dimmers selecteren"
+        },
+        "binary_input": {
+            "title": "Binaire ingangen selecteren"
+        },
+        "door_window_sensor": {
+            "title": "Deur- en raamsensoren selecteren"
+        },
+        "energy_meter": {
+            "title": "Energiemeters selecteren"
+        },
+        "motion_sensor": {
+            "title": "Bewegingssensoren selecteren"
+        },
+        "shading": {
+            "title": "Zonwering selecteren"
+        },
+        "thermostat": {
+            "title": "Thermostaten selecteren"
+        },
+        "wall_switch": {
+            "title": "Wandschakelaars selecteren"
+        },
+        "water_sensor": {
+            "title": "Watersensoren selecteren"
+        }
+    }
+}

@@ -1,0 +1,77 @@
+{
+    "settings": {
+        "title": "Eaton xComfort",
+        "intro": "Konfigurera en eller flera xComfort Bridge-anslutningar.",
+        "connection": "Bridge-anslutningar",
+        "add_bridge": "Lägg till bridge",
+        "auth_key_hint": "Bindestreck och mellanslag i autentiseringsnyckeln accepteras och tas bort automatiskt vid sparande.",
+        "diagnostics": "Diagnostik",
+        "diagnostics_hint": "Generera en rensad supportexport för konfigurerade bridgar och upptäckta xComfort-data.",
+        "generate_diagnostics": "Generera diagnostik",
+        "download": "Ladda ner",
+        "generating_diagnostics": "Genererar diagnostik...",
+        "name": "Namn",
+        "bridge_ip": "IP-adress",
+        "bridge_host": "IP-adress eller värdnamn",
+        "bridge_auth_key": "Autentiseringsnyckel",
+        "bridge_ip_hint": "Tips: Reservera denna IP-adress i routern så att den förblir stabil.",
+        "login_mode": "Inloggningsläge",
+        "device_auth_key": "Enhetens autentiseringsnyckel",
+        "user_password": "Användare/lösenord",
+        "username": "Användarnamn",
+        "password": "Lösenord",
+        "password_placeholder": "Lösenord för bridge-användaren",
+        "auth_key_placeholder": "t.ex. A1B2-C3D4-...",
+        "password_hint": "Använd lösenordet för det namngivna bridge-användarkontot.",
+        "auth_key_mode_hint": "Använd enhetens autentiseringskod som visas i Eaton xComfort Bridge-appen.",
+        "remote_access": "Fjärråtkomst",
+        "remote_unchanged": "Lämna oförändrat",
+        "remote_allow": "Tillåt fjärråtkomst",
+        "remote_block": "Blockera fjärråtkomst",
+        "remote_access_hint": "Valfri bridge-inställning, tillämpas efter att bridgen anslutit.",
+        "remove": "Ta bort",
+        "save": "Spara inställningar",
+        "show": "Visa",
+        "hide": "Dölj",
+        "saved": "Inställningar sparade!",
+        "save_error": "Fel vid sparande av bridge-inställningar.",
+        "fill_required": "Fyll i båda fälten."
+    },
+    "pair": {
+        "common": {
+            "add_selected": "Lägg till valda",
+            "loading_devices": "Laddar enheter...",
+            "still_loading": "Laddar fortfarande...",
+            "no_devices": "Inga enheter hittades.",
+            "unable_to_load": "Kunde inte ladda enheter.",
+            "unnamed": "Namnlös"
+        },
+        "actuator": {
+            "title": "Välj ställdon och dimmrar"
+        },
+        "binary_input": {
+            "title": "Välj binäringångar"
+        },
+        "door_window_sensor": {
+            "title": "Välj dörr- och fönstersensorer"
+        },
+        "energy_meter": {
+            "title": "Välj energimätare"
+        },
+        "motion_sensor": {
+            "title": "Välj rörelsesensorer"
+        },
+        "shading": {
+            "title": "Välj solskyddsenheter"
+        },
+        "thermostat": {
+            "title": "Välj termostater"
+        },
+        "wall_switch": {
+            "title": "Välj väggströmbrytare"
+        },
+        "water_sensor": {
+            "title": "Välj vattensensorer"
+        }
+    }
+}

@@ -1,0 +1,17 @@
+.homeybuild/
+.homeybuild_trash/
+.git/
+.github/
+**/*.ts
+tsconfig.json
+.DS_Store
+**/.DS_Store
+drivers/appliance/pair/
+drivers/bridge_diagnostics/pair/
+drivers/room_status/pair/
+drivers/scene/pair/
+drivers/temperature_sensor/pair/
+drivers/weather_station/pair/
+drivers/actuator/pair/select_devices.html
+drivers/wall_switch/pair/select_devices.html
+*.swp

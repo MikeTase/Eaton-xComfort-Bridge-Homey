@@ -1,0 +1,2555 @@
+{
+  "id": "eaton.xcomfort.bridge",
+  "name": {
+    "en": "Eaton xComfort",
+    "nl": "Eaton xComfort",
+    "de": "Eaton xComfort",
+    "no": "Eaton xComfort",
+    "sv": "Eaton xComfort",
+    "da": "Eaton xComfort"
+  },
+  "description": {
+    "en": "Local Eaton xComfort control for lights, shades, heating, sensors, and energy.",
+    "nl": "Lokale Eaton xComfort-bediening voor verlichting, zonwering, verwarming, sensoren en energie.",
+    "de": "Lokale Eaton xComfort-Steuerung für Licht, Beschattung, Heizung, Sensoren und Energie.",
+    "no": "Lokal Eaton xComfort-styring av lys, solskjerming, varme, sensorer og energi.",
+    "sv": "Lokal Eaton xComfort-styrning av belysning, solskydd, värme, sensorer och energi.",
+    "da": "Lokal Eaton xComfort-styring af lys, solafskærmning, varme, sensorer og energi."
+  },
+  "version": "1.6.0",
+  "category": [
+    "lights",
+    "climate"
+  ],
+  "tags": {
+    "en": [
+      "eaton",
+      "xcomfort",
+      "smart home",
+      "lighting",
+      "heating",
+      "shading",
+      "blinds",
+      "thermostat",
+      "sensors",
+      "energy",
+      "weather"
+    ],
+    "nl": [
+      "eaton",
+      "xcomfort",
+      "smart home",
+      "verlichting",
+      "verwarming",
+      "zonwering",
+      "jaloezieen",
+      "thermostaat",
+      "sensoren",
+      "energie",
+      "weer"
+    ]
+  },
+  "brandColor": "#005EB8",
+  "support": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey/issues",
+  "bugs": {
+    "url": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey/issues"
+  },
+  "source": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey",
+  "homeyCommunityTopicId": 839,
+  "images": {
+    "large": "assets/images/large.png",
+    "small": "assets/images/small.png",
+    "xlarge": "assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Mike Taselaar"
+  },
+  "compatibility": ">=12.3.0",
+  "sdk": 3,
+  "platforms": [
+    "local"
+  ],
+  "permissions": [],
+  "api": {
+    "getDiagnostics": {
+      "method": "GET",
+      "path": "/diagnostics"
+    }
+  },
+  "flow": {
+    "triggers": [
+      {
+        "id": "wall_switch_pressed",
+        "title": {
+          "en": "Wall switch pressed",
+          "nl": "Wandschakelaar ingedrukt"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "event",
+            "type": "string",
+            "title": {
+              "en": "Event",
+              "nl": "Gebeurtenis"
+            }
+          },
+          {
+            "name": "action",
+            "type": "string",
+            "title": {
+              "en": "Action",
+              "nl": "Actie"
+            }
+          },
+          {
+            "name": "button",
+            "type": "number",
+            "title": {
+              "en": "Button",
+              "nl": "Knop"
+            }
+          },
+          {
+            "name": "component_id",
+            "type": "string",
+            "title": {
+              "en": "Component ID",
+              "nl": "Component-ID"
+            }
+          },
+          {
+            "name": "component_model",
+            "type": "string",
+            "title": {
+              "en": "Component Model",
+              "nl": "Componentmodel"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wall_switch_up",
+        "title": {
+          "en": "Wall switch pressed up",
+          "nl": "Wandschakelaar omhoog ingedrukt"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ]
+      },
+      {
+        "id": "wall_switch_down",
+        "title": {
+          "en": "Wall switch pressed down",
+          "nl": "Wandschakelaar omlaag ingedrukt"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ]
+      },
+      {
+        "id": "wall_switch_double_up",
+        "title": {
+          "en": "Wall switch double pressed up",
+          "nl": "Wandschakelaar dubbel omhoog ingedrukt"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "button",
+            "type": "number",
+            "title": {
+              "en": "Button",
+              "nl": "Knop"
+            }
+          },
+          {
+            "name": "component_id",
+            "type": "string",
+            "title": {
+              "en": "Component ID",
+              "nl": "Component-ID"
+            }
+          },
+          {
+            "name": "component_model",
+            "type": "string",
+            "title": {
+              "en": "Component Model",
+              "nl": "Componentmodel"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wall_switch_double_down",
+        "title": {
+          "en": "Wall switch double pressed down",
+          "nl": "Wandschakelaar dubbel omlaag ingedrukt"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=wall_switch"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "button",
+            "type": "number",
+            "title": {
+              "en": "Button",
+              "nl": "Knop"
+            }
+          },
+          {
+            "name": "component_id",
+            "type": "string",
+            "title": {
+              "en": "Component ID",
+              "nl": "Component-ID"
+            }
+          },
+          {
+            "name": "component_model",
+            "type": "string",
+            "title": {
+              "en": "Component Model",
+              "nl": "Componentmodel"
+            }
+          }
+        ]
+      },
+      {
+        "id": "thermostat_button_on",
+        "title": {
+          "en": "Thermostat right button pressed",
+          "nl": "Thermostaatknop rechts ingedrukt"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ]
+      },
+      {
+        "id": "thermostat_button_off",
+        "title": {
+          "en": "Thermostat left button pressed",
+          "nl": "Thermostaatknop links ingedrukt"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ]
+      },
+      {
+        "id": "xcomfort_preset_changed",
+        "title": {
+          "en": "Heating preset changed",
+          "nl": "Verwarmingspreset gewijzigd"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "preset",
+            "type": "string",
+            "title": {
+              "en": "Preset",
+              "nl": "Preset"
+            }
+          }
+        ]
+      }
+    ],
+    "conditions": [
+      {
+        "id": "xcomfort_preset_is",
+        "title": {
+          "en": "Heating preset is",
+          "nl": "Verwarmingspreset is"
+        },
+        "titleFormatted": {
+          "en": "Heating preset is [[preset]]",
+          "nl": "Verwarmingspreset is [[preset]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          },
+          {
+            "name": "preset",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "frost",
+                "label": {
+                  "en": "Frost",
+                  "nl": "Vorst"
+                }
+              },
+              {
+                "id": "eco",
+                "label": {
+                  "en": "Economy",
+                  "nl": "Eco"
+                }
+              },
+              {
+                "id": "comfort",
+                "label": {
+                  "en": "Comfort",
+                  "nl": "Comfort"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "water_valve_is",
+        "title": {
+          "en": "Water valve is",
+          "nl": "Waterklep is"
+        },
+        "titleFormatted": {
+          "en": "Water valve !{{is|is not}} open",
+          "nl": "Waterklep !{{is|is niet}} open"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=water_sensor"
+          }
+        ]
+      },
+      {
+        "id": "xcomfort_astro_is",
+        "title": {
+          "en": "Astro period is",
+          "nl": "Astroperiode is"
+        },
+        "titleFormatted": {
+          "en": "Astro period is [[period]]",
+          "nl": "Astroperiode is [[period]]"
+        },
+        "args": [
+          {
+            "name": "period",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "dark",
+                "label": {
+                  "en": "Dark",
+                  "nl": "Donker"
+                }
+              },
+              {
+                "id": "daylight",
+                "label": {
+                  "en": "Daylight",
+                  "nl": "Daglicht"
+                }
+              },
+              {
+                "id": "after_sunset",
+                "label": {
+                  "en": "After sunset",
+                  "nl": "Na zonsondergang"
+                }
+              },
+              {
+                "id": "before_sunrise",
+                "label": {
+                  "en": "Before sunrise",
+                  "nl": "Voor zonsopkomst"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "set_xcomfort_preset",
+        "title": {
+          "en": "Set Heating preset",
+          "nl": "Verwarmingspreset instellen"
+        },
+        "titleFormatted": {
+          "en": "Set heating preset to [[preset]]",
+          "nl": "Stel verwarmingspreset in op [[preset]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=thermostat"
+          },
+          {
+            "name": "preset",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "frost",
+                "label": {
+                  "en": "Frost",
+                  "nl": "Vorst"
+                }
+              },
+              {
+                "id": "eco",
+                "label": {
+                  "en": "Economy",
+                  "nl": "Eco"
+                }
+              },
+              {
+                "id": "comfort",
+                "label": {
+                  "en": "Comfort",
+                  "nl": "Comfort"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "set_water_valve",
+        "title": {
+          "en": "Set water valve",
+          "nl": "Waterklep instellen"
+        },
+        "titleFormatted": {
+          "en": "Set water valve to [[state]]",
+          "nl": "Zet waterklep op [[state]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=water_sensor"
+          },
+          {
+            "name": "state",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "closed",
+                "label": {
+                  "en": "Closed",
+                  "nl": "Gesloten"
+                }
+              },
+              {
+                "id": "open",
+                "label": {
+                  "en": "Open",
+                  "nl": "Open"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "activate_xcomfort_scene",
+        "title": {
+          "en": "Activate xComfort scene",
+          "nl": "xComfort-scene activeren"
+        },
+        "titleFormatted": {
+          "en": "Activate [[device]]",
+          "nl": "Activeer [[device]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=scene"
+          }
+        ]
+      },
+      {
+        "id": "switch_xcomfort_room_lights",
+        "title": {
+          "en": "Switch xComfort room lights",
+          "nl": "xComfort-kamerverlichting schakelen"
+        },
+        "titleFormatted": {
+          "en": "Switch room lights [[state]]",
+          "nl": "Schakel kamerverlichting [[state]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=room_status"
+          },
+          {
+            "name": "state",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "on",
+                "label": {
+                  "en": "On",
+                  "nl": "Aan"
+                }
+              },
+              {
+                "id": "off",
+                "label": {
+                  "en": "Off",
+                  "nl": "Uit"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "reset_energy_meter",
+        "title": {
+          "en": "Reset energy meter",
+          "nl": "Energiemeter resetten"
+        },
+        "titleFormatted": {
+          "en": "Reset energy meter of [[device]]",
+          "nl": "Reset energiemeter van [[device]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "capabilities=meter_power"
+          }
+        ]
+      },
+      {
+        "id": "set_energy_load_mode",
+        "title": {
+          "en": "Set energy load mode",
+          "nl": "Energiestand belasting instellen"
+        },
+        "titleFormatted": {
+          "en": "Set energy load mode to [[mode]]",
+          "nl": "Stel energiestand belasting in op [[mode]]"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=energy_meter"
+          },
+          {
+            "name": "mode",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "normal",
+                "label": {
+                  "en": "Normal",
+                  "nl": "Normaal"
+                }
+              },
+              {
+                "id": "energy_saving",
+                "label": {
+                  "en": "Energy saving",
+                  "nl": "Energiebesparing"
+                }
+              },
+              {
+                "id": "priority",
+                "label": {
+                  "en": "Priority",
+                  "nl": "Prioriteit"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "refresh_energy_meter",
+        "title": {
+          "en": "Refresh energy meter",
+          "nl": "Energiemeter vernieuwen"
+        },
+        "titleFormatted": {
+          "en": "Refresh energy data",
+          "nl": "Energiegegevens vernieuwen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=energy_meter"
+          }
+        ]
+      },
+      {
+        "id": "activate_scene_by_name",
+        "title": {
+          "en": "Activate scene by name",
+          "nl": "Scene op naam activeren"
+        },
+        "titleFormatted": {
+          "en": "Activate scene [[scene]]",
+          "nl": "Activeer scene [[scene]]"
+        },
+        "args": [
+          {
+            "name": "scene",
+            "type": "autocomplete",
+            "placeholder": {
+              "en": "Scene",
+              "nl": "Scene"
+            }
+          }
+        ]
+      },
+      {
+        "id": "switch_room_lights_by_name",
+        "title": {
+          "en": "Switch room lights by name",
+          "nl": "Kamerverlichting op naam schakelen"
+        },
+        "titleFormatted": {
+          "en": "Switch room [[room]] lights [[state]]",
+          "nl": "Schakel verlichting in kamer [[room]] [[state]]"
+        },
+        "args": [
+          {
+            "name": "room",
+            "type": "autocomplete",
+            "placeholder": {
+              "en": "Room",
+              "nl": "Kamer"
+            }
+          },
+          {
+            "name": "state",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "on",
+                "label": {
+                  "en": "On",
+                  "nl": "Aan"
+                }
+              },
+              {
+                "id": "off",
+                "label": {
+                  "en": "Off",
+                  "nl": "Uit"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "set_bridge_remote_access",
+        "title": {
+          "en": "Set bridge remote access",
+          "nl": "Remote access van bridge instellen"
+        },
+        "titleFormatted": {
+          "en": "Set bridge [[bridge]] remote access to [[state]]",
+          "nl": "Zet remote access van bridge [[bridge]] op [[state]]"
+        },
+        "args": [
+          {
+            "name": "bridge",
+            "type": "autocomplete",
+            "placeholder": {
+              "en": "Bridge",
+              "nl": "Bridge"
+            }
+          },
+          {
+            "name": "state",
+            "type": "dropdown",
+            "values": [
+              {
+                "id": "enabled",
+                "label": {
+                  "en": "Allow",
+                  "nl": "Toestaan"
+                }
+              },
+              {
+                "id": "disabled",
+                "label": {
+                  "en": "Block",
+                  "nl": "Blokkeren"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "capabilities": {
+    "xcomfort_preset_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Heating preset",
+        "nl": "Verwarmingspreset"
+      },
+      "desc": {
+        "en": "Active xComfort heating preset",
+        "nl": "Actieve xComfort-verwarmingspreset"
+      },
+      "values": [
+        {
+          "id": "frost",
+          "title": {
+            "en": "Frost",
+            "nl": "Vorst"
+          }
+        },
+        {
+          "id": "eco",
+          "title": {
+            "en": "Economy",
+            "nl": "Eco"
+          }
+        },
+        {
+          "id": "comfort",
+          "title": {
+            "en": "Comfort",
+            "nl": "Comfort"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": true,
+      "uiComponent": "picker"
+    },
+    "xcomfort_heating_demand": {
+      "type": "number",
+      "title": {
+        "en": "Heating demand",
+        "nl": "Warmtevraag"
+      },
+      "units": {
+        "en": "%",
+        "nl": "%"
+      },
+      "desc": {
+        "en": "Current heating demand",
+        "nl": "Huidige warmtevraag"
+      },
+      "insights": true,
+      "decimals": 1,
+      "min": 0,
+      "max": 100,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_device_temperature": {
+      "type": "number",
+      "title": {
+        "en": "Device temperature",
+        "nl": "Apparaattemperatuur"
+      },
+      "units": {
+        "en": "°C",
+        "nl": "°C"
+      },
+      "desc": {
+        "en": "Internal xComfort heating device temperature",
+        "nl": "Interne temperatuur van het xComfort-verwarmingsapparaat"
+      },
+      "insights": true,
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_valve_position": {
+      "type": "number",
+      "title": {
+        "en": "Valve position",
+        "nl": "Klepstand"
+      },
+      "units": {
+        "en": "%",
+        "nl": "%"
+      },
+      "desc": {
+        "en": "Current heating valve position",
+        "nl": "Huidige verwarmingsklepstand"
+      },
+      "insights": true,
+      "decimals": 1,
+      "min": 0,
+      "max": 100,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_lights_on": {
+      "type": "number",
+      "title": {
+        "en": "Lights on",
+        "nl": "Lampen aan"
+      },
+      "desc": {
+        "en": "Number of lights currently on in the xComfort room",
+        "nl": "Aantal lampen dat nu aan is in de xComfort-kamer"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_windows_open": {
+      "type": "number",
+      "title": {
+        "en": "Open windows",
+        "nl": "Open ramen"
+      },
+      "desc": {
+        "en": "Number of open windows in the xComfort room",
+        "nl": "Aantal open ramen in de xComfort-kamer"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_doors_open": {
+      "type": "number",
+      "title": {
+        "en": "Open doors",
+        "nl": "Open deuren"
+      },
+      "desc": {
+        "en": "Number of open doors in the xComfort room",
+        "nl": "Aantal open deuren in de xComfort-kamer"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_current_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Current heating mode",
+        "nl": "Huidige verwarmingsmodus"
+      },
+      "desc": {
+        "en": "Current xComfort room heating mode",
+        "nl": "Huidige xComfort-verwarmingsmodus van de kamer"
+      },
+      "values": [
+        {
+          "id": "unknown",
+          "title": {
+            "en": "Unknown",
+            "nl": "Onbekend"
+          }
+        },
+        {
+          "id": "frost",
+          "title": {
+            "en": "Frost",
+            "nl": "Vorst"
+          }
+        },
+        {
+          "id": "eco",
+          "title": {
+            "en": "Economy",
+            "nl": "Eco"
+          }
+        },
+        {
+          "id": "comfort",
+          "title": {
+            "en": "Comfort",
+            "nl": "Comfort"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": false,
+      "uiComponent": "picker"
+    },
+    "xcomfort_signal_quality": {
+      "type": "number",
+      "title": {
+        "en": "Signal quality",
+        "nl": "Signaalkwaliteit"
+      },
+      "desc": {
+        "en": "xComfort radio signal quality reported by the bridge",
+        "nl": "xComfort-radiosignaalkwaliteit gerapporteerd door de bridge"
+      },
+      "units": {
+        "en": "/4",
+        "nl": "/4"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "max": 4,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_signal_strength": {
+      "type": "number",
+      "title": {
+        "en": "Signal strength",
+        "nl": "Signaalsterkte"
+      },
+      "desc": {
+        "en": "xComfort radio signal strength",
+        "nl": "xComfort-radiosignaalsterkte"
+      },
+      "units": {
+        "en": "dBm",
+        "nl": "dBm"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": -120,
+      "max": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_wind_speed": {
+      "type": "number",
+      "title": {
+        "en": "Wind speed",
+        "nl": "Windsnelheid"
+      },
+      "desc": {
+        "en": "Wind speed reported by the xComfort weather station",
+        "nl": "Windsnelheid gerapporteerd door het xComfort-weerstation"
+      },
+      "units": {
+        "en": "m/s",
+        "nl": "m/s"
+      },
+      "insights": true,
+      "decimals": 1,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_rain": {
+      "type": "boolean",
+      "title": {
+        "en": "Rain",
+        "nl": "Regen"
+      },
+      "desc": {
+        "en": "Rain state reported by the xComfort weather station",
+        "nl": "Regenstatus gerapporteerd door het xComfort-weerstation"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_pulses": {
+      "type": "number",
+      "title": {
+        "en": "Pulses",
+        "nl": "Pulsen"
+      },
+      "desc": {
+        "en": "Pulse count from an xComfort impulse or EMS input",
+        "nl": "Pulsteller van een xComfort-impuls- of EMS-ingang"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_energy_tariff": {
+      "type": "number",
+      "title": {
+        "en": "Energy tariff",
+        "nl": "Energietarief"
+      },
+      "desc": {
+        "en": "Current tariff or tariff identifier reported by xComfort",
+        "nl": "Huidig tarief of tarief-ID gerapporteerd door xComfort"
+      },
+      "insights": true,
+      "decimals": 4,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_energy_tariff_label": {
+      "type": "string",
+      "title": {
+        "en": "Tariff",
+        "nl": "Tarief"
+      },
+      "desc": {
+        "en": "Current tariff name or tariff label reported by xComfort",
+        "nl": "Huidige tariefnaam of tarieflabel gerapporteerd door xComfort"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_energy_currency": {
+      "type": "string",
+      "title": {
+        "en": "Currency",
+        "nl": "Valuta"
+      },
+      "desc": {
+        "en": "Currency reported by xComfort energy data",
+        "nl": "Valuta gerapporteerd door xComfort-energiegegevens"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_energy_history": {
+      "type": "string",
+      "title": {
+        "en": "Energy history",
+        "nl": "Energiehistorie"
+      },
+      "desc": {
+        "en": "Summary of historical energy data reported by xComfort",
+        "nl": "Samenvatting van historische energiegegevens gerapporteerd door xComfort"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_energy_cost": {
+      "type": "number",
+      "title": {
+        "en": "Energy cost",
+        "nl": "Energiekosten"
+      },
+      "desc": {
+        "en": "Energy cost reported by xComfort",
+        "nl": "Energiekosten gerapporteerd door xComfort"
+      },
+      "insights": true,
+      "decimals": 2,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_load_mode": {
+      "type": "enum",
+      "title": {
+        "en": "Load mode",
+        "nl": "Belastingsmodus"
+      },
+      "desc": {
+        "en": "xComfort energy control load mode",
+        "nl": "Belastingsmodus voor xComfort Energy Control"
+      },
+      "values": [
+        {
+          "id": "normal",
+          "title": {
+            "en": "Normal",
+            "nl": "Normaal"
+          }
+        },
+        {
+          "id": "energy_saving",
+          "title": {
+            "en": "Energy saving",
+            "nl": "Energiebesparing"
+          }
+        },
+        {
+          "id": "priority",
+          "title": {
+            "en": "Priority",
+            "nl": "Prioriteit"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": true,
+      "uiComponent": "picker"
+    },
+    "xcomfort_floor_temperature": {
+      "type": "number",
+      "title": {
+        "en": "Floor temperature",
+        "nl": "Vloertemperatuur"
+      },
+      "units": {
+        "en": "°C",
+        "nl": "°C"
+      },
+      "desc": {
+        "en": "Floor sensor temperature reported by xComfort",
+        "nl": "Vloersensortemperatuur gerapporteerd door xComfort"
+      },
+      "insights": true,
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_floor_min_limit": {
+      "type": "number",
+      "title": {
+        "en": "Floor min limit",
+        "nl": "Minimale vloerlimiet"
+      },
+      "units": {
+        "en": "°C",
+        "nl": "°C"
+      },
+      "desc": {
+        "en": "Configured xComfort floor sensor minimum limit",
+        "nl": "Ingestelde minimale limiet van de xComfort-vloersensor"
+      },
+      "insights": true,
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_floor_max_limit": {
+      "type": "number",
+      "title": {
+        "en": "Floor max limit",
+        "nl": "Maximale vloerlimiet"
+      },
+      "units": {
+        "en": "°C",
+        "nl": "°C"
+      },
+      "desc": {
+        "en": "Configured xComfort floor sensor maximum limit",
+        "nl": "Ingestelde maximale limiet van de xComfort-vloersensor"
+      },
+      "insights": true,
+      "decimals": 1,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_external_climate_control": {
+      "type": "boolean",
+      "title": {
+        "en": "External climate control",
+        "nl": "Externe klimaatregeling"
+      },
+      "desc": {
+        "en": "Whether xComfort reports an external heating/cooling control source",
+        "nl": "Of xComfort een externe verwarmings-/koelingsbron rapporteert"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_energy_today": {
+      "type": "number",
+      "title": {
+        "en": "Energy today",
+        "nl": "Energie vandaag"
+      },
+      "desc": {
+        "en": "Energy used today, from xComfort energy history",
+        "nl": "Energieverbruik vandaag, uit de xComfort-energiehistorie"
+      },
+      "units": {
+        "en": "kWh"
+      },
+      "insights": true,
+      "decimals": 3,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_energy_month": {
+      "type": "number",
+      "title": {
+        "en": "Energy this month",
+        "nl": "Energie deze maand"
+      },
+      "desc": {
+        "en": "Energy used this month, from xComfort energy history",
+        "nl": "Energieverbruik deze maand, uit de xComfort-energiehistorie"
+      },
+      "units": {
+        "en": "kWh"
+      },
+      "insights": true,
+      "decimals": 3,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    }
+  },
+  "drivers": [
+    {
+      "id": "actuator",
+      "name": {
+        "en": "Actuator / Dimmer",
+        "nl": "Actuator / dimmer"
+      },
+      "class": "light",
+      "capabilities": [
+        "onoff",
+        "dim"
+      ],
+      "images": {
+        "large": "drivers/actuator/assets/images/large.png",
+        "small": "drivers/actuator/assets/images/small.png",
+        "xlarge": "drivers/actuator/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select actuators and dimmers",
+            "nl": "Actuatoren en dimmers selecteren"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "settings": [
+        {
+          "id": "dimming_min_level",
+          "type": "number",
+          "label": {
+            "en": "Minimum dim level (%)",
+            "nl": "Minimaal dimniveau (%)"
+          },
+          "hint": {
+            "en": "Homey will not send dim commands below this level for dimming actuators.",
+            "nl": "Homey stuurt geen dimcommando's onder dit niveau naar dimactuatoren."
+          },
+          "value": 1,
+          "min": 1,
+          "max": 100
+        },
+        {
+          "id": "dimming_default_on_level",
+          "type": "number",
+          "label": {
+            "en": "Default on dim level (%)",
+            "nl": "Standaard dimniveau bij inschakelen (%)"
+          },
+          "hint": {
+            "en": "Used when turning a dimmer on with the on/off button.",
+            "nl": "Gebruikt wanneer een dimmer met de aan/uit-knop wordt ingeschakeld."
+          },
+          "value": 100,
+          "min": 1,
+          "max": 100
+        },
+        {
+          "id": "dimming_below_min_behavior",
+          "type": "dropdown",
+          "label": {
+            "en": "Below minimum dim",
+            "nl": "Onder minimaal dimniveau"
+          },
+          "value": "switch_off",
+          "values": [
+            {
+              "id": "switch_off",
+              "label": {
+                "en": "Switch off",
+                "nl": "Uitschakelen"
+              }
+            },
+            {
+              "id": "clamp_to_min",
+              "label": {
+                "en": "Use minimum level",
+                "nl": "Minimumniveau gebruiken"
+              }
+            }
+          ]
+        },
+        {
+          "id": "dimming_profile",
+          "type": "dropdown",
+          "label": {
+            "en": "Homey dimming profile",
+            "nl": "Homey-dimprofiel"
+          },
+          "value": "linear",
+          "values": [
+            {
+              "id": "linear",
+              "label": {
+                "en": "Linear",
+                "nl": "Lineair"
+              }
+            },
+            {
+              "id": "led_safe",
+              "label": {
+                "en": "LED safe",
+                "nl": "LED-veilig"
+              }
+            }
+          ]
+        }
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "energy": {
+        "approximation": {
+          "usageOn": 8,
+          "usageOff": 0.5
+        }
+      },
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "appliance",
+      "name": {
+        "en": "Appliance / Load",
+        "nl": "Apparaat / belasting"
+      },
+      "class": "socket",
+      "capabilities": [
+        "onoff",
+        "dim"
+      ],
+      "deprecated": true,
+      "images": {
+        "large": "drivers/appliance/assets/images/large.png",
+        "small": "drivers/appliance/assets/images/small.png",
+        "xlarge": "drivers/appliance/assets/images/xlarge.png"
+      },
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "door_window_sensor",
+      "name": {
+        "en": "Door / Window Sensor",
+        "nl": "Deur- / raamsensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_contact"
+      ],
+      "images": {
+        "large": "drivers/door_window_sensor/assets/images/large.png",
+        "small": "drivers/door_window_sensor/assets/images/small.png",
+        "xlarge": "drivers/door_window_sensor/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select door and window sensors",
+            "nl": "Deur- en raamsensoren selecteren"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "binary_input",
+      "name": {
+        "en": "Binary Input",
+        "nl": "Binaire ingang"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_generic"
+      ],
+      "capabilitiesOptions": {
+        "alarm_generic": {
+          "title": {
+            "en": "Input Active",
+            "nl": "Ingang actief"
+          }
+        }
+      },
+      "images": {
+        "large": "drivers/binary_input/assets/images/large.png",
+        "small": "drivers/binary_input/assets/images/small.png",
+        "xlarge": "drivers/binary_input/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select binary inputs",
+            "nl": "Binaire ingangen selecteren"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "motion_sensor",
+      "name": {
+        "en": "Motion Sensor",
+        "nl": "Bewegingssensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_motion"
+      ],
+      "images": {
+        "large": "drivers/motion_sensor/assets/images/large.png",
+        "small": "drivers/motion_sensor/assets/images/small.png",
+        "xlarge": "drivers/motion_sensor/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select motion sensors",
+            "nl": "Bewegingssensoren selecteren"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "weather_station",
+      "name": {
+        "en": "Weather Station",
+        "nl": "Weerstation"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_humidity",
+        "measure_luminance",
+        "xcomfort_wind_speed",
+        "xcomfort_rain"
+      ],
+      "deprecated": true,
+      "images": {
+        "large": "drivers/temperature_sensor/assets/images/large.png",
+        "small": "drivers/temperature_sensor/assets/images/small.png",
+        "xlarge": "drivers/temperature_sensor/assets/images/xlarge.png"
+      },
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "temperature_sensor",
+      "name": {
+        "en": "Temperature Sensor",
+        "nl": "Temperatuursensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_humidity"
+      ],
+      "deprecated": true,
+      "images": {
+        "large": "drivers/temperature_sensor/assets/images/large.png",
+        "small": "drivers/temperature_sensor/assets/images/small.png",
+        "xlarge": "drivers/temperature_sensor/assets/images/xlarge.png"
+      },
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "room_status",
+      "name": {
+        "en": "Room Status",
+        "nl": "Kamerstatus"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_humidity",
+        "xcomfort_heating_demand",
+        "measure_power",
+        "meter_power",
+        "xcomfort_lights_on",
+        "xcomfort_windows_open",
+        "xcomfort_doors_open",
+        "xcomfort_current_mode"
+      ],
+      "deprecated": true,
+      "images": {
+        "large": "drivers/room_status/assets/images/large.png",
+        "small": "drivers/room_status/assets/images/small.png",
+        "xlarge": "drivers/room_status/assets/images/xlarge.png"
+      },
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "thermostat",
+      "name": {
+        "en": "Thermostat / Heating",
+        "nl": "Thermostaat / verwarming"
+      },
+      "class": "thermostat",
+      "capabilities": [
+        "measure_temperature",
+        "target_temperature",
+        "thermostat_mode",
+        "xcomfort_preset_mode",
+        "xcomfort_heating_demand"
+      ],
+      "capabilitiesOptions": {
+        "target_temperature": {
+          "min": 5,
+          "max": 40,
+          "step": 0.5
+        }
+      },
+      "images": {
+        "large": "drivers/thermostat/assets/images/large.png",
+        "small": "drivers/thermostat/assets/images/small.png",
+        "xlarge": "drivers/thermostat/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select thermostats",
+            "nl": "Thermostaten selecteren"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "settings": [
+        {
+          "id": "room_id_override",
+          "type": "text",
+          "label": {
+            "en": "xComfort Room ID override",
+            "nl": "xComfort-kamer-ID overschrijven"
+          },
+          "hint": {
+            "en": "Leave blank for automatic detection. Only set this if you see errors about NO linked room. E.g. 1",
+            "nl": "Laat leeg voor automatische detectie. Stel dit alleen in als je fouten ziet over GEEN gekoppelde kamer. Bijv. 1"
+          },
+          "value": ""
+        },
+        {
+          "id": "estimated_active_power_watts",
+          "type": "number",
+          "label": {
+            "en": "Estimated active power (W)",
+            "nl": "Geschat actief vermogen (W)"
+          },
+          "hint": {
+            "en": "Optional fallback when xComfort does not report live power. When heating demand is available, Homey scales this value by the current demand percentage.",
+            "nl": "Optionele fallback wanneer xComfort geen live vermogen rapporteert. Als warmtevraag beschikbaar is, schaalt Homey deze waarde met het huidige vraagpercentage."
+          },
+          "value": 0,
+          "min": 0,
+          "max": 10000
+        }
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "shading",
+      "name": {
+        "en": "Shading / Blinds",
+        "nl": "Zonwering / jaloezieen"
+      },
+      "class": "windowcoverings",
+      "capabilities": [
+        "windowcoverings_state",
+        "windowcoverings_set",
+        "alarm_generic"
+      ],
+      "images": {
+        "large": "drivers/shading/assets/images/large.png",
+        "small": "drivers/shading/assets/images/small.png",
+        "xlarge": "drivers/shading/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select shading devices",
+            "nl": "Zonwering selecteren"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "settings": [
+        {
+          "id": "shRuntime",
+          "type": "number",
+          "value": 0,
+          "label": {
+            "en": "Position support (shRuntime)",
+            "nl": "Positie-ondersteuning (shRuntime)"
+          },
+          "hint": {
+            "en": "Filled automatically from the bridge. 1 = the actuator supports moving to a specific position (shows the position slider).",
+            "nl": "Wordt automatisch ingevuld via de bridge. 1 = de actor ondersteunt het verplaatsen naar een specifieke positie (toont de positieschuif)."
+          }
+        }
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "connectivity": [
+        "lan"
+      ],
+      "capabilitiesOptions": {
+        "alarm_generic": {
+          "title": {
+            "en": "Safety lock (wind/rain)",
+            "nl": "Veiligheidsvergrendeling (wind/regen)"
+          }
+        }
+      }
+    },
+    {
+      "id": "wall_switch",
+      "name": {
+        "en": "Wall Switch",
+        "nl": "Wandschakelaar"
+      },
+      "class": "button",
+      "capabilities": [
+        "onoff"
+      ],
+      "capabilitiesOptions": {
+        "onoff": {
+          "title": {
+            "en": "Last Pressed",
+            "nl": "Laatst ingedrukt"
+          },
+          "insightsTitleTrue": {
+            "en": "Pressed Up",
+            "nl": "Omhoog ingedrukt"
+          },
+          "insightsTitleFalse": {
+            "en": "Pressed Down",
+            "nl": "Omlaag ingedrukt"
+          }
+        }
+      },
+      "images": {
+        "large": "drivers/wall_switch/assets/images/large.png",
+        "small": "drivers/wall_switch/assets/images/small.png",
+        "xlarge": "drivers/wall_switch/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select wall switches",
+            "nl": "Wandschakelaars selecteren"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "scene",
+      "name": {
+        "en": "xComfort Scene",
+        "nl": "xComfort-scene"
+      },
+      "class": "button",
+      "capabilities": [
+        "onoff"
+      ],
+      "deprecated": true,
+      "capabilitiesOptions": {
+        "onoff": {
+          "title": {
+            "en": "Activate",
+            "nl": "Activeren"
+          }
+        }
+      },
+      "settings": [
+        {
+          "id": "scene_order",
+          "type": "label",
+          "label": {
+            "en": "Scene order",
+            "nl": "Scenevolgorde"
+          },
+          "value": "-"
+        },
+        {
+          "id": "scene_type",
+          "type": "label",
+          "label": {
+            "en": "Scene type",
+            "nl": "Scenetype"
+          },
+          "value": "-"
+        },
+        {
+          "id": "scene_conditions",
+          "type": "label",
+          "label": {
+            "en": "Conditions",
+            "nl": "Voorwaarden"
+          },
+          "value": "-"
+        },
+        {
+          "id": "scene_schedule",
+          "type": "label",
+          "label": {
+            "en": "Schedule",
+            "nl": "Schema"
+          },
+          "value": "-"
+        },
+        {
+          "id": "scene_devices",
+          "type": "label",
+          "label": {
+            "en": "Devices",
+            "nl": "Apparaten"
+          },
+          "value": "-"
+        }
+      ],
+      "images": {
+        "large": "drivers/scene/assets/images/large.png",
+        "small": "drivers/scene/assets/images/small.png",
+        "xlarge": "drivers/scene/assets/images/xlarge.png"
+      },
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "bridge_diagnostics",
+      "name": {
+        "en": "Bridge Diagnostics",
+        "nl": "Bridge-diagnose"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_temperature",
+        "measure_power",
+        "meter_power",
+        "alarm_heat",
+        "alarm_generic.cooling",
+        "onoff",
+        "alarm_generic",
+        "alarm_contact.windows",
+        "alarm_contact.doors",
+        "alarm_motion"
+      ],
+      "deprecated": true,
+      "settings": [
+        {
+          "id": "bridge_name",
+          "type": "label",
+          "label": {
+            "en": "Bridge name",
+            "nl": "Bridge-naam"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_id",
+          "type": "label",
+          "label": {
+            "en": "Bridge ID",
+            "nl": "Bridge-ID"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_model",
+          "type": "label",
+          "label": {
+            "en": "Bridge model",
+            "nl": "Bridge-model"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_firmware",
+          "type": "label",
+          "label": {
+            "en": "Firmware version",
+            "nl": "Firmwareversie"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_ip",
+          "type": "label",
+          "label": {
+            "en": "Bridge IP",
+            "nl": "Bridge-IP"
+          },
+          "value": "-"
+        },
+        {
+          "id": "bridge_scenes",
+          "type": "label",
+          "label": {
+            "en": "Scenes",
+            "nl": "Scenes"
+          },
+          "value": "-"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "images": {
+        "large": "drivers/bridge_diagnostics/assets/images/large.png",
+        "small": "drivers/bridge_diagnostics/assets/images/small.png",
+        "xlarge": "drivers/bridge_diagnostics/assets/images/xlarge.png"
+      },
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "energy_meter",
+      "name": {
+        "en": "Energy Meter",
+        "nl": "Energiemeter"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "measure_power",
+        "meter_power",
+        "measure_current",
+        "measure_voltage",
+        "xcomfort_pulses",
+        "xcomfort_energy_tariff",
+        "xcomfort_energy_tariff_label",
+        "xcomfort_energy_currency",
+        "xcomfort_energy_history",
+        "xcomfort_energy_cost",
+        "xcomfort_load_mode"
+      ],
+      "images": {
+        "large": "drivers/room_status/assets/images/large.png",
+        "small": "drivers/room_status/assets/images/small.png",
+        "xlarge": "drivers/room_status/assets/images/xlarge.png"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select energy meters",
+            "nl": "Energiemeters selecteren"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "settings": [
+        {
+          "id": "whole_home_meter",
+          "type": "checkbox",
+          "value": false,
+          "label": {
+            "en": "Whole-home meter (cumulative)",
+            "nl": "Hoofdmeter (cumulatief)"
+          },
+          "hint": {
+            "en": "Enable if this meter measures your home's total consumption. Homey Energy will then treat it as a home meter.",
+            "nl": "Schakel in als deze meter het totale verbruik van je woning meet. Homey Energy behandelt hem dan als hoofdmeter."
+          }
+        }
+      ],
+      "connectivity": [
+        "lan"
+      ]
+    },
+    {
+      "id": "water_sensor",
+      "name": {
+        "en": "Water Sensor",
+        "nl": "Watersensor"
+      },
+      "class": "sensor",
+      "capabilities": [
+        "alarm_water"
+      ],
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          },
+          "title": {
+            "en": "Select water sensors",
+            "nl": "Watersensoren selecteren"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "platforms": [
+        "local"
+      ],
+      "images": {
+        "large": "drivers/water_sensor/assets/images/large.png",
+        "small": "drivers/water_sensor/assets/images/small.png",
+        "xlarge": "drivers/water_sensor/assets/images/xlarge.png"
+      },
+      "repair": [
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "title": {
+              "en": "Update bridge connection",
+              "nl": "Bridge-verbinding bijwerken"
+            },
+            "usernameLabel": {
+              "en": "Bridge IP address",
+              "nl": "IP-adres van bridge"
+            },
+            "usernamePlaceholder": {
+              "en": "192.168.1.100",
+              "nl": "192.168.1.100"
+            },
+            "passwordLabel": {
+              "en": "Authentication key",
+              "nl": "Authenticatiesleutel"
+            },
+            "passwordPlaceholder": {
+              "en": "Auth key from the Eaton app",
+              "nl": "Sleutel uit de Eaton-app"
+            }
+          }
+        }
+      ],
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "connectivity": [
+        "lan"
+      ]
+    }
+  ],
+  "widgets": {
+    "bridge_status": {
+      "name": {
+        "en": "xComfort Bridge Status",
+        "nl": "xComfort Bridge-status"
+      },
+      "height": 160,
+      "transparent": false,
+      "settings": [],
+      "api": {
+        "getStatus": {
+          "method": "GET",
+          "path": "/"
+        }
+      },
+      "id": "bridge_status"
+    }
+  }
+}

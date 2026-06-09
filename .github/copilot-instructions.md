@@ -1,0 +1,4 @@
+- [x] Configured Project Structure
+- [x] Implemented Encryption
+- [x] Implemented Bridge Connection
+- [x] Implemented Drivers

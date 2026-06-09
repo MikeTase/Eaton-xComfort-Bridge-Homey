@@ -1,0 +1,3 @@
+Bring your local Eaton xComfort Bridge into Homey for everyday control of lighting, shading, heating, safety sensors, weather readings, and energy insight from one or more bridges. The app keeps communication local to the bridge, helps avoid duplicate devices during setup, and exposes useful xComfort status in Homey without needing the Eaton mobile app for daily use.
+
+Use Homey to automate xComfort scenes, room lighting, astro-based scene or room actions, climate presets, water protection, energy-aware loads, dimmer behavior, and optional bridge remote-access control while keeping auth-key or user/password bridge credentials in App Settings. A redacted diagnostics export is available from settings when support information is needed.

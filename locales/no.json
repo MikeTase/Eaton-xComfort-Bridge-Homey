@@ -1,0 +1,77 @@
+{
+    "settings": {
+        "title": "Eaton xComfort",
+        "intro": "Konfigurer én eller flere xComfort Bridge-tilkoblinger.",
+        "connection": "Bridge-tilkoblinger",
+        "add_bridge": "Legg til bridge",
+        "auth_key_hint": "Bindestreker og mellomrom i autentiseringsnøkkelen godtas og fjernes automatisk ved lagring.",
+        "diagnostics": "Diagnostikk",
+        "diagnostics_hint": "Generer en anonymisert støtteeksport for konfigurerte bridger og oppdagede xComfort-data.",
+        "generate_diagnostics": "Generer diagnostikk",
+        "download": "Last ned",
+        "generating_diagnostics": "Genererer diagnostikk...",
+        "name": "Navn",
+        "bridge_ip": "IP-adresse",
+        "bridge_host": "IP-adresse eller vertsnavn",
+        "bridge_auth_key": "Autentiseringsnøkkel",
+        "bridge_ip_hint": "Tips: Reserver denne IP-adressen i ruteren for å holde den stabil.",
+        "login_mode": "Påloggingsmodus",
+        "device_auth_key": "Enhetens autentiseringsnøkkel",
+        "user_password": "Bruker/passord",
+        "username": "Brukernavn",
+        "password": "Passord",
+        "password_placeholder": "Passord for bridge-brukeren",
+        "auth_key_placeholder": "f.eks. A1B2-C3D4-...",
+        "password_hint": "Bruk passordet til den navngitte bridge-brukerkontoen.",
+        "auth_key_mode_hint": "Bruk enhetens autentiseringskode som vises i Eaton xComfort Bridge-appen.",
+        "remote_access": "Fjerntilgang",
+        "remote_unchanged": "La stå uendret",
+        "remote_allow": "Tillat fjerntilgang",
+        "remote_block": "Blokker fjerntilgang",
+        "remote_access_hint": "Valgfri bridge-innstilling, brukes etter at bridgen er tilkoblet.",
+        "remove": "Fjern",
+        "save": "Lagre innstillinger",
+        "show": "Vis",
+        "hide": "Skjul",
+        "saved": "Innstillinger lagret!",
+        "save_error": "Feil ved lagring av bridge-innstillinger.",
+        "fill_required": "Fyll ut begge feltene."
+    },
+    "pair": {
+        "common": {
+            "add_selected": "Legg til valgte",
+            "loading_devices": "Laster enheter...",
+            "still_loading": "Laster fortsatt...",
+            "no_devices": "Ingen enheter funnet.",
+            "unable_to_load": "Kunne ikke laste enheter.",
+            "unnamed": "Uten navn"
+        },
+        "actuator": {
+            "title": "Velg aktuatorer og dimmere"
+        },
+        "binary_input": {
+            "title": "Velg binærinnganger"
+        },
+        "door_window_sensor": {
+            "title": "Velg dør- og vindussensorer"
+        },
+        "energy_meter": {
+            "title": "Velg energimålere"
+        },
+        "motion_sensor": {
+            "title": "Velg bevegelsessensorer"
+        },
+        "shading": {
+            "title": "Velg solskjermingsenheter"
+        },
+        "thermostat": {
+            "title": "Velg termostater"
+        },
+        "wall_switch": {
+            "title": "Velg veggbrytere"
+        },
+        "water_sensor": {
+            "title": "Velg vannsensorer"
+        }
+    }
+}

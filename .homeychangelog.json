@@ -1,0 +1,278 @@
+{
+  "1.0.5": {
+    "en": "Updated images"
+  },
+  "1.0.6": {
+    "en": "added readme"
+  },
+  "1.0.7": {
+    "en": "Images"
+  },
+  "1.0.8": {
+    "en": "images"
+  },
+  "1.0.9": {
+    "en": "Logo"
+  },
+  "1.0.10": {
+    "en": "Image"
+  },
+  "1.0.11": {
+    "en": "Changed permisions"
+  },
+  "1.1.0": {
+    "en": "images"
+  },
+  "1.2.0": {
+    "en": "added functions "
+  },
+  "1.2.1": {
+    "en": "improved stability and images"
+  },
+  "1.2.3": {
+    "en": "removed dead coding"
+  },
+  "1.2.4": {
+    "en": "image quality"
+  },
+  "1.2.5": {
+    "en": "state monitoring improved for actuator "
+  },
+  "1.3.0": {
+    "en": "fixed unexpected crash"
+  },
+  "1.3.1": {
+    "en": "improved error handling"
+  },
+  "1.4.0": {
+    "en": "tuning"
+  },
+  "1.4.1": {
+    "en": "stability and type-safety improvements"
+  },
+  "1.4.2": {
+    "en": "Changed readme for IP"
+  },
+  "1.4.3": {
+    "en": "readme changed"
+  },
+  "1.4.4": {
+    "en": "stability"
+  },
+  "1.4.5": {
+    "en": "Added synced xComfort thermostat presets and room heating state, plus new temperature/humidity, door/window, and room status sensors with improved heater and button telemetry."
+  },
+  "1.4.6": {
+    "en": "Removed room and temperature/humidity sensor device types and corrected the door/window sensor images."
+  },
+  "1.4.7": {
+    "en": "Improved thermostat sensor sync and energy tracking, richer wall switch events, bridge diagnostics metadata, and better state restore after reconnect."
+  },
+  "1.4.8": {
+    "en": "Fixed thermostat room sync and preset control, and corrected water sensor alarm reset syncing."
+  },
+  "1.4.9": {
+    "en": "Added fallback thermostat"
+  },
+  "1.4.10": {
+    "en": "fallback thermostat"
+  },
+  "1.4.11": {
+    "en": "sensor changes"
+  },
+  "1.4.13": {
+    "en": "Adds thermostat heating preset Flow support, estimated thermostat power fallback, and water guard on/off control with corrected alarm sync."
+  },
+  "1.4.14": {
+    "en": "Improves shading position/state sync, adds thermostat heating-demand parsing from bridge metadata, and adds extra xComfort bridge message compatibility."
+  },
+  "1.4.15": {
+    "en": "Flows for water state"
+  },
+  "1.4.16": {
+    "en": "status water"
+  },
+  "1.4.17": {
+    "en": "removed energy reporting from devices that dont support it "
+  },
+  "1.4.18": {
+    "en": "stuck state"
+  },
+  "1.4.19": {
+    "en": "heater changes"
+  },
+  "1.4.20": {
+    "en": "wattage changes"
+  },
+  "1.4.21": {
+    "en": "Improved bridge state handling for wall switches and shading, added better direct update support, and improved metadata/home-data reliability."
+  },
+  "1.4.22": {
+    "en": "Improved state syncing for actuators, shading, wall switches, and room updates, with better direct update handling from the bridge."
+  },
+  "1.4.23": {
+    "en": "Fixed water sensor alarm state so Homey no longer shows a triggered alarm when the bridge reports no water alarm."
+  },
+  "1.4.24": {
+    "en": "Fix WaterGuard alarm sync so opening the water valve no longer triggers a false alarm in Homey."
+  },
+  "1.4.25": {
+    "en": "Fix thermostat power usage so partial xComfort updates no longer make Homey drop to 0 W while heating is still active."
+  },
+  "1.4.26": {
+    "en": "Convert the remaining helper script to TypeScript and keep the update script runnable from the compiled build output."
+  },
+  "1.4.27": {
+    "en": "changes Thermo"
+  },
+  "1.4.28": {
+    "en": "Improved bridge reliability and thermostat handling, fixed combined state+metadata updates, and made dimming more responsive."
+  },
+  "1.4.29": {
+    "en": "Added Binary Input, Temperature Sensor, and Motion Sensor support for additional xComfort sensor channels; improved door/window sensor detection using bridge component type mapping."
+  },
+  "1.4.30": {
+    "en": "Added Room Status sensors with room temperature, humidity, heating demand, power, calculated room energy, lights-on counts, and open window/door counts; improved temperature/humidity pairing and thermostat heating demand visibility."
+  },
+  "1.4.31": {
+    "en": "Added support for configuring multiple xComfort Bridges and pairing devices, room status sensors, and diagnostics from each bridge while keeping existing single-bridge devices compatible."
+  },
+  "1.4.32": {
+    "en": "Improved bridge diagnostics by preserving full status across main power updates, added calculated main-meter energy, initialized multiple bridges in parallel, improved sensor pairing diagnostics, and added clearer wall switch pairing names."
+  },
+  "1.4.33": {
+    "en": "Fixed pairing lists so already-installed devices are hidden when adding new devices, including legacy single-bridge devices and newer multi-bridge device IDs."
+  },
+  "1.4.34": {
+    "en": "Added xComfort scenes, appliance/load support, updated binary input and motion classifications, remote access diagnostics, heating valve details, improved pairing speed, and slow background reconnect retries."
+  },
+  "1.4.35": {
+    "en": "Updated motion and binary input artwork, improved motion sensor icon, and removed appliance and temperature sensor from new device pairing."
+  },
+  "1.4.39": {
+    "en": "Improved actuator command reliability, fixed the motion sensor icon, and cleaned up the Add Device list metadata."
+  },
+  "1.4.48": {
+    "en": "Restored stable actuator switching and added paced light command handling for safer bulk on/off actions."
+  },
+  "1.4.49": {
+    "en": "Improved release validation and cleaned up lint warnings for a more reliable app build."
+  },
+  "1.4.50": {
+    "en": "Improve actuator switching stability by preventing bridge command bursts during all-lights actions."
+  },
+  "1.4.51": {
+    "en": "Improved actuator switching stability and bridge connection handling; reduced retry storms during busy bridge responses."
+  },
+  "1.4.52": {
+    "en": "Restore Bridge Diagnostics as an addable device while keeping Room Status hidden from pairing."
+  },
+  "1.4.53": {
+    "en": "Align README and metadata with current addable devices; clean up hidden legacy scene pairing."
+  },
+  "1.4.54": {
+    "en": "Hide Bridge Diagnostics from the add-device pairing flow."
+  },
+  "1.4.55": {
+    "en": "Add Weather Station and Energy Meter pairing, redacted settings diagnostics, broader xComfort model recognition, battery and signal metadata, and improved thermostat mode handling."
+  },
+  "1.4.56": {
+    "en": "Expand Energy Meter and EMS support with current, voltage, pulse, tariff, cost, load-mode controls, richer pairing metadata, and advanced thermostat room details."
+  },
+  "1.4.57": {
+    "en": "Hide Weather Station from new device pairing while keeping existing installed Weather Station devices supported."
+  },
+  "1.4.58": {
+    "en": "Add Dutch App Store text and localized app description."
+  },
+  "1.4.59": {
+    "en": "Add wall-switch double-press Flow triggers, broader device diagnostics, and richer xComfort energy tariff, currency, and history handling while keeping safe light command pacing."
+  },
+  "1.4.60": {
+    "en": "Add bridge remote access control in settings and Flow, improve Push Button MultiSensor metadata parsing, and broaden xComfort energy history and tariff parsing."
+  },
+  "1.4.61": {
+    "en": "Add dimming actuator behavior settings, an astro Flow condition for scene/room automations, richer scene metadata, and improved Energy Control meter/load pairing."
+  },
+  "1.4.62": {
+    "en": "Add named bridge user/password login as an alternative to the existing device auth-key flow."
+  },
+  "1.4.63": {
+    "en": "Add human-readable bridge app-info messages to improve logs and diagnostics for bridge-side errors."
+  },
+  "1.4.64": {
+    "en": "Handle bridge component-info updates for fresher battery, signal, and mains metadata."
+  },
+  "1.4.65": {
+    "en": "Handle bridge add, info, and delete lifecycle messages for fresher device, room, and component inventory."
+  },
+  "1.4.66": {
+    "en": "Update the WebSocket dependency and developer tooling, exclude macOS metadata from Homey packages, and remove local lint suppressions."
+  },
+  "1.4.67": {
+    "en": "Exclude unused pairing views for hidden legacy and internal drivers, and harden bridge settings normalization."
+  },
+  "1.4.68": {
+    "en": "Align TypeScript Node typings with Homey's documented Node 22 runtime."
+  },
+  "1.4.69": {
+    "en": "Add Dutch locale translations for the settings page and route bridge settings messages through Homey i18n."
+  },
+  "1.4.70": {
+    "en": "Apply Homey i18n translations to static settings labels and await final energy-meter persistence during device deletion."
+  },
+  "1.4.71": {
+    "en": "Add Dutch translations for active add-device pairing pages and exclude obsolete actuator and wall-switch pairing pages."
+  },
+  "1.4.72": {
+    "en": "Add Dutch translations across settings, pairing, Flow cards, custom capabilities, driver names, and device settings, plus packaging cleanup for obsolete pairing views.",
+    "nl": "Nederlandse vertalingen toegevoegd voor instellingen, toevoegen van apparaten, Flow-kaarten, aangepaste mogelijkheden, drivernamen en apparaatinstellingen, plus pakketopschoning voor verouderde koppelingspagina's."
+  },
+  "1.4.73": {
+    "en": "Prevent duplicate device and room state listeners after bridge rebinds, and complete release metadata for recent cleanup builds.",
+    "nl": "Voorkomt dubbele apparaat- en kamerstatuslisteners na bridge-herkoppelingen en vult releasemetadata aan voor recente opschoningsversies."
+  },
+  "1.4.74": {
+    "en": "Broaden diagnostics redaction to remove user identity fields from raw support exports.",
+    "nl": "Breidt diagnose-redactie uit zodat gebruikersidentiteitsvelden uit ruwe supportexports worden verwijderd."
+  },
+  "1.4.75": {
+    "en": "Expand diagnostics redaction for alternate user identity, account, login, credential, and session fields.",
+    "nl": "Breidt diagnose-redactie uit voor alternatieve gebruikers-, account-, login-, credential- en sessievelden."
+  },
+  "1.4.76": {
+    "en": "Add Homey App Store xlarge image assets for the app and all manifest drivers.",
+    "nl": "Voegt Homey App Store xlarge-afbeeldingen toe voor de app en alle manifestdrivers."
+  },
+  "1.4.77": {
+    "en": "Reduce sensitive connection details in runtime logs.",
+    "nl": "Vermindert gevoelige verbindingsdetails in runtime-logs."
+  },
+  "1.4.78": {
+    "en": "Complete missing manifest driver icons and normalize all driver SVG icons to Homey's recommended 960x960 canvas.",
+    "nl": "Vult ontbrekende manifest-drivericonen aan en normaliseert alle SVG-drivericonen naar het door Homey aanbevolen canvas van 960x960."
+  },
+  "1.4.79": {
+    "en": "Clean up Flow card titles to better match Homey App Store wording guidelines.",
+    "nl": "Schoont Flow-kaarttitels op zodat ze beter aansluiten op de Homey App Store-richtlijnen."
+  },
+  "1.4.80": {
+    "en": "Add targeted development dependency overrides so full npm audit reports no vulnerabilities.",
+    "nl": "Voegt gerichte overrides voor ontwikkelafhankelijkheden toe zodat volledige npm audit geen kwetsbaarheden meer meldt."
+  },
+  "1.5.0": {
+    "en": "Adds a Bridge Status dashboard widget, a repair flow to update bridge credentials without re-pairing, battery info for battery-powered sensors in Homey Energy, energy approximation for non-metered lights, and a whole-home (cumulative) meter option for energy meters. Fixes shading position control: position support (shRuntime) is now stored correctly and existing shades self-heal from bridge data. Requires Homey v12.3.0 or newer.",
+    "nl": "Voegt een Bridge-status dashboardwidget toe, een herstelflow om bridge-gegevens bij te werken zonder opnieuw te koppelen, batterij-informatie voor sensoren in Homey Energy, energie-benadering voor niet-gemeten verlichting en een hoofdmeter-optie (cumulatief) voor energiemeters. Herstelt positiebediening van zonwering: positie-ondersteuning (shRuntime) wordt nu correct opgeslagen en bestaande zonwering herstelt zichzelf via bridge-gegevens. Vereist Homey v12.3.0 of nieuwer."
+  },
+  "1.5.1": {
+    "en": "Renames the Energy Meter whole-home setting ID so Homey no longer reports a reserved energy_ prefix warning.",
+    "nl": "Hernoemt de instelling-ID voor de hoofdmeter van de Energiemeter zodat Homey geen waarschuwing meer meldt over de gereserveerde energy_-prefix."
+  },
+  "1.5.2": {
+    "en": "Fixes shading position control by storing shRuntime correctly and restoring the position slider from live bridge data for already-paired shades.",
+    "nl": "Herstelt positiebediening van zonwering door shRuntime correct op te slaan en de positieschuif voor bestaande zonwering via live bridge-data te herstellen."
+  },
+  "1.6.0": {
+    "en": "Stability: declined-handshake reconnect fix, smoother settings saves, clean shutdown with energy flush. New: shading safety-lock alarm, energy history insights, scene button class, DE/NO/SV/DA translations."
+  }
+}

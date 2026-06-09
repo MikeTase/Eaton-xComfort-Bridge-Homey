@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: var(--homey-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+      color: var(--homey-text-color, #222);
+      padding: var(--homey-su-2, 8px) var(--homey-su-3, 12px);
+      background: transparent;
+    }
+
+    .bridge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 4px;
+    }
+
+    .bridge+.bridge {
+      border-top: 1px solid var(--homey-color-mono-100, rgba(128, 128, 128, 0.15));
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: #d0d0d0;
+    }
+
+    .dot.connected {
+      background: #2ecc71;
+    }
+
+    .dot.disconnected {
+      background: #e74c3c;
+    }
+
+    .info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .name {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .meta {
+      font-size: 12px;
+      opacity: 0.65;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .state {
+      font-size: 12px;
+      font-weight: 500;
+      flex-shrink: 0;
+    }
+
+    .state.connected {
+      color: #2ecc71;
+    }
+
+    .state.disconnected {
+      color: #e74c3c;
+    }
+
+    .empty {
+      font-size: 13px;
+      opacity: 0.6;
+      text-align: center;
+      padding: 16px 8px;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="bridges"></div>
+
+  <script type="text/javascript">
+    function render(bridges) {
+      const container = document.getElementById('bridges');
+      container.innerHTML = '';
+
+      if (!Array.isArray(bridges) || bridges.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = 'No bridges configured. Add one in the app settings.';
+        container.appendChild(empty);
+        return;
+      }
+
+      bridges.forEach((bridge) => {
+        const row = document.createElement('div');
+        row.className = 'bridge';
+
+        const dot = document.createElement('div');
+        dot.className = 'dot ' + (bridge.connected ? 'connected' : 'disconnected');
+
+        const info = document.createElement('div');
+        info.className = 'info';
+
+        const name = document.createElement('div');
+        name.className = 'name';
+        name.textContent = bridge.name || bridge.id;
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+        meta.textContent = bridge.devices + ' devices · ' + bridge.rooms + ' rooms · ' + bridge.scenes + ' scenes';
+
+        info.appendChild(name);
+        info.appendChild(meta);
+
+        const state = document.createElement('div');
+        state.className = 'state ' + (bridge.connected ? 'connected' : 'disconnected');
+        state.textContent = bridge.connected ? 'Connected' : 'Disconnected';
+
+        row.appendChild(dot);
+        row.appendChild(info);
+        row.appendChild(state);
+        container.appendChild(row);
+      });
+    }
+
+    function onHomeyReady(Homey) {
+      function refresh() {
+        Homey.api('GET', '/', {})
+          .then((result) => {
+            render(result);
+            const count = Array.isArray(result) ? Math.max(result.length, 1) : 1;
+            Homey.setHeight(16 + count * 50).catch(() => { });
+          })
+          .catch((err) => {
+            console.error(err);
+          });
+      }
+
+      refresh();
+      setInterval(refresh, 30000);
+      Homey.ready();
+    }
+  </script>
+</body>
+
+</html>

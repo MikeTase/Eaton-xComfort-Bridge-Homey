@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script type="text/javascript" src="/homey.js" data-origin="settings"></script>
+        <style>
+            body { font-family: sans-serif; padding: 16px; }
+            .hint { color: #666; font-size: 12px; margin-top: 4px; }
+            .status { margin-top: 12px; min-height: 18px; }
+            .status.ok { color: #0a7f3f; }
+            .status.err { color: #b00020; }
+            .bridge-row {
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 12px;
+                margin: 10px 0;
+            }
+            .field { margin: 8px 0; }
+            label { display: block; font-size: 13px; margin-bottom: 4px; }
+            input, select { box-sizing: border-box; width: 100%; }
+            .hidden { display: none; }
+            .actions { display: flex; gap: 8px; margin-top: 12px; }
+            .row-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+            textarea { box-sizing: border-box; width: 100%; min-height: 180px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; margin-top: 8px; }
+        </style>
+    </head>
+    <body>
+        <h1 data-i18n="settings.title">Eaton xComfort</h1>
+        <p data-i18n="settings.intro">Configure one or more xComfort Bridge connections.</p>
+
+        <fieldset>
+            <legend data-i18n="settings.connection">Bridge Connections</legend>
+            <div id="bridges"></div>
+            <button id="add_bridge" type="button" data-i18n="settings.add_bridge">Add Bridge</button>
+            <div class="hint" data-i18n="settings.auth_key_hint">Device auth key dashes and spaces are accepted and removed automatically when saved.</div>
+        </fieldset>
+
+        <fieldset>
+            <legend data-i18n="settings.diagnostics">Diagnostics</legend>
+            <div class="hint" data-i18n="settings.diagnostics_hint">Generate a redacted support export for configured bridges and discovered xComfort data.</div>
+            <div class="actions">
+                <button id="diagnostics" type="button" data-i18n="settings.generate_diagnostics">Generate Diagnostics</button>
+                <button id="download_diagnostics" type="button" disabled data-i18n="settings.download">Download</button>
+            </div>
+            <textarea id="diagnostics_output" readonly></textarea>
+        </fieldset>
+
+        <div class="actions">
+            <button id="save" class="button-primary" disabled data-i18n="settings.save">Save Settings</button>
+        </div>
+        <div id="status" class="status"></div>
+
+        <script type="text/javascript">
+            function onHomeyReady(Homey) {
+                Homey.ready();
+
+                var bridgesEl = document.getElementById('bridges');
+                var addButton = document.getElementById('add_bridge');
+                var saveButton = document.getElementById('save');
+                var diagnosticsButton = document.getElementById('diagnostics');
+                var downloadDiagnosticsButton = document.getElementById('download_diagnostics');
+                var diagnosticsOutput = document.getElementById('diagnostics_output');
+                var statusEl = document.getElementById('status');
+                var bridges = [];
+                var latestDiagnostics = '';
+
+                function translate(key, fallback) {
+                    var translated = Homey.__(key);
+                    return translated && translated !== key ? translated : fallback;
+                }
+
+                function translateHtml(key, fallback) {
+                    return String(translate(key, fallback)).replace(/[&<>"']/g, function(char) {
+                        return {
+                            '&': '&amp;',
+                            '<': '&lt;',
+                            '>': '&gt;',
+                            '"': '&quot;',
+                            "'": '&#39;'
+                        }[char];
+                    });
+                }
+
+                function applyStaticTranslations() {
+                    document.querySelectorAll('[data-i18n]').forEach(function(element) {
+                        var key = element.getAttribute('data-i18n');
+                        if (!key) {
+                            return;
+                        }
+                        element.textContent = translate(key, element.textContent || '');
+                    });
+                }
+
+                function setStatus(text, isError) {
+                    statusEl.textContent = text || '';
+                    statusEl.className = 'status ' + (isError ? 'err' : 'ok');
+                }
+
+                function sanitizeId(value, index) {
+                    var base = String(value || ('bridge_' + (index + 1))).toLowerCase()
+                        .replace(/[^a-z0-9]+/g, '_')
+                        .replace(/^_+|_+$/g, '');
+                    return base || ('bridge_' + (index + 1));
+                }
+
+                function isValidHost(str) {
+                    var ipv4 = /^(\d{1,3}\.){3}\d{1,3}$/;
+                    var hostname = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/;
+                    if (ipv4.test(str)) {
+                        return str.split('.').every(function(o) {
+                            var n = parseInt(o, 10);
+                            return n >= 0 && n <= 255;
+                        });
+                    }
+                    return hostname.test(str);
+                }
+
+                function normalizeRemoteAccessPreference(value) {
+                    if (value === true || value === false) {
+                        return value;
+                    }
+                    if (value === 1 || value === '1') {
+                        return true;
+                    }
+                    if (value === 0 || value === '0') {
+                        return false;
+                    }
+                    if (typeof value === 'string') {
+                        var normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
+                        if (['true', 'yes', 'on', 'allow', 'allowed', 'enable', 'enabled'].indexOf(normalized) !== -1) {
+                            return true;
+                        }
+                        if (['false', 'no', 'off', 'block', 'blocked', 'disable', 'disabled'].indexOf(normalized) !== -1) {
+                            return false;
+                        }
+                    }
+                    return null;
+                }
+
+                function normalizeAuthMode(value) {
+                    var normalized = String(value || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+                    return ['user', 'username', 'password', 'account', 'named_user', 'user_password'].indexOf(normalized) !== -1
+                        ? 'user'
+                        : 'device';
+                }
+
+                function normalizeSecret(value, authMode) {
+                    var secret = String(value || '');
+                    return authMode === 'user' ? secret.trim() : secret.replace(/[\s-]+/g, '');
+                }
+
+                function normalizeBridge(entry, index) {
+                    entry = entry || {};
+                    var name = String(entry.name || ('xComfort Bridge ' + (index + 1))).trim();
+                    var ip = String(entry.ip || '').trim();
+                    var authMode = normalizeAuthMode(entry.authMode || entry.auth_mode);
+                    var authKey = normalizeSecret(entry.authKey || entry.auth_key || entry.password || '', authMode);
+                    var username = String(entry.username || '').trim();
+                    var remoteAccessValue = Object.prototype.hasOwnProperty.call(entry, 'remoteAccess')
+                        ? entry.remoteAccess
+                        : entry.remote_access;
+                    return {
+                        id: sanitizeId(entry.id || name || ip, index),
+                        name: name,
+                        ip: ip,
+                        authMode: authMode,
+                        authKey: authKey,
+                        username: username,
+                        remoteAccess: normalizeRemoteAccessPreference(remoteAccessValue)
+                    };
+                }
+
+                function parseBridges(value) {
+                    if (Array.isArray(value)) {
+                        return value;
+                    }
+                    if (typeof value === 'string') {
+                        try {
+                            var parsed = JSON.parse(value);
+                            return Array.isArray(parsed) ? parsed : [];
+                        } catch (e) {
+                            return [];
+                        }
+                    }
+                    return [];
+                }
+
+                function validate() {
+                    var valid = bridges.length > 0 && bridges.every(function(bridge) {
+                        return bridge.name.trim().length > 0
+                            && bridge.ip.trim().length > 0
+                            && isValidHost(bridge.ip.trim())
+                            && bridge.authKey.trim().length > 0
+                            && (bridge.authMode !== 'user' || bridge.username.trim().length > 0);
+                    });
+                    saveButton.disabled = !valid;
+                }
+
+                function updateAuthModeFields(row, bridge) {
+                    var userMode = bridge.authMode === 'user';
+                    row.querySelector('[data-role="usernameField"]').classList.toggle('hidden', !userMode);
+                    row.querySelector('[data-role="secretLabel"]').textContent = userMode
+                        ? translate('settings.password', 'Password')
+                        : translate('settings.bridge_auth_key', 'Auth Key');
+                    row.querySelector('[data-field="authKey"]').placeholder = userMode
+                        ? translate('settings.password_placeholder', 'Bridge user password')
+                        : translate('settings.auth_key_placeholder', 'e.g. A1B2-C3D4-...');
+                    row.querySelector('[data-role="secretHint"]').textContent = userMode
+                        ? translate('settings.password_hint', 'Use the password for the named bridge user account.')
+                        : translate('settings.auth_key_mode_hint', 'Use the device auth code shown in the Eaton xComfort Bridge app.');
+                }
+
+                function render() {
+                    bridgesEl.innerHTML = '';
+                    bridges.forEach(function(bridge, index) {
+                        var row = document.createElement('div');
+                        row.className = 'bridge-row';
+
+                        row.innerHTML =
+                            '<div class="field">' +
+                                '<label>' + translateHtml('settings.name', 'Name') + '</label>' +
+                                '<input data-field="name" type="text" autocomplete="off" />' +
+                            '</div>' +
+                            '<div class="field">' +
+                                '<label>' + translateHtml('settings.bridge_host', 'IP Address or Hostname') + '</label>' +
+                                '<input data-field="ip" type="text" placeholder="192.168.1.x" autocomplete="off" />' +
+                            '</div>' +
+                            '<div class="field">' +
+                                '<label>' + translateHtml('settings.login_mode', 'Login Mode') + '</label>' +
+                                '<select data-field="authMode">' +
+                                    '<option value="device">' + translateHtml('settings.device_auth_key', 'Device auth key') + '</option>' +
+                                    '<option value="user">' + translateHtml('settings.user_password', 'User/password') + '</option>' +
+                                '</select>' +
+                            '</div>' +
+                            '<div class="field" data-role="usernameField">' +
+                                '<label>' + translateHtml('settings.username', 'Username') + '</label>' +
+                                '<input data-field="username" type="text" autocomplete="username" />' +
+                            '</div>' +
+                            '<div class="field">' +
+                                '<label data-role="secretLabel">' + translateHtml('settings.bridge_auth_key', 'Auth Key') + '</label>' +
+                                '<input data-field="authKey" type="password" placeholder="' + translateHtml('settings.auth_key_placeholder', 'e.g. A1B2-C3D4-...') + '" autocomplete="current-password" />' +
+                                '<div class="hint" data-role="secretHint"></div>' +
+                            '</div>' +
+                            '<div class="field">' +
+                                '<label>' + translateHtml('settings.remote_access', 'Remote Access') + '</label>' +
+                                '<select data-field="remoteAccess">' +
+                                    '<option value="unchanged">' + translateHtml('settings.remote_unchanged', 'Leave unchanged') + '</option>' +
+                                    '<option value="allow">' + translateHtml('settings.remote_allow', 'Allow remote access') + '</option>' +
+                                    '<option value="block">' + translateHtml('settings.remote_block', 'Block remote access') + '</option>' +
+                                '</select>' +
+                                '<div class="hint">' + translateHtml('settings.remote_access_hint', 'Optional bridge preference, applied after the bridge connects.') + '</div>' +
+                            '</div>' +
+                            '<div class="row-actions">' +
+                                '<button type="button" data-action="remove">' + translateHtml('settings.remove', 'Remove') + '</button>' +
+                            '</div>';
+
+                        row.querySelector('[data-field="name"]').value = bridge.name;
+                        row.querySelector('[data-field="ip"]').value = bridge.ip;
+                        row.querySelector('[data-field="authMode"]').value = bridge.authMode;
+                        row.querySelector('[data-field="username"]').value = bridge.username;
+                        row.querySelector('[data-field="authKey"]').value = bridge.authKey;
+                        row.querySelector('[data-field="remoteAccess"]').value =
+                            bridge.remoteAccess === true ? 'allow' : bridge.remoteAccess === false ? 'block' : 'unchanged';
+                        updateAuthModeFields(row, bridge);
+
+                        row.querySelectorAll('input, select').forEach(function(input) {
+                            input.addEventListener('input', function() {
+                                var field = input.getAttribute('data-field');
+                                bridges[index][field] = field === 'remoteAccess'
+                                    ? normalizeRemoteAccessPreference(input.value)
+                                    : field === 'authMode'
+                                        ? normalizeAuthMode(input.value)
+                                        : field === 'authKey'
+                                            ? normalizeSecret(input.value, bridges[index].authMode)
+                                    : input.value;
+                                if (field === 'authMode') {
+                                    bridges[index].authKey = normalizeSecret(bridges[index].authKey, bridges[index].authMode);
+                                    updateAuthModeFields(row, bridges[index]);
+                                }
+                                if (field === 'name') {
+                                    bridges[index].id = sanitizeId(bridges[index].id || input.value, index);
+                                }
+                                validate();
+                            });
+                        });
+
+                        row.querySelector('[data-action="remove"]').addEventListener('click', function() {
+                            bridges.splice(index, 1);
+                            if (!bridges.length) {
+                                bridges.push(normalizeBridge({}, 0));
+                            }
+                            render();
+                            validate();
+                        });
+
+                        bridgesEl.appendChild(row);
+                    });
+                }
+
+                function loadSettings() {
+                    Homey.get('bridges', function(err, value) {
+                        var savedBridges = parseBridges(value);
+                        if (savedBridges.length) {
+                            bridges = savedBridges.map(normalizeBridge);
+                            render();
+                            validate();
+                            return;
+                        }
+
+                        Homey.get('bridge_ip', function(ipErr, ip) {
+                            Homey.get('bridge_auth_key', function(keyErr, key) {
+                                if (ip && key) {
+                                    bridges = [normalizeBridge({
+                                        id: 'default',
+                                        name: 'xComfort Bridge',
+                                        ip: ip,
+                                        authKey: key
+                                    }, 0)];
+                                } else {
+                                    bridges = [normalizeBridge({}, 0)];
+                                }
+                                render();
+                                validate();
+                            });
+                        });
+                    });
+                }
+
+                addButton.addEventListener('click', function() {
+                    bridges.push(normalizeBridge({}, bridges.length));
+                    render();
+                    validate();
+                });
+
+                saveButton.addEventListener('click', function() {
+                    var normalized = bridges.map(normalizeBridge);
+                    var seen = {};
+                    normalized = normalized.map(function(bridge, index) {
+                        var baseId = sanitizeId(bridge.id, index);
+                        var id = baseId;
+                        var suffix = 2;
+                        while (seen[id]) {
+                            id = baseId + '_' + suffix++;
+                        }
+                        seen[id] = true;
+                        bridge.id = id;
+                        bridge.authMode = normalizeAuthMode(bridge.authMode);
+                        bridge.authKey = normalizeSecret(bridge.authKey, bridge.authMode);
+                        bridge.username = String(bridge.username || '').trim();
+                        if (bridge.authMode !== 'user') {
+                            delete bridge.username;
+                        }
+                        if (bridge.remoteAccess !== true && bridge.remoteAccess !== false) {
+                            delete bridge.remoteAccess;
+                        }
+                        return bridge;
+                    });
+
+                    Homey.set('bridges', normalized, function(err) {
+                        if (err) {
+                            setStatus(translate('settings.save_error', 'Error saving bridge settings.'), true);
+                            return;
+                        }
+                        bridges = normalized;
+                        render();
+                        validate();
+                        setStatus(translate('settings.saved', 'Settings saved!'), false);
+                    });
+                });
+
+                diagnosticsButton.addEventListener('click', function() {
+                    diagnosticsButton.disabled = true;
+                    downloadDiagnosticsButton.disabled = true;
+                    diagnosticsOutput.value = translate('settings.generating_diagnostics', 'Generating diagnostics...');
+                    Homey.api('GET', '/diagnostics', {}, function(err, result) {
+                        diagnosticsButton.disabled = false;
+                        if (err) {
+                            latestDiagnostics = '';
+                            diagnosticsOutput.value = (err && err.message) || String(err);
+                            return;
+                        }
+
+                        latestDiagnostics = JSON.stringify(result, null, 2);
+                        diagnosticsOutput.value = latestDiagnostics;
+                        downloadDiagnosticsButton.disabled = false;
+                    });
+                });
+
+                downloadDiagnosticsButton.addEventListener('click', function() {
+                    if (!latestDiagnostics) {
+                        return;
+                    }
+
+                    var blob = new Blob([latestDiagnostics], { type: 'application/json' });
+                    var link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'xcomfort-diagnostics.json';
+                    link.click();
+                    setTimeout(function() {
+                        URL.revokeObjectURL(link.href);
+                    }, 1000);
+                });
+
+                applyStaticTranslations();
+                loadSettings();
+            }
+        </script>
+    </body>
+</html>

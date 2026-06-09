@@ -1,0 +1,77 @@
+{
+    "settings": {
+        "title": "Eaton xComfort",
+        "intro": "Konfiguriere eine oder mehrere xComfort Bridge-Verbindungen.",
+        "connection": "Bridge-Verbindungen",
+        "add_bridge": "Bridge hinzufügen",
+        "auth_key_hint": "Bindestriche und Leerzeichen im Geräte-Auth-Schlüssel werden beim Speichern automatisch entfernt.",
+        "diagnostics": "Diagnose",
+        "diagnostics_hint": "Erstelle einen bereinigten Support-Export der konfigurierten Bridges und erkannten xComfort-Daten.",
+        "generate_diagnostics": "Diagnose erstellen",
+        "download": "Herunterladen",
+        "generating_diagnostics": "Diagnose wird erstellt...",
+        "name": "Name",
+        "bridge_ip": "IP-Adresse",
+        "bridge_host": "IP-Adresse oder Hostname",
+        "bridge_auth_key": "Auth-Schlüssel",
+        "bridge_ip_hint": "Tipp: Reserviere diese IP im Router, damit sie stabil bleibt.",
+        "login_mode": "Anmeldemodus",
+        "device_auth_key": "Geräte-Auth-Schlüssel",
+        "user_password": "Benutzer/Passwort",
+        "username": "Benutzername",
+        "password": "Passwort",
+        "password_placeholder": "Passwort des Bridge-Benutzers",
+        "auth_key_placeholder": "z. B. A1B2-C3D4-...",
+        "password_hint": "Verwende das Passwort des benannten Bridge-Benutzerkontos.",
+        "auth_key_mode_hint": "Verwende den Geräte-Auth-Code aus der Eaton xComfort Bridge-App.",
+        "remote_access": "Fernzugriff",
+        "remote_unchanged": "Unverändert lassen",
+        "remote_allow": "Fernzugriff erlauben",
+        "remote_block": "Fernzugriff blockieren",
+        "remote_access_hint": "Optionale Bridge-Einstellung, wird nach dem Verbinden der Bridge angewendet.",
+        "remove": "Entfernen",
+        "save": "Einstellungen speichern",
+        "show": "Anzeigen",
+        "hide": "Verbergen",
+        "saved": "Einstellungen gespeichert!",
+        "save_error": "Fehler beim Speichern der Bridge-Einstellungen.",
+        "fill_required": "Bitte fülle beide Felder aus."
+    },
+    "pair": {
+        "common": {
+            "add_selected": "Auswahl hinzufügen",
+            "loading_devices": "Geräte werden geladen...",
+            "still_loading": "Wird noch geladen...",
+            "no_devices": "Keine Geräte gefunden.",
+            "unable_to_load": "Geräte konnten nicht geladen werden.",
+            "unnamed": "Unbenannt"
+        },
+        "actuator": {
+            "title": "Aktoren und Dimmer auswählen"
+        },
+        "binary_input": {
+            "title": "Binäreingänge auswählen"
+        },
+        "door_window_sensor": {
+            "title": "Tür- und Fenstersensoren auswählen"
+        },
+        "energy_meter": {
+            "title": "Energiezähler auswählen"
+        },
+        "motion_sensor": {
+            "title": "Bewegungsmelder auswählen"
+        },
+        "shading": {
+            "title": "Beschattungsgeräte auswählen"
+        },
+        "thermostat": {
+            "title": "Thermostate auswählen"
+        },
+        "wall_switch": {
+            "title": "Wandschalter auswählen"
+        },
+        "water_sensor": {
+            "title": "Wassersensoren auswählen"
+        }
+    }
+}

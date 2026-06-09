@@ -1,0 +1,15 @@
+{
+  "name": {
+    "en": "xComfort Bridge Status",
+    "nl": "xComfort Bridge-status"
+  },
+  "height": 160,
+  "transparent": false,
+  "settings": [],
+  "api": {
+    "getStatus": {
+      "method": "GET",
+      "path": "/"
+    }
+  }
+}

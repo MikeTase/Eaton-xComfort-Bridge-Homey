@@ -1,0 +1,54 @@
+{
+  "name": "com.eaton.xcomfort",
+  "version": "1.6.0",
+  "description": "Eaton xComfort implementation for Homey",
+  "main": "app.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey/issues"
+  },
+  "homepage": "https://github.com/MikeTase/Eaton-xComfort-Bridge-Homey#readme",
+  "scripts": {
+    "build": "tsc",
+    "test": "npm run build && node test/helpers.test.js && node test/units.test.js",
+    "watch": "tsc --watch",
+    "lint": "eslint .",
+    "format": "prettier --write \"**/*.ts\"",
+    "update-app-json": "npm run build && node ./.homeybuild/update_app_json.js"
+  },
+  "dependencies": {
+    "ws": "^8.21.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.13.0",
+    "@types/node": "^22.19.20",
+    "@types/ws": "^8.5.0",
+    "eslint": "^9.13.0",
+    "homey": "^4.3.0",
+    "prettier": "^3.8.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.61.0"
+  },
+  "overrides": {
+    "dockerode": {
+      "uuid": "11.1.1"
+    },
+    "engine.io-client": "6.6.5",
+    "homey": {
+      "inquirer": "8.2.7",
+      "update-notifier": "7.3.1"
+    },
+    "socket.io-client": "4.8.3"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "xcomfort": {
+    "clientType": "shl-app",
+    "clientId": "c956e43f999f8004",
+    "clientVersion": "3.0.0"
+  }
+}
