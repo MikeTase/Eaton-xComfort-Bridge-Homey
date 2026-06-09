@@ -16,7 +16,7 @@
     "sv": "Lokal Eaton xComfort-styrning av belysning, solskydd, värme, sensorer och energi.",
     "da": "Lokal Eaton xComfort-styring af lys, solafskærmning, varme, sensorer og energi."
   },
-  "version": "1.6.0",
+  "version": "1.7.0",
   "category": [
     "lights",
     "climate"
@@ -293,6 +293,54 @@
             }
           }
         ]
+      },
+      {
+        "id": "bridge_connected",
+        "title": {
+          "en": "Bridge connected",
+          "nl": "Bridge verbonden"
+        },
+        "hint": {
+          "en": "Triggers when a bridge connection is (re)established.",
+          "nl": "Wordt geactiveerd wanneer een bridge-verbinding (opnieuw) tot stand komt."
+        },
+        "tokens": [
+          {
+            "name": "bridge",
+            "type": "string",
+            "title": {
+              "en": "Bridge",
+              "nl": "Bridge"
+            },
+            "example": {
+              "en": "xComfort Bridge"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bridge_disconnected",
+        "title": {
+          "en": "Bridge disconnected",
+          "nl": "Bridge verbinding verbroken"
+        },
+        "hint": {
+          "en": "Triggers when a bridge connection is lost.",
+          "nl": "Wordt geactiveerd wanneer een bridge-verbinding wegvalt."
+        },
+        "tokens": [
+          {
+            "name": "bridge",
+            "type": "string",
+            "title": {
+              "en": "Bridge",
+              "nl": "Bridge"
+            },
+            "example": {
+              "en": "xComfort Bridge"
+            }
+          }
+        ]
       }
     ],
     "conditions": [
@@ -403,6 +451,27 @@
                 }
               }
             ]
+          }
+        ]
+      },
+      {
+        "id": "bridge_is_connected",
+        "title": {
+          "en": "Bridge !{{is|isn't}} connected",
+          "nl": "Bridge !{{is|is niet}} verbonden"
+        },
+        "titleFormatted": {
+          "en": "Bridge [[bridge]] !{{is|isn't}} connected",
+          "nl": "Bridge [[bridge]] !{{is|is niet}} verbonden"
+        },
+        "args": [
+          {
+            "name": "bridge",
+            "type": "autocomplete",
+            "placeholder": {
+              "en": "Bridge",
+              "nl": "Bridge"
+            }
           }
         ]
       }
@@ -728,6 +797,41 @@
                 }
               }
             ]
+          }
+        ]
+      },
+      {
+        "id": "dim_room_lights_by_name",
+        "title": {
+          "en": "Dim room lights by name",
+          "nl": "Kamerverlichting op naam dimmen"
+        },
+        "titleFormatted": {
+          "en": "Dim room [[room]] lights to [[level]] %",
+          "nl": "Dim verlichting in kamer [[room]] naar [[level]] %"
+        },
+        "hint": {
+          "en": "Dims all dimmable lights in an xComfort room with a single bridge command. 0% switches the room lights off.",
+          "nl": "Dimt alle dimbare lampen in een xComfort-kamer met één bridge-commando. 0% schakelt de kamerverlichting uit."
+        },
+        "args": [
+          {
+            "name": "room",
+            "type": "autocomplete",
+            "placeholder": {
+              "en": "Room",
+              "nl": "Kamer"
+            }
+          },
+          {
+            "name": "level",
+            "type": "number",
+            "min": 0,
+            "max": 100,
+            "step": 1,
+            "placeholder": {
+              "en": "50"
+            }
           }
         ]
       }

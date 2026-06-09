@@ -292,7 +292,11 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
       await this.ensureDeviceCapability('meter_power');
       const roundedEnergy = Number(directEnergy.toFixed(6));
       await this.updateCapability('meter_power', roundedEnergy);
-      await this.setStoreValue('meterPowerKwh', roundedEnergy).catch(this.error);
+      // Bridge readings repeat frequently — skip the store write when the
+      // value hasn't changed to avoid unnecessary flash wear.
+      if (this.getStoreValue('meterPowerKwh') !== roundedEnergy) {
+        await this.setStoreValue('meterPowerKwh', roundedEnergy).catch(this.error);
+      }
       return;
     }
 

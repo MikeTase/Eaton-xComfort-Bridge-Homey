@@ -1,6 +1,8 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 
 module.exports = class SceneDevice extends BaseDevice {
+  private resetTimer: ReturnType<typeof setTimeout> | null = null;
+
   async onDeviceReady() {
     // Scenes are momentary actions; Homey renders the 'button' class better
     // than 'other'. Migrate devices paired under the old class in place.
@@ -27,9 +29,28 @@ module.exports = class SceneDevice extends BaseDevice {
 
     await this.bridge.activateScene(this.sceneId);
     await this.updateCapability('onoff', true);
-    setTimeout(() => {
+    if (this.resetTimer) clearTimeout(this.resetTimer);
+    this.resetTimer = setTimeout(() => {
+      this.resetTimer = null;
       this.updateCapability('onoff', false).catch(this.error);
     }, 750);
+  }
+
+  private clearResetTimer(): void {
+    if (this.resetTimer) {
+      clearTimeout(this.resetTimer);
+      this.resetTimer = null;
+    }
+  }
+
+  onDeleted(): void {
+    this.clearResetTimer();
+    super.onDeleted();
+  }
+
+  async onUninit(): Promise<void> {
+    this.clearResetTimer();
+    await super.onUninit();
   }
 
   protected onBridgeChanged(): void {

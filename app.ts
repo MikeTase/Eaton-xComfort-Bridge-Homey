@@ -28,6 +28,9 @@ class XComfortApp extends Homey.App {
   private defaultBridgeId: string | null = null;
   private initToken = 0;
   private settingsDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  // Last connectivity state announced via Flow triggers, per bridge id.
+  // Prevents repeated 'disconnected' triggers during failing reconnect cycles.
+  private bridgeConnectivityAnnounced: Map<string, boolean> = new Map();
 
   async onInit() {
     (this as unknown as { setMaxListeners(n: number): void }).setMaxListeners(300);
@@ -184,26 +187,7 @@ class XComfortApp extends Homey.App {
       ): void;
     } | null;
     roomCard?.registerArgumentAutocompleteListener('room', async (query: string) => {
-      const entries = this.getBridgeEntries();
-      const multiBridge = entries.length > 1;
-      const results: RoomAutocompleteResult[] = [];
-
-      for (const entry of entries) {
-        for (const room of entry.bridge.getRooms()) {
-          const roomName = room.name || `Room ${room.roomId}`;
-          results.push({
-            name: multiBridge ? `${entry.name} - ${roomName}` : roomName,
-            id: String(room.roomId),
-            bridgeId: entry.id,
-          });
-        }
-      }
-
-      const needle = query.trim().toLowerCase();
-      const filtered = needle
-        ? results.filter((result) => result.name.toLowerCase().includes(needle))
-        : results;
-      return filtered.sort((left, right) => left.name.localeCompare(right.name));
+      return this.getRoomAutocompleteResults(query);
     });
     roomCard?.registerRunListener(async (args: { room?: { id?: string; bridgeId?: string }; state?: 'on' | 'off' }) => {
       const selected = args.room;
@@ -216,6 +200,59 @@ class XComfortApp extends Homey.App {
       }
       await bridge.switchRoom(selected.id, args.state === 'on');
       return true;
+    });
+
+    const dimRoomCard = this.homey.flow.getActionCard('dim_room_lights_by_name') as unknown as {
+      registerArgumentAutocompleteListener(
+        name: string,
+        listener: (query: string) => Promise<RoomAutocompleteResult[]>,
+      ): void;
+      registerRunListener(
+        listener: (args: { room?: { id?: string; bridgeId?: string }; level?: number }) => Promise<boolean>,
+      ): void;
+    } | null;
+    dimRoomCard?.registerArgumentAutocompleteListener('room', async (query: string) => {
+      return this.getRoomAutocompleteResults(query);
+    });
+    dimRoomCard?.registerRunListener(async (args: { room?: { id?: string; bridgeId?: string }; level?: number }) => {
+      const selected = args.room;
+      if (!selected || !selected.id) {
+        throw new Error('No room selected');
+      }
+      if (typeof args.level !== 'number' || !Number.isFinite(args.level)) {
+        throw new Error('No dim level selected');
+      }
+      const bridge = this.getBridge(selected.bridgeId || null);
+      if (!bridge) {
+        throw new Error('Bridge not connected');
+      }
+      await bridge.dimRoom(selected.id, args.level);
+      return true;
+    });
+
+    const bridgeConnectedCondition = this.homey.flow.getConditionCard('bridge_is_connected') as unknown as {
+      registerArgumentAutocompleteListener(
+        name: string,
+        listener: (query: string) => Promise<Array<{ name: string; description?: string; id: string }>>,
+      ): void;
+      registerRunListener(
+        listener: (args: { bridge?: { id?: string } }) => Promise<boolean>,
+      ): void;
+    } | null;
+    bridgeConnectedCondition?.registerArgumentAutocompleteListener('bridge', async (query: string) => {
+      const needle = query.trim().toLowerCase();
+      return this.getBridgeEntries()
+        .map((entry) => ({
+          id: entry.id,
+          name: entry.name,
+          description: entry.bridge.isConnected ? 'Connected' : 'Connecting',
+        }))
+        .filter((entry) => !needle || entry.name.toLowerCase().includes(needle))
+        .sort((left, right) => left.name.localeCompare(right.name));
+    });
+    bridgeConnectedCondition?.registerRunListener(async (args: { bridge?: { id?: string } }) => {
+      const bridge = this.getBridge(args.bridge?.id || null);
+      return !!(bridge && bridge.isConnected);
     });
 
     type BridgeAutocompleteResult = { name: string; description?: string; id: string };
@@ -252,6 +289,47 @@ class XComfortApp extends Homey.App {
 
       await bridge.setRemoteAccess(allowed);
       return true;
+    });
+  }
+
+  private async getRoomAutocompleteResults(
+    query: string,
+  ): Promise<Array<{ name: string; description?: string; id: string; bridgeId: string }>> {
+    const entries = this.getBridgeEntries();
+    const multiBridge = entries.length > 1;
+    const results: Array<{ name: string; description?: string; id: string; bridgeId: string }> = [];
+
+    for (const entry of entries) {
+      for (const room of entry.bridge.getRooms()) {
+        const roomName = room.name || `Room ${room.roomId}`;
+        results.push({
+          name: multiBridge ? `${entry.name} - ${roomName}` : roomName,
+          id: String(room.roomId),
+          bridgeId: entry.id,
+        });
+      }
+    }
+
+    const needle = query.trim().toLowerCase();
+    const filtered = needle
+      ? results.filter((result) => result.name.toLowerCase().includes(needle))
+      : results;
+    return filtered.sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  /**
+   * Fire the bridge connected/disconnected Flow triggers on actual state
+   * transitions only, so repeated failed reconnect attempts don't spam Flows.
+   */
+  private announceBridgeConnectivity(bridgeId: string, bridgeName: string, connected: boolean): void {
+    if (this.bridgeConnectivityAnnounced.get(bridgeId) === connected) {
+      return;
+    }
+    this.bridgeConnectivityAnnounced.set(bridgeId, connected);
+
+    const card = this.homey.flow.getTriggerCard(connected ? 'bridge_connected' : 'bridge_disconnected');
+    card?.trigger({ bridge: bridgeName }).catch((err) => {
+      this.error(`Failed to trigger bridge_${connected ? 'connected' : 'disconnected'}`, err);
     });
   }
 
@@ -570,6 +648,7 @@ class XComfortApp extends Homey.App {
       bridge.disconnect();
       bridge.removeAllListeners();
       this.bridges.delete(bridgeId);
+      this.bridgeConnectivityAnnounced.delete(bridgeId);
       this.emit('bridge_changed', bridgeId, null);
     }
 
@@ -657,6 +736,8 @@ class XComfortApp extends Homey.App {
     });
     bridge.on('disconnected', () => this.log(`Bridge "${name}": Disconnected`));
     bridge.on('reconnecting', () => this.log(`Bridge "${name}": Reconnecting...`));
+    bridge.on('connected', () => this.announceBridgeConnectivity(config.id, name, true));
+    bridge.on('disconnected', () => this.announceBridgeConnectivity(config.id, name, false));
 
     try {
       await bridge.init();
@@ -682,6 +763,7 @@ class XComfortApp extends Homey.App {
     }
 
     this.bridges.clear();
+    this.bridgeConnectivityAnnounced.clear();
     this.bridge = null;
   }
 

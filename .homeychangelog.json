@@ -274,5 +274,8 @@
   },
   "1.6.0": {
     "en": "Stability: declined-handshake reconnect fix, smoother settings saves, clean shutdown with energy flush. New: shading safety-lock alarm, energy history insights, scene button class, DE/NO/SV/DA translations."
+  },
+  "1.7.0": {
+    "en": "New: Bridge connected/disconnected Flow triggers and condition, and a Dim room lights Flow action. Improvements: scene timer cleanup and fewer energy meter store writes."
   }
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.7.0 - 2026-06-09
+
+### Features
+- Added "Bridge connected" and "Bridge disconnected" Flow triggers (with bridge name token) plus a "Bridge is connected" Flow condition, so Flows can react to bridge connectivity (e.g. send a notification when the bridge goes offline). Triggers fire on actual state transitions only, not on every retry during an outage.
+- Added a "Dim room lights by name" Flow action that dims all dimmable lights in an xComfort room with a single bridge ROOM_DIM command; 0% switches the room lights off.
+
+### Improvements
+- Scene devices now cancel their pending button-reset timer on deletion and app shutdown.
+- Energy meters skip redundant store writes when the bridge repeats an unchanged kWh reading, reducing flash wear.
+- Removed duplicated room autocomplete code in the app Flow card handlers.
+
 ## 1.6.0 - 2026-06-09
 
 ### Fixes

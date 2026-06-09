@@ -607,6 +607,30 @@ export class XComfortBridge extends EventEmitter {
     });
   }
 
+  /**
+   * Dim all dimmable lights in a room with a single ROOM_DIM command.
+   * `dimLevel` is 0-100; 0 switches the room lights off via ROOM_SWITCH.
+   */
+  async dimRoom(roomId: string | number, dimLevel: number): Promise<boolean> {
+    if (!Number.isFinite(dimLevel) || dimLevel <= 0) {
+      return this.switchRoom(roomId, false);
+    }
+
+    const targetVal = Math.max(
+      PROTOCOL_CONFIG.LIMITS.DIM_MIN,
+      Math.min(PROTOCOL_CONFIG.LIMITS.DIM_MAX, Math.round(dimLevel)),
+    );
+
+    return this.sendControlMessage({
+      type_int: MESSAGE_TYPES.ROOM_DIM,
+      mc: this.connectionManager.nextMc(),
+      payload: {
+        roomId: this.parseId(String(roomId)),
+        dimmvalue: targetVal,
+      },
+    });
+  }
+
   async activateScene(sceneId: string | number): Promise<boolean> {
     return this.sendControlMessage({
       type_int: MESSAGE_TYPES.ACTIVATE_SCENE,
