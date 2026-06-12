@@ -2,6 +2,7 @@ import * as Homey from 'homey';
 import { XComfortBridge } from './connection/XComfortBridge';
 import { XCOMFORT_CAPABILITIES } from './XComfortCapabilities';
 import type { DeviceMetadata, DeviceStateCallback, InfoEntry, RoomStateCallback } from './types';
+import { EnergyTracker } from './utils/EnergyTracker';
 import { parseInfoMetadata } from './utils/parseInfoMetadata';
 
 // Define the shape of our specific App class
@@ -260,6 +261,42 @@ export abstract class BaseDevice extends Homey.Device {
         if (!this.hasCapability(capabilityId)) {
             await this.addCapability(capabilityId).catch(this.error);
         }
+    }
+
+    /**
+     * Standard per-device energy tracker: live kWh updates go to the
+     * meter_power capability, persistence is throttled into the device store
+     * under the given key. Restore with restorePersistedEnergy(); call
+     * tracker.flush() from onDeleted()/onUninit().
+     */
+    protected createEnergyTracker(storeKey: string = 'meterPowerKwh'): EnergyTracker {
+        return new EnergyTracker(
+            async (kwh) => {
+                await this.ensureDeviceCapability('meter_power');
+                await this.updateCapability('meter_power', kwh);
+            },
+            {
+                onPersist: async (kwh) => {
+                    await this.setStoreValue(storeKey, kwh).catch(this.error);
+                },
+            },
+        );
+    }
+
+    /**
+     * Restore a previously persisted kWh reading into the tracker and the
+     * meter_power capability. Returns true when a stored value was restored.
+     */
+    protected async restorePersistedEnergy(tracker: EnergyTracker, storeKey: string = 'meterPowerKwh'): Promise<boolean> {
+        const storedValue = this.getStoreValue(storeKey);
+        if (typeof storedValue !== 'number' || !Number.isFinite(storedValue) || storedValue <= 0) {
+            return false;
+        }
+
+        tracker.restore(storedValue);
+        await this.ensureDeviceCapability('meter_power');
+        await this.updateCapability('meter_power', tracker.getKwh());
+        return true;
     }
 
     protected async applyDeviceMetadataSnapshot(deviceId: string = this.deviceId): Promise<void> {

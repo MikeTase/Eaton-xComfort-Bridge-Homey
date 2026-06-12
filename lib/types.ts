@@ -47,6 +47,12 @@ export type XComfortAuthMode = 'device' | 'user';
 export interface XComfortAuthOptions {
   mode?: XComfortAuthMode;
   username?: string;
+  /**
+   * Session label sent as `client_id` in CONNECTION_CONFIRM. The official app
+   * sends the phone's unique device id; the bridge uses it to clean up stale
+   * sessions. Falls back to the legacy shared CLIENT_CONFIG.ID when unset.
+   */
+  clientId?: string;
 }
 
 // =============================================================================

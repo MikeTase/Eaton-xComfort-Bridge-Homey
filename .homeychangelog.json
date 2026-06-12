@@ -277,5 +277,8 @@
   },
   "1.7.0": {
     "en": "New: Bridge connected/disconnected Flow triggers and condition, and a Dim room lights Flow action. Improvements: scene timer cleanup and fewer energy meter store writes."
+  },
+  "1.7.3": {
+    "en": "Reliability: devices now show offline during silent bridge drops, faster recovery when the bridge misses the startup device list, better busy-bridge handling, corrected energy meter protocol handling, and unique per-Homey bridge identification."
   }
 }

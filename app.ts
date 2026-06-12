@@ -1,4 +1,5 @@
 import * as Homey from 'homey';
+import { createHash } from 'crypto';
 import appManifest from './app.json';
 import { XComfortBridge } from './lib/connection/XComfortBridge';
 import type { XComfortAuthMode } from './lib/types';
@@ -21,6 +22,21 @@ export interface XComfortBridgeEntry {
 
 type AstroPeriod = 'dark' | 'daylight' | 'after_sunset' | 'before_sunrise';
 
+type AutocompleteResult = { name: string; description?: string; id: string; bridgeId?: string };
+
+/**
+ * Structural view of a Flow card with autocomplete support.
+ * `registerArgumentAutocompleteListener` exists at runtime but is missing
+ * from this SDK version's typings, so cards are cast to this shape.
+ */
+interface AutocompleteFlowCard<Args> {
+  registerArgumentAutocompleteListener(
+    name: string,
+    listener: (query: string) => Promise<AutocompleteResult[]>,
+  ): void;
+  registerRunListener(listener: (args: Args) => Promise<boolean>): void;
+}
+
 class XComfortApp extends Homey.App {
   public bridge: XComfortBridge | null = null;
   public bridges: Map<string, XComfortBridge> = new Map();
@@ -31,6 +47,8 @@ class XComfortApp extends Homey.App {
   // Last connectivity state announced via Flow triggers, per bridge id.
   // Prevents repeated 'disconnected' triggers during failing reconnect cycles.
   private bridgeConnectivityAnnounced: Map<string, boolean> = new Map();
+  // Stable per-Homey client_id sent to the bridge (derived once, cached).
+  private bridgeClientId: string | null = null;
 
   async onInit() {
     (this as unknown as { setMaxListeners(n: number): void }).setMaxListeners(300);
@@ -124,22 +142,12 @@ class XComfortApp extends Homey.App {
       return true;
     });
 
-    // `registerArgumentAutocompleteListener` exists at runtime but is missing
-    // from this SDK version's FlowCardAction typings — cast structurally.
-    type SceneAutocompleteResult = { name: string; description?: string; id: string; bridgeId: string };
-    const sceneCard = this.homey.flow.getActionCard('activate_scene_by_name') as unknown as {
-      registerArgumentAutocompleteListener(
-        name: string,
-        listener: (query: string) => Promise<SceneAutocompleteResult[]>,
-      ): void;
-      registerRunListener(
-        listener: (args: { scene?: { id?: string; bridgeId?: string } }) => Promise<boolean>,
-      ): void;
-    } | null;
+    const sceneCard = this.homey.flow.getActionCard('activate_scene_by_name') as unknown as
+      AutocompleteFlowCard<{ scene?: { id?: string; bridgeId?: string } }> | null;
     sceneCard?.registerArgumentAutocompleteListener('scene', async (query: string) => {
       const entries = this.getBridgeEntries();
       const multiBridge = entries.length > 1;
-      const results: Array<{ name: string; description?: string; id: string; bridgeId: string }> = [];
+      const results: AutocompleteResult[] = [];
 
       for (const entry of entries) {
         for (const scene of entry.bridge.getScenes()) {
@@ -157,11 +165,7 @@ class XComfortApp extends Homey.App {
         }
       }
 
-      const needle = query.trim().toLowerCase();
-      const filtered = needle
-        ? results.filter((result) => result.name.toLowerCase().includes(needle))
-        : results;
-      return filtered.sort((left, right) => left.name.localeCompare(right.name));
+      return this.filterAndSortByName(results, query);
     });
     sceneCard?.registerRunListener(async (args: { scene?: { id?: string; bridgeId?: string } }) => {
       const selected = args.scene;
@@ -176,16 +180,8 @@ class XComfortApp extends Homey.App {
       return true;
     });
 
-    type RoomAutocompleteResult = { name: string; description?: string; id: string; bridgeId: string };
-    const roomCard = this.homey.flow.getActionCard('switch_room_lights_by_name') as unknown as {
-      registerArgumentAutocompleteListener(
-        name: string,
-        listener: (query: string) => Promise<RoomAutocompleteResult[]>,
-      ): void;
-      registerRunListener(
-        listener: (args: { room?: { id?: string; bridgeId?: string }; state?: 'on' | 'off' }) => Promise<boolean>,
-      ): void;
-    } | null;
+    const roomCard = this.homey.flow.getActionCard('switch_room_lights_by_name') as unknown as
+      AutocompleteFlowCard<{ room?: { id?: string; bridgeId?: string }; state?: 'on' | 'off' }> | null;
     roomCard?.registerArgumentAutocompleteListener('room', async (query: string) => {
       return this.getRoomAutocompleteResults(query);
     });
@@ -202,15 +198,8 @@ class XComfortApp extends Homey.App {
       return true;
     });
 
-    const dimRoomCard = this.homey.flow.getActionCard('dim_room_lights_by_name') as unknown as {
-      registerArgumentAutocompleteListener(
-        name: string,
-        listener: (query: string) => Promise<RoomAutocompleteResult[]>,
-      ): void;
-      registerRunListener(
-        listener: (args: { room?: { id?: string; bridgeId?: string }; level?: number }) => Promise<boolean>,
-      ): void;
-    } | null;
+    const dimRoomCard = this.homey.flow.getActionCard('dim_room_lights_by_name') as unknown as
+      AutocompleteFlowCard<{ room?: { id?: string; bridgeId?: string }; level?: number }> | null;
     dimRoomCard?.registerArgumentAutocompleteListener('room', async (query: string) => {
       return this.getRoomAutocompleteResults(query);
     });
@@ -230,51 +219,20 @@ class XComfortApp extends Homey.App {
       return true;
     });
 
-    const bridgeConnectedCondition = this.homey.flow.getConditionCard('bridge_is_connected') as unknown as {
-      registerArgumentAutocompleteListener(
-        name: string,
-        listener: (query: string) => Promise<Array<{ name: string; description?: string; id: string }>>,
-      ): void;
-      registerRunListener(
-        listener: (args: { bridge?: { id?: string } }) => Promise<boolean>,
-      ): void;
-    } | null;
+    const bridgeConnectedCondition = this.homey.flow.getConditionCard('bridge_is_connected') as unknown as
+      AutocompleteFlowCard<{ bridge?: { id?: string } }> | null;
     bridgeConnectedCondition?.registerArgumentAutocompleteListener('bridge', async (query: string) => {
-      const needle = query.trim().toLowerCase();
-      return this.getBridgeEntries()
-        .map((entry) => ({
-          id: entry.id,
-          name: entry.name,
-          description: entry.bridge.isConnected ? 'Connected' : 'Connecting',
-        }))
-        .filter((entry) => !needle || entry.name.toLowerCase().includes(needle))
-        .sort((left, right) => left.name.localeCompare(right.name));
+      return this.getBridgeAutocompleteResults(query);
     });
     bridgeConnectedCondition?.registerRunListener(async (args: { bridge?: { id?: string } }) => {
       const bridge = this.getBridge(args.bridge?.id || null);
       return !!(bridge && bridge.isConnected);
     });
 
-    type BridgeAutocompleteResult = { name: string; description?: string; id: string };
-    const remoteAccessCard = this.homey.flow.getActionCard('set_bridge_remote_access') as unknown as {
-      registerArgumentAutocompleteListener(
-        name: string,
-        listener: (query: string) => Promise<BridgeAutocompleteResult[]>,
-      ): void;
-      registerRunListener(
-        listener: (args: { bridge?: { id?: string }; state?: unknown }) => Promise<boolean>,
-      ): void;
-    } | null;
+    const remoteAccessCard = this.homey.flow.getActionCard('set_bridge_remote_access') as unknown as
+      AutocompleteFlowCard<{ bridge?: { id?: string }; state?: unknown }> | null;
     remoteAccessCard?.registerArgumentAutocompleteListener('bridge', async (query: string) => {
-      const needle = query.trim().toLowerCase();
-      return this.getBridgeEntries()
-        .map((entry) => ({
-          id: entry.id,
-          name: entry.name,
-          description: entry.bridge.isConnected ? 'Connected' : 'Connecting',
-        }))
-        .filter((entry) => !needle || entry.name.toLowerCase().includes(needle))
-        .sort((left, right) => left.name.localeCompare(right.name));
+      return this.getBridgeAutocompleteResults(query);
     });
     remoteAccessCard?.registerRunListener(async (args: { bridge?: { id?: string }; state?: unknown }) => {
       const allowed = this.normalizeRemoteAccessPreference(args.state);
@@ -292,12 +250,10 @@ class XComfortApp extends Homey.App {
     });
   }
 
-  private async getRoomAutocompleteResults(
-    query: string,
-  ): Promise<Array<{ name: string; description?: string; id: string; bridgeId: string }>> {
+  private async getRoomAutocompleteResults(query: string): Promise<AutocompleteResult[]> {
     const entries = this.getBridgeEntries();
     const multiBridge = entries.length > 1;
-    const results: Array<{ name: string; description?: string; id: string; bridgeId: string }> = [];
+    const results: AutocompleteResult[] = [];
 
     for (const entry of entries) {
       for (const room of entry.bridge.getRooms()) {
@@ -310,6 +266,22 @@ class XComfortApp extends Homey.App {
       }
     }
 
+    return this.filterAndSortByName(results, query);
+  }
+
+  private getBridgeAutocompleteResults(query: string): AutocompleteResult[] {
+    return this.filterAndSortByName(
+      this.getBridgeEntries().map((entry) => ({
+        id: entry.id,
+        name: entry.name,
+        description: entry.bridge.isConnected ? 'Connected' : 'Connecting',
+      })),
+      query,
+    );
+  }
+
+  /** Case-insensitive substring filter on `name`, then alphabetical sort. */
+  private filterAndSortByName<T extends { name: string }>(results: T[], query: string): T[] {
     const needle = query.trim().toLowerCase();
     const filtered = needle
       ? results.filter((result) => result.name.toLowerCase().includes(needle))
@@ -709,6 +681,11 @@ class XComfortApp extends Homey.App {
     const cleanKey = this.normalizeBridgeSecret(config.authKey, authMode);
     const username = authMode === 'user' ? this.normalizeBridgeUsername(config.username) : 'default';
     const name = config.name || cleanIp;
+    const clientId = await this.resolveBridgeClientId();
+
+    if (token !== this.initToken) {
+      return;
+    }
 
     this.log(`Initializing Bridge "${name}" using ${authMode} login...`);
 
@@ -716,7 +693,7 @@ class XComfortApp extends Homey.App {
       cleanIp,
       cleanKey,
       (...args) => this.log(`[${name}]`, ...args),
-      { mode: authMode, username },
+      { mode: authMode, username, ...(clientId ? { clientId } : {}) },
     );
     this.bridges.set(config.id, bridge);
     if (config.id === this.defaultBridgeId) {
@@ -749,6 +726,42 @@ class XComfortApp extends Homey.App {
         this.error(`Bridge "${name}": Initialization failed`, err);
       }
     }
+  }
+
+  /**
+   * Stable per-Homey `client_id` for the bridge handshake. The official app
+   * sends the phone's unique device identifier, which the bridge uses to
+   * clean up stale sessions; a shared constant id would make two Homeys (or
+   * a Homey and another integration using the same constant) evict each
+   * other. Hashed to 16 hex chars to match the official id format. Returns
+   * undefined when the Homey id is unavailable (falls back to the legacy
+   * shared CLIENT_CONFIG.ID).
+   */
+  private async resolveBridgeClientId(): Promise<string | undefined> {
+    if (this.bridgeClientId) {
+      return this.bridgeClientId;
+    }
+
+    try {
+      const homeyWithCloud = this.homey as unknown as {
+        cloud?: { getHomeyId?: () => string | Promise<string> };
+      };
+      const homeyId = typeof homeyWithCloud.cloud?.getHomeyId === 'function'
+        ? await homeyWithCloud.cloud.getHomeyId()
+        : undefined;
+
+      if (typeof homeyId === 'string' && homeyId.trim()) {
+        this.bridgeClientId = createHash('sha256')
+          .update(`homey-xcomfort-bridge:${homeyId.trim()}`)
+          .digest('hex')
+          .slice(0, 16);
+        return this.bridgeClientId;
+      }
+    } catch (err) {
+      this.error('Failed to derive per-Homey bridge client id, using shared fallback', err);
+    }
+
+    return undefined;
   }
 
   private resetBridges(reason?: string): void {

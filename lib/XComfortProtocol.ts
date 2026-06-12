@@ -13,6 +13,10 @@ export const MESSAGE_TYPES = {
   NACK: 0,
   ACK: 1,
   HEARTBEAT: 2,
+  // Type 3 is WAIT4ACK in the official app — the bridge's "I'm busy, extend
+  // your timeout, don't resend" backpressure signal. PING is kept as a
+  // same-valued alias for backward compatibility.
+  WAIT4ACK: 3,
   PING: 3,
 
   // Connection & Authentication Flow
@@ -52,21 +56,29 @@ export const MESSAGE_TYPES = {
   SET_DEVICE_SHADING_STATE: 355,
   SET_DEVICE_ALARM_STATE: 356,
   SET_ROOM_HEATING_STATE: 363,
-  SET_ENERGY_DATA: 386,
-  SET_ENERGY_TARIFF: 387,
-  REQUEST_TARIFF_INFO: 388,
-  REQUEST_MAIN_ELECTRICAL_ENERGY_USAGE: 389,
-  SET_ENERGY_MONITORING: 390,
-  REQUEST_ENERGY_MONITORING: 391,
-  SET_ENERGY_CONTROL: 392,
-  REQUEST_ENERGY_CONTROL: 393,
-  ENERGY_HISTORY: 394,
-  REQUEST_ENERGY_HISTORY: 395,
-  SET_ENERGY_METER: 396,
-  REQUEST_ENERGY_METER: 397,
-  // Observed as 401 in bridge captures. Earlier revisions also defined
-  // PUBLISH_MAIN_ELECTRICAL_ENERGY_USAGE with the same value — both were
-  // aliases for this message; the handler treats it as generic energy data.
+  // Energy message types. Names/numbers verified against the official Eaton
+  // xComfort Bridge app (com.eaton.corp.xComfortBridge 2.4.1). The protocol
+  // splits these into outgoing (client→bridge) and incoming (bridge→client)
+  // groups that happen to share a number range, so direction matters.
+  //
+  // Outgoing (client→bridge):
+  SET_ENERGY_TARIFF: 387,        // configure tariff
+  REQUEST_TARIFF_INFO: 388,      // request tariff prices → bridge replies TARIFF_INFO (389)
+  SET_ENERGY_MONITORING: 390,    // configure monitoring
+  SET_ENERGY_CONTROL: 391,       // configure load control
+  ENERGY_CONTROL_SET_MODE: 392,  // set load mode (normal/eco/priority)
+  SET_ENERGY_MONITORING_VIEW: 394,
+  REQUEST_ENERGY_HISTORY: 395,   // request history → bridge replies ENERGY_HISTORY (396)
+  SET_ENERGY_METER: 397,         // configure/query a meter
+  DELETE_ENERGY_METER: 398,
+  //
+  // Incoming (bridge→client):
+  SET_ENERGY_DATA: 386,          // live power/energy push
+  TARIFF_INFO: 389,              // tariff price response
+  SET_ENERGY_STATE: 393,         // energy/load control state
+  ENERGY_HISTORY: 396,           // history response
+  SET_ENERGY_METER_ID: 399,
+  ENERGY_METER_DELETED: 400,
   SET_ENERGY_METER_STATE: 401,
 
   // Response/Data Messages
@@ -223,6 +235,11 @@ export const INFO_TEXT_CODES = {
 
 /**
  * Client Configuration
+ *
+ * ID is only the fallback client_id: the app normally derives a stable
+ * per-Homey id (see app.ts resolveBridgeClientId) so the bridge can tell
+ * different Homeys apart when cleaning up stale sessions, matching the
+ * official app's behaviour of sending the device's unique identifier.
  */
 export const CLIENT_CONFIG = {
   TYPE: 'shl-app',

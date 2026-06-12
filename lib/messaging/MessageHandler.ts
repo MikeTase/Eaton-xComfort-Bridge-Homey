@@ -7,6 +7,22 @@
 
 import { MESSAGE_TYPES } from '../XComfortProtocol';
 import { DeviceStateManager } from '../state/DeviceStateManager';
+import {
+  POWER_KEYS_BROAD,
+  ENERGY_KEYS,
+  CURRENT_KEYS,
+  VOLTAGE_KEYS,
+  PULSES_KEYS,
+  COST_KEYS,
+  TARIFF_KEYS,
+  TARIFF_LABEL_KEYS,
+  CURRENCY_KEYS,
+  HISTORY_KEYS,
+  getFirstNumber,
+  getFirstString,
+  getFirstValue,
+  getLoadMode,
+} from '../utils/energyFields';
 import type {
   ProtocolMessage,
   StateUpdateItem,
@@ -40,13 +56,15 @@ type OnBridgeStatusUpdateFn = (status: BridgeStatus) => void;
 /** Callback when Home/Bridge info is received */
 type OnHomeDataUpdateFn = (payload: Record<string, unknown>) => void;
 
+// Incoming (bridge→client) energy message types, per the official app. The
+// bridge replies to REQUEST_TARIFF_INFO with TARIFF_INFO (389) and to
+// REQUEST_ENERGY_HISTORY with ENERGY_HISTORY (396); SET_ENERGY_STATE (393)
+// carries load-control state. These were previously dropped as "unhandled".
 const ENERGY_MESSAGE_TYPES = new Set<number>([
   MESSAGE_TYPES.SET_ENERGY_DATA,
-  MESSAGE_TYPES.SET_ENERGY_TARIFF,
-  MESSAGE_TYPES.SET_ENERGY_MONITORING,
-  MESSAGE_TYPES.SET_ENERGY_CONTROL,
+  MESSAGE_TYPES.TARIFF_INFO,
+  MESSAGE_TYPES.SET_ENERGY_STATE,
   MESSAGE_TYPES.ENERGY_HISTORY,
-  MESSAGE_TYPES.SET_ENERGY_METER,
   MESSAGE_TYPES.SET_ENERGY_METER_STATE,
 ]);
 
@@ -84,7 +102,7 @@ const APP_INFO_MESSAGES: Record<string, string> = {
   '1030': 'Device {value} removed because of an unsupported device type',
   '1031': 'Unknown device',
   '1032': 'Failed creating device',
-  '1033': 'New component added to bridge, serial {value}',
+  '1033': 'New {type} added to bridge, serial {value}',
   '1034': 'Operate device serial {value} to finalize configuration',
   '1035': 'Mode not editable because the device is already in use',
   '1036': 'Device {value} was removed after mode update',
@@ -137,7 +155,128 @@ const APP_INFO_MESSAGES: Record<string, string> = {
   '1083': 'Failed creating meter',
   '1084': 'Unknown meter',
   '1085': 'History request currently not possible',
+  '1100': 'Sensor overflow',
 };
+
+// ============================================================================
+// Device / room state field tables
+// ============================================================================
+//
+// These tables drive every place a state field is copied: gating an incoming
+// STATE_UPDATE item, building the listener update, patching the stored
+// device/room snapshot, and extracting initial state from discovery payloads.
+// A new protocol field only has to be added here once. ('switch' is handled
+// separately everywhere because it needs boolean/0-1 normalization.)
+
+const DEVICE_STATE_KEYS = [
+  'dimmvalue',
+  'power',
+  'energy',
+  'current',
+  'voltage',
+  'pulses',
+  'energyCost',
+  'tariff',
+  'tariffLabel',
+  'currency',
+  'energyHistory',
+  'loadMode',
+  'curstate',
+  'errorState',
+  'shadsClosed',
+  'shPos',
+  'shSafety',
+  'setpoint',
+  'operationMode',
+  'tempState',
+] as const;
+
+type DeviceStateKey = (typeof DEVICE_STATE_KEYS)[number];
+
+const NUMERIC_DEVICE_STATE_KEYS = new Set<DeviceStateKey>([
+  'dimmvalue',
+  'power',
+  'energy',
+  'current',
+  'voltage',
+  'pulses',
+  'energyCost',
+  'setpoint',
+  'shadsClosed',
+  'shPos',
+  'shSafety',
+]);
+
+const STRING_DEVICE_STATE_KEYS = new Set<DeviceStateKey>([
+  'tariffLabel',
+  'currency',
+  'loadMode',
+]);
+
+/**
+ * Type guard used when extracting initial state from full discovery records,
+ * which may hold nulls or unrelated shapes. Live STATE_UPDATE items are
+ * copied as-is (any defined value).
+ */
+function isValidDiscoveryValue(key: DeviceStateKey, value: unknown): boolean {
+  if (NUMERIC_DEVICE_STATE_KEYS.has(key)) {
+    return typeof value === 'number';
+  }
+  if (STRING_DEVICE_STATE_KEYS.has(key)) {
+    return typeof value === 'string';
+  }
+  if (key === 'tariff') {
+    return typeof value === 'number' || typeof value === 'string';
+  }
+  // energyHistory, curstate, errorState, operationMode, tempState
+  return true;
+}
+
+/**
+ * Copy every defined device state field from source to target.
+ * With `validated`, values that fail the per-key discovery type guard are
+ * skipped. Returns true when at least one field was copied.
+ */
+function copyDeviceStateFields(
+  source: Record<string, unknown>,
+  target: Record<string, unknown>,
+  options: { validated?: boolean } = {},
+): boolean {
+  let copied = false;
+  for (const key of DEVICE_STATE_KEYS) {
+    const value = source[key];
+    if (value === undefined) {
+      continue;
+    }
+    if (options.validated && !isValidDiscoveryValue(key, value)) {
+      continue;
+    }
+    target[key] = value;
+    copied = true;
+  }
+  return copied;
+}
+
+const ROOM_NUMBER_STATE_KEYS = [
+  'setpoint',
+  'temp',
+  'humidity',
+  'power',
+  'valve',
+  'lightsOn',
+  'windowsOpen',
+  'doorsOpen',
+] as const;
+
+const ROOM_STATE_KEYS = [
+  ...ROOM_NUMBER_STATE_KEYS,
+  'currentMode',
+  'mode',
+  'state',
+  'temperatureOnly',
+  'modes',
+  'raw',
+] as const;
 
 // ============================================================================
 // MessageHandler Class
@@ -236,7 +375,9 @@ export class MessageHandler {
       return true;
     }
 
-    if (msg.type_int === MESSAGE_TYPES.PING) {
+    // WAIT4ACK (type 3): timeout extension is handled in XComfortBridge before
+    // this point; nothing more to do here.
+    if (msg.type_int === MESSAGE_TYPES.WAIT4ACK) {
       return true;
     }
 
@@ -433,144 +574,74 @@ export class MessageHandler {
       ...source,
       ...(meters[0] || loads[0] || {}),
     };
-    const power = this.getFirstNumber(primarySource, [
-      'power',
-      'activePower',
-      'currentPower',
-      'mainPower',
-      'electricalPower',
-      'powerW',
-      'instantPower',
-      'actualPower',
-      'powerConsumption',
-      'watt',
-      'watts',
-      'value',
-    ]);
+    const power = getFirstNumber(primarySource, POWER_KEYS_BROAD);
     if (power !== undefined) {
       status.power = power;
     }
 
-    const energy = this.getFirstNumber(primarySource, [
-      'energy',
-      'energyKwh',
-      'kwh',
-      'totalEnergy',
-      'electricalEnergy',
-      'consumption',
-      'totalConsumption',
-      'consumptionKwh',
-      'totalKwh',
-      'importEnergy',
-      'meterPower',
-    ]);
+    const energy = getFirstNumber(primarySource, ENERGY_KEYS);
     if (energy !== undefined) {
       status.energy = energy;
       status.energyKwh = energy;
     }
 
-    const current = this.getFirstNumber(primarySource, ['current', 'currentA', 'ampere', 'amperes', 'amps']);
+    const current = getFirstNumber(primarySource, CURRENT_KEYS);
     if (current !== undefined) {
       status.current = current;
     }
 
-    const voltage = this.getFirstNumber(primarySource, ['voltage', 'voltageV', 'volt', 'volts']);
+    const voltage = getFirstNumber(primarySource, VOLTAGE_KEYS);
     if (voltage !== undefined) {
       status.voltage = voltage;
     }
 
-    const pulses = this.getFirstNumber(primarySource, ['pulses', 'pulse', 'pulseCount', 'impulses', 'counter']);
+    const pulses = getFirstNumber(primarySource, PULSES_KEYS);
     if (pulses !== undefined) {
       status.pulses = pulses;
     }
 
-    const energyCost = this.getFirstNumber(primarySource, ['cost', 'energyCost', 'totalCost', 'totalPrice']);
+    const energyCost = getFirstNumber(primarySource, COST_KEYS);
     if (energyCost !== undefined) {
       status.energyCost = energyCost;
     }
 
-    const meterId = this.getFirstValue(primarySource, ['meterId', 'energyMeterId', 'id', 'deviceId']);
+    const meterId = getFirstValue(primarySource, ['meterId', 'energyMeterId', 'id', 'deviceId']);
     if (typeof meterId === 'number' || typeof meterId === 'string') {
       status.meterId = meterId;
     }
 
-    const connectionState = this.getFirstNumber(primarySource, ['connectionState', 'state', 'status']);
+    const connectionState = getFirstNumber(primarySource, ['connectionState', 'state', 'status']);
     if (connectionState !== undefined) {
       status.connectionState = connectionState;
     }
 
-    const tariff = this.getFirstValue(primarySource, [
-      'tariff',
-      'tariffId',
-      'currentTariff',
-      'tariffPrice',
-      'priceNow',
-      'currentPrice',
-      'pricePerKwh',
-      'rate',
-    ]);
+    const tariff = getFirstValue(primarySource, TARIFF_KEYS);
     if (typeof tariff === 'number' || typeof tariff === 'string') {
       status.tariff = tariff;
     }
 
-    const tariffLabel = this.getFirstString(primarySource, [
-      'tariffLabel',
-      'tariffName',
-      'tariffText',
-      'currentTariffName',
-      'currentTariffLabel',
-      'priceArea',
-      'priceZone',
-      'tariffCode',
-    ]);
+    const tariffLabel = getFirstString(primarySource, TARIFF_LABEL_KEYS);
     if (tariffLabel !== undefined) {
       status.tariffLabel = tariffLabel;
     } else if (typeof tariff === 'string' && Number.isNaN(Number.parseFloat(tariff))) {
       status.tariffLabel = tariff;
     }
 
-    const currency = this.getFirstString(primarySource, [
-      'currency',
-      'currencyCode',
-      'energyCurrency',
-      'costCurrency',
-      'tariffCurrency',
-    ]);
+    const currency = getFirstString(primarySource, CURRENCY_KEYS);
     if (currency !== undefined) {
       status.currency = currency.toUpperCase();
     }
 
-    const energyHistory = this.getFirstValue(primarySource, [
-      'history',
-      'energyHistory',
-      'consumptionHistory',
-      'historicEnergy',
-      'periods',
-      'dayHistory',
-      'daily',
-      'weekHistory',
-      'weekly',
-      'monthHistory',
-      'monthly',
-      'yearHistory',
-      'yearly',
-    ]);
+    const energyHistory = getFirstValue(primarySource, HISTORY_KEYS);
     if (energyHistory !== undefined) {
       status.energyHistory = energyHistory;
     } else if (messageType === MESSAGE_TYPES.ENERGY_HISTORY) {
       status.energyHistory = payload.data ?? payload.items ?? payload;
     }
 
-    const loadMode = this.getFirstValue(primarySource, [
-      'loadMode',
-      'mode',
-      'controlMode',
-      'priorityMode',
-      'loadControlMode',
-      'energyMode',
-    ]);
-    if (typeof loadMode === 'number' || typeof loadMode === 'string') {
-      status.loadMode = this.normalizeLoadMode(loadMode);
+    const loadMode = getLoadMode(primarySource);
+    if (loadMode !== undefined) {
+      status.loadMode = loadMode;
     }
 
     return status;
@@ -660,67 +731,6 @@ export class MessageHandler {
     return records;
   }
 
-  private getFirstNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
-    for (const key of keys) {
-      const value = source[key];
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-      }
-      if (typeof value === 'string') {
-        const parsed = Number.parseFloat(value.replace(',', '.'));
-        if (Number.isFinite(parsed)) {
-          return parsed;
-        }
-      }
-    }
-
-    return undefined;
-  }
-
-  private getFirstValue(source: Record<string, unknown>, keys: string[]): unknown {
-    for (const key of keys) {
-      if (source[key] !== undefined && source[key] !== null) {
-        return source[key];
-      }
-    }
-
-    return undefined;
-  }
-
-  private getFirstString(source: Record<string, unknown>, keys: string[]): string | undefined {
-    for (const key of keys) {
-      const value = source[key];
-      if (typeof value === 'string' && value.trim().length > 0) {
-        return value.trim();
-      }
-    }
-
-    return undefined;
-  }
-
-  private normalizeLoadMode(value: string | number): string {
-    if (typeof value === 'number') {
-      switch (value) {
-        case 1:
-          return 'energy_saving';
-        case 2:
-          return 'priority';
-        case 0:
-        default:
-          return 'normal';
-      }
-    }
-
-    const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
-    if (normalized === 'saving' || normalized === 'energy_saving' || normalized === 'energysaving') {
-      return 'energy_saving';
-    }
-    if (normalized === 'priority' || normalized === 'prio') {
-      return 'priority';
-    }
-    return 'normal';
-  }
-
   /**
    * Process SET_HOME_DATA (303) messages
    */
@@ -782,80 +792,7 @@ export class MessageHandler {
           update.switch = device.switch === true || device.switch === 1;
           hasUpdate = true;
         }
-        if (typeof device.dimmvalue === 'number') {
-          update.dimmvalue = device.dimmvalue;
-          hasUpdate = true;
-        }
-        if (typeof device.power === 'number') {
-          update.power = device.power;
-          hasUpdate = true;
-        }
-        if (typeof device.energy === 'number') {
-          update.energy = device.energy;
-          hasUpdate = true;
-        }
-        if (typeof device.current === 'number') {
-          update.current = device.current;
-          hasUpdate = true;
-        }
-        if (typeof device.voltage === 'number') {
-          update.voltage = device.voltage;
-          hasUpdate = true;
-        }
-        if (typeof device.pulses === 'number') {
-          update.pulses = device.pulses;
-          hasUpdate = true;
-        }
-        if (typeof device.energyCost === 'number') {
-          update.energyCost = device.energyCost;
-          hasUpdate = true;
-        }
-        if (typeof device.tariff === 'number' || typeof device.tariff === 'string') {
-          update.tariff = device.tariff;
-          hasUpdate = true;
-        }
-        if (typeof device.tariffLabel === 'string') {
-          update.tariffLabel = device.tariffLabel;
-          hasUpdate = true;
-        }
-        if (typeof device.currency === 'string') {
-          update.currency = device.currency;
-          hasUpdate = true;
-        }
-        if (device.energyHistory !== undefined) {
-          update.energyHistory = device.energyHistory;
-          hasUpdate = true;
-        }
-        if (typeof device.loadMode === 'string') {
-          update.loadMode = device.loadMode;
-          hasUpdate = true;
-        }
-        if (typeof device.setpoint === 'number') {
-          update.setpoint = device.setpoint;
-          hasUpdate = true;
-        }
-        if (typeof device.shadsClosed === 'number') {
-          update.shadsClosed = device.shadsClosed;
-          hasUpdate = true;
-        }
-        if (typeof device.shPos === 'number') {
-          update.shPos = device.shPos;
-          hasUpdate = true;
-        }
-        if (typeof device.shSafety === 'number') {
-          update.shSafety = device.shSafety;
-          hasUpdate = true;
-        }
-        if (device.operationMode !== undefined) {
-          update.operationMode = device.operationMode as number;
-          hasUpdate = true;
-        }
-        if (device.tempState !== undefined) {
-          update.tempState = device.tempState as number;
-          hasUpdate = true;
-        }
-        if (device.curstate !== undefined) {
-          update.curstate = device.curstate;
+        if (copyDeviceStateFields(device, update as Record<string, unknown>, { validated: true })) {
           hasUpdate = true;
         }
         if (Array.isArray(device.info)) {
@@ -950,27 +887,9 @@ export class MessageHandler {
               this.logger(`[MessageHandler] Raw item for device ${deviceId}: ${JSON.stringify(item)}`);
             }
 
-            const hasStateField = (
-              item.switch !== undefined ||
-              item.dimmvalue !== undefined ||
-              item.setpoint !== undefined ||
-              item.shadsClosed !== undefined ||
-              item.shPos !== undefined ||
-              item.shSafety !== undefined ||
-              item.curstate !== undefined ||
-              item.errorState !== undefined ||
-              item.power !== undefined ||
-              item.energy !== undefined ||
-              item.current !== undefined ||
-              item.voltage !== undefined ||
-              item.pulses !== undefined ||
-              item.energyCost !== undefined ||
-              item.tariff !== undefined ||
-              item.tariffLabel !== undefined ||
-              item.currency !== undefined ||
-              item.energyHistory !== undefined ||
-              item.loadMode !== undefined
-            );
+            const itemRecord = item as unknown as Record<string, unknown>;
+            const hasStateField = item.switch !== undefined
+              || DEVICE_STATE_KEYS.some((key) => itemRecord[key] !== undefined);
 
             if (hasStateField) {
               if (item.switch !== undefined) {
@@ -979,26 +898,7 @@ export class MessageHandler {
                   deviceUpdate.switch = (item.curstate === 1);
               }
 
-              if (item.dimmvalue !== undefined) deviceUpdate.dimmvalue = item.dimmvalue;
-              if (item.power !== undefined) deviceUpdate.power = item.power;
-              if (item.energy !== undefined) deviceUpdate.energy = item.energy;
-              if (item.current !== undefined) deviceUpdate.current = item.current;
-              if (item.voltage !== undefined) deviceUpdate.voltage = item.voltage;
-              if (item.pulses !== undefined) deviceUpdate.pulses = item.pulses;
-              if (item.energyCost !== undefined) deviceUpdate.energyCost = item.energyCost;
-              if (item.tariff !== undefined) deviceUpdate.tariff = item.tariff;
-              if (item.tariffLabel !== undefined) deviceUpdate.tariffLabel = item.tariffLabel;
-              if (item.currency !== undefined) deviceUpdate.currency = item.currency;
-              if (item.energyHistory !== undefined) deviceUpdate.energyHistory = item.energyHistory;
-              if (item.loadMode !== undefined) deviceUpdate.loadMode = item.loadMode;
-              if (item.curstate !== undefined) deviceUpdate.curstate = item.curstate;
-              if (item.errorState !== undefined) deviceUpdate.errorState = item.errorState;
-              if (item.shadsClosed !== undefined) deviceUpdate.shadsClosed = item.shadsClosed;
-              if (item.shPos !== undefined) deviceUpdate.shPos = item.shPos;
-              if (item.shSafety !== undefined) deviceUpdate.shSafety = item.shSafety;
-              if (item.setpoint !== undefined) deviceUpdate.setpoint = item.setpoint;
-              if (item.operationMode !== undefined) deviceUpdate.operationMode = item.operationMode;
-              if (item.tempState !== undefined) deviceUpdate.tempState = item.tempState;
+              copyDeviceStateFields(itemRecord, deviceUpdate as Record<string, unknown>);
             }
 
             // Parse info[] independently — a single update item may contain BOTH
@@ -1025,32 +925,7 @@ export class MessageHandler {
             }
             const roomUpdate = roomUpdates.get(roomId)!;
 
-            if (typeof item.setpoint === 'number') roomUpdate.setpoint = item.setpoint;
-            if (typeof item.temp === 'number') roomUpdate.temp = item.temp;
-            if (typeof item.humidity === 'number') roomUpdate.humidity = item.humidity;
-            if (typeof item.power === 'number') roomUpdate.power = item.power;
-            if (typeof item.valve === 'number') roomUpdate.valve = item.valve;
-            if (typeof item.lightsOn === 'number') roomUpdate.lightsOn = item.lightsOn;
-            if (typeof item.windowsOpen === 'number') roomUpdate.windowsOpen = item.windowsOpen;
-            if (typeof item.doorsOpen === 'number') roomUpdate.doorsOpen = item.doorsOpen;
-            if (item.currentMode !== undefined) roomUpdate.currentMode = item.currentMode;
-            if (item.mode !== undefined) roomUpdate.mode = item.mode;
-            if (item.state !== undefined) roomUpdate.state = item.state;
-            if (typeof item.temperatureOnly === 'boolean') roomUpdate.temperatureOnly = item.temperatureOnly;
-            if (Array.isArray(item.modes)) {
-              roomUpdate.modes = item.modes
-                .filter((mode): mode is RoomModeSetpoint => {
-                  return !!mode
-                    && typeof mode === 'object'
-                    && !Array.isArray(mode)
-                    && (mode as RoomModeSetpoint).mode !== undefined
-                    && typeof (mode as RoomModeSetpoint).value === 'number';
-                })
-                .map((mode) => ({
-                  mode: mode.mode,
-                  value: mode.value,
-                }));
-            }
+            Object.assign(roomUpdate, this.extractRoomUpdate(item as unknown as Record<string, unknown>));
             roomUpdate.raw = {
               ...(roomUpdate.raw || {}),
               ...(item as Record<string, unknown>),
@@ -1065,26 +940,7 @@ export class MessageHandler {
           if (device) {
             const patch: Partial<XComfortDevice> = {};
             if (updateData.switch !== undefined) patch.switch = updateData.switch;
-            if (updateData.dimmvalue !== undefined) patch.dimmvalue = updateData.dimmvalue;
-            if (updateData.power !== undefined) patch.power = updateData.power;
-            if (updateData.energy !== undefined) patch.energy = updateData.energy;
-            if (updateData.current !== undefined) patch.current = updateData.current;
-            if (updateData.voltage !== undefined) patch.voltage = updateData.voltage;
-            if (updateData.pulses !== undefined) patch.pulses = updateData.pulses;
-            if (updateData.energyCost !== undefined) patch.energyCost = updateData.energyCost;
-            if (updateData.tariff !== undefined) patch.tariff = updateData.tariff;
-            if (updateData.tariffLabel !== undefined) patch.tariffLabel = updateData.tariffLabel;
-            if (updateData.currency !== undefined) patch.currency = updateData.currency;
-            if (updateData.energyHistory !== undefined) patch.energyHistory = updateData.energyHistory;
-            if (updateData.loadMode !== undefined) patch.loadMode = updateData.loadMode;
-            if (updateData.curstate !== undefined) patch.curstate = updateData.curstate;
-            if (updateData.errorState !== undefined) patch.errorState = updateData.errorState;
-            if (updateData.shadsClosed !== undefined) patch.shadsClosed = updateData.shadsClosed;
-            if (updateData.shPos !== undefined) patch.shPos = updateData.shPos;
-            if (updateData.shSafety !== undefined) patch.shSafety = updateData.shSafety;
-            if (updateData.setpoint !== undefined) patch.setpoint = updateData.setpoint;
-            if (updateData.operationMode !== undefined) patch.operationMode = updateData.operationMode;
-            if (updateData.tempState !== undefined) patch.tempState = updateData.tempState;
+            copyDeviceStateFields(updateData as Record<string, unknown>, patch as Record<string, unknown>);
             if (deviceInfoUpdates.has(deviceId)) patch.info = deviceInfoUpdates.get(deviceId);
 
             if (Object.keys(patch).length > 0) {
@@ -1098,20 +954,12 @@ export class MessageHandler {
         roomUpdates.forEach((updateData, roomId) => {
           const existingRoom = this.deviceStateManager.getRoom(roomId);
           const patch: Record<string, unknown> = {};
-          if (updateData.setpoint !== undefined) patch.setpoint = updateData.setpoint;
-          if (updateData.temp !== undefined) patch.temp = updateData.temp;
-          if (updateData.humidity !== undefined) patch.humidity = updateData.humidity;
-          if (updateData.power !== undefined) patch.power = updateData.power;
-          if (updateData.valve !== undefined) patch.valve = updateData.valve;
-          if (updateData.lightsOn !== undefined) patch.lightsOn = updateData.lightsOn;
-          if (updateData.windowsOpen !== undefined) patch.windowsOpen = updateData.windowsOpen;
-          if (updateData.doorsOpen !== undefined) patch.doorsOpen = updateData.doorsOpen;
-          if (updateData.currentMode !== undefined) patch.currentMode = updateData.currentMode;
-          if (updateData.mode !== undefined) patch.mode = updateData.mode;
-          if (updateData.state !== undefined) patch.state = updateData.state;
-          if (updateData.temperatureOnly !== undefined) patch.temperatureOnly = updateData.temperatureOnly;
-          if (updateData.modes !== undefined) patch.modes = updateData.modes;
-          if (updateData.raw !== undefined) patch.raw = updateData.raw;
+          const updateRecord = updateData as Record<string, unknown>;
+          for (const key of ROOM_STATE_KEYS) {
+            if (updateRecord[key] !== undefined) {
+              patch[key] = updateRecord[key];
+            }
+          }
 
           if (Object.keys(patch).length > 0) {
             this.deviceStateManager.setRoom({
@@ -1292,7 +1140,7 @@ export class MessageHandler {
     conditionSummary?: string,
     scheduleSummary?: string,
   ): string {
-    const explicitType = this.getFirstString(payload, [
+    const explicitType = getFirstString(payload, [
       'sceneType',
       'type',
       'kind',
@@ -1318,7 +1166,7 @@ export class MessageHandler {
   }
 
   private summarizeSceneMetadata(payload: Record<string, unknown>, keys: string[]): string | undefined {
-    const value = this.getFirstValue(payload, keys);
+    const value = getFirstValue(payload, keys);
     if (value === undefined || value === null || value === false) {
       return undefined;
     }
@@ -1371,8 +1219,8 @@ export class MessageHandler {
     }
 
     const record = value as Record<string, unknown>;
-    const label = this.getFirstString(record, ['label', 'name', 'type', 'kind', 'event']) || fallbackLabel;
-    const detail = this.getFirstString(record, ['value', 'time', 'operator', 'state', 'mode', 'offset']);
+    const label = getFirstString(record, ['label', 'name', 'type', 'kind', 'event']) || fallbackLabel;
+    const detail = getFirstString(record, ['value', 'time', 'operator', 'state', 'mode', 'offset']);
     if (detail) {
       return `${this.humanizeLabel(label)} ${detail}`;
     }
@@ -1461,20 +1309,22 @@ export class MessageHandler {
     this.deviceStateManager.setComponent(component);
   }
 
-  private extractRoomUpdate(room: XComfortRoom): RoomStateUpdate {
+  /**
+   * Extract a RoomStateUpdate from any room-shaped source (a stored
+   * XComfortRoom or a raw STATE_UPDATE item), applying per-field type guards.
+   */
+  private extractRoomUpdate(room: Record<string, unknown>): RoomStateUpdate {
     const update: RoomStateUpdate = {};
+    const target = update as Record<string, unknown>;
 
-    if (typeof room.setpoint === 'number') update.setpoint = room.setpoint;
-    if (typeof room.temp === 'number') update.temp = room.temp;
-    if (typeof room.humidity === 'number') update.humidity = room.humidity;
-    if (typeof room.power === 'number') update.power = room.power;
-    if (typeof room.valve === 'number') update.valve = room.valve;
-    if (typeof room.lightsOn === 'number') update.lightsOn = room.lightsOn;
-    if (typeof room.windowsOpen === 'number') update.windowsOpen = room.windowsOpen;
-    if (typeof room.doorsOpen === 'number') update.doorsOpen = room.doorsOpen;
-    if (room.currentMode !== undefined) update.currentMode = room.currentMode;
-    if (room.mode !== undefined) update.mode = room.mode;
-    if (room.state !== undefined) update.state = room.state;
+    for (const key of ROOM_NUMBER_STATE_KEYS) {
+      if (typeof room[key] === 'number') {
+        target[key] = room[key];
+      }
+    }
+    if (room.currentMode !== undefined) target.currentMode = room.currentMode;
+    if (room.mode !== undefined) target.mode = room.mode;
+    if (room.state !== undefined) target.state = room.state;
     if (typeof room.temperatureOnly === 'boolean') update.temperatureOnly = room.temperatureOnly;
     if (Array.isArray(room.modes)) {
       update.modes = room.modes
@@ -1482,8 +1332,8 @@ export class MessageHandler {
           return !!mode
             && typeof mode === 'object'
             && !Array.isArray(mode)
-            && mode.mode !== undefined
-            && typeof mode.value === 'number';
+            && (mode as RoomModeSetpoint).mode !== undefined
+            && typeof (mode as RoomModeSetpoint).value === 'number';
         })
         .map((mode) => ({
           mode: mode.mode,
@@ -1491,7 +1341,7 @@ export class MessageHandler {
         }));
     }
     if (room.raw) {
-      update.raw = room.raw;
+      update.raw = room.raw as Record<string, unknown>;
     }
 
     return update;

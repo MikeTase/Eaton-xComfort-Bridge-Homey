@@ -17,22 +17,6 @@ import { Encryption } from '../crypto/Encryption';
 import type { EncryptionContext, LoggerFunction } from '../types';
 
 // ============================================================================
-// Retry Configuration
-// ============================================================================
-
-interface RetryConfig {
-  maxRetries: number;
-  ackTimeout: number; // ms to wait for ACK before retry
-  retryDelay: number; // ms between retries
-}
-
-const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 0,
-  ackTimeout: 10000,
-  retryDelay: 600,
-};
-
-// ============================================================================
 // Module-specific Types (callbacks)
 // ============================================================================
 
@@ -64,10 +48,20 @@ export class ConnectionManager {
 
   private base64regex: RegExp = /^[A-Za-z0-9+/=]+$/;
 
-  // Retry mechanism: Map of mc -> resolve function for pending ACKs
+  // Map of mc -> resolve function for pending ACKs
   private pendingAcks: Map<number, (acked: boolean, aborted?: boolean) => void> = new Map();
-  private retryConfig: RetryConfig = DEFAULT_RETRY_CONFIG;
+  private readonly ACK_TIMEOUT_MS = 10000;
   private txSemaphore = new Semaphore(1);
+
+  // WAIT4ACK (message type 3) is the bridge's backpressure signal: "I received
+  // your command but I'm busy — extend your timeout instead of giving up". The
+  // official Eaton app honours it by extending the in-flight command's deadline
+  // rather than letting it time out (which here would trigger a NACK cooldown
+  // and possibly a reconnect). We register a per-command timeout extender so a
+  // WAIT4ACK can push the deadline out, bounded to avoid hanging forever.
+  private ackTimeoutExtenders: Map<number, () => void> = new Map();
+  private readonly WAIT4ACK_EXTEND_MS = 30000;
+  private readonly WAIT4ACK_MAX_EXTENSIONS = 3;
 
   // Outbound command pacing. The xComfort bridge NACKs and abnormally drops
   // (1006) the connection when hit with a burst of commands (e.g. an "all
@@ -195,6 +189,18 @@ export class ConnectionManager {
       }
       this.pendingAcks.clear();
     }
+    this.ackTimeoutExtenders.clear();
+  }
+
+  /**
+   * Handle a WAIT4ACK (message type 3) from the bridge: extend the deadline of
+   * every in-flight command. The signal is global (it carries no mc), so it
+   * applies to all currently pending commands.
+   */
+  handleWait4Ack(): void {
+    for (const extend of this.ackTimeoutExtenders.values()) {
+      extend();
+    }
   }
 
   /**
@@ -227,6 +233,11 @@ export class ConnectionManager {
 
       try {
         this.connectionEstablished = false;
+
+        // The close-driven reconnect path reaches here without a prior
+        // cleanup(), leaving the previous (closed) socket and its listeners
+        // attached. Dispose it before replacing it.
+        this.disposeSocket();
 
         this.ws = new WebSocket(`ws://${this.bridgeIp}`, {
           perMessageDeflate: false,
@@ -382,30 +393,38 @@ export class ConnectionManager {
   }
 
   /**
-   * Send message with retry and ACK wait.
+   * Send a message and wait for the bridge to ACK it.
    *
    * The bridge accepts command bursts poorly: many in-flight DEVICE_SWITCH
    * commands lead to NACKs and abnormal 1006 disconnects. Keep only one
    * ACK-waiting command active at a time; after a NACK or timeout, apply a
-   * short shared cooldown before the next queued command.
+   * short shared cooldown before the next queued command. Failed commands
+   * are not retried — a NACK means the bridge is busy, and retrying only
+   * amplifies the backpressure.
    */
-  async sendWithRetry(msg: { mc: number; [key: string]: unknown }): Promise<boolean> {
+  async sendAndWaitForAck(msg: { mc: number; [key: string]: unknown }): Promise<boolean> {
     const mc = msg.mc;
     const typeStr = typeof msg.type_int === 'number' ? ` type=${msg.type_int}` : '';
     const targetStr = this.describeMessageTarget(msg);
 
     return new Promise((resolve, reject) => {
-      let retries = 0;
       let ackTimeoutTimer: NodeJS.Timeout | null = null;
-      let retryTimer: NodeJS.Timeout | null = null;
       let releaseSemaphore: (() => void) | null = null;
       let settled = false;
       let lastAttemptSentAt = 0;
 
+      let extensions = 0;
+      const armAckTimeout = (ms: number) => {
+        if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
+        ackTimeoutTimer = setTimeout(() => {
+          handleFailure();
+        }, ms);
+      };
+
       const cleanup = () => {
         if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
-        if (retryTimer) clearTimeout(retryTimer);
         this.pendingAcks.delete(mc);
+        this.ackTimeoutExtenders.delete(mc);
         if (releaseSemaphore) {
           releaseSemaphore();
           releaseSemaphore = null;
@@ -489,10 +508,18 @@ export class ConnectionManager {
           }
         });
 
-        if (ackTimeoutTimer) clearTimeout(ackTimeoutTimer);
-        ackTimeoutTimer = setTimeout(() => {
-          handleFailure();
-        }, this.retryConfig.ackTimeout);
+        // Allow a WAIT4ACK from the bridge to extend this command's deadline
+        // (bounded), instead of letting it expire while the bridge is busy.
+        this.ackTimeoutExtenders.set(mc, () => {
+          if (settled || extensions >= this.WAIT4ACK_MAX_EXTENSIONS) {
+            return;
+          }
+          extensions++;
+          this.logger(`[ConnectionManager] WAIT4ACK for mc=${mc}${typeStr}${targetStr}; extending ACK wait to ${this.WAIT4ACK_EXTEND_MS}ms (#${extensions})`);
+          armAckTimeout(this.WAIT4ACK_EXTEND_MS);
+        });
+
+        armAckTimeout(this.ACK_TIMEOUT_MS);
       };
 
       const handleFailure = () => {
@@ -505,22 +532,9 @@ export class ConnectionManager {
             ackTimeoutTimer = null;
          }
          this.pendingAcks.delete(mc);
-
-         if (retries < this.retryConfig.maxRetries) {
-            retries++;
-            this.logger(`[ConnectionManager] Retry ${retries}/${this.retryConfig.maxRetries} for mc=${mc}${typeStr}`);
-
-            retryTimer = setTimeout(() => {
-               if (!settled) {
-                  void sendAttempt();
-               }
-            }, this.retryConfig.retryDelay);
-         } else {
-            const reason = retries === 0 ? 'No ACK before timeout' : 'Max retries reached';
-            this.logger(`[ConnectionManager] ${reason} for mc=${mc}${typeStr}${targetStr} after ${retries} retries`);
-            this.bridgeBackoffUntil = Date.now() + this.NACK_BACKOFF_MS;
-            finishReject(new Error(reason));
-         }
+         this.logger(`[ConnectionManager] No ACK before timeout for mc=${mc}${typeStr}${targetStr}`);
+         this.bridgeBackoffUntil = Date.now() + this.NACK_BACKOFF_MS;
+         finishReject(new Error('No ACK before timeout'));
       };
 
       this.txSemaphore.acquire().then(() => {
@@ -566,19 +580,27 @@ export class ConnectionManager {
     this.connectionEstablished = false;
     this.reconnecting = false;
     this.connectResolve = undefined;
-    if (this.ws) {
-      this.ws.removeAllListeners();
-      // Add no-op error handler to prevent unhandled 'error' crash.
-      // When close() is called on a CONNECTING socket, the ws library
-      // emits 'error' asynchronously via process.nextTick (abortHandshake).
-      // Without a listener, Node.js treats it as an uncaught exception.
-      this.ws.on('error', () => {});
-      try {
-        this.ws.close();
-      } catch {
-        // ignore
-      }
-      this.ws = null;
+    this.disposeSocket();
+  }
+
+  /**
+   * Detach and close the current WebSocket, if any.
+   */
+  private disposeSocket(): void {
+    if (!this.ws) {
+      return;
     }
+    this.ws.removeAllListeners();
+    // Add no-op error handler to prevent unhandled 'error' crash.
+    // When close() is called on a CONNECTING socket, the ws library
+    // emits 'error' asynchronously via process.nextTick (abortHandshake).
+    // Without a listener, Node.js treats it as an uncaught exception.
+    this.ws.on('error', () => {});
+    try {
+      this.ws.close();
+    } catch {
+      // ignore
+    }
+    this.ws = null;
   }
 }

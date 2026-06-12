@@ -16,7 +16,7 @@
     "sv": "Lokal Eaton xComfort-styrning av belysning, solskydd, värme, sensorer och energi.",
     "da": "Lokal Eaton xComfort-styring af lys, solafskærmning, varme, sensorer og energi."
   },
-  "version": "1.7.0",
+  "version": "1.7.3",
   "category": [
     "lights",
     "climate"

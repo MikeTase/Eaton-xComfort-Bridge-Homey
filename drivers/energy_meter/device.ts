@@ -2,7 +2,23 @@ import { BaseDevice } from '../../lib/BaseDevice';
 import type { XComfortBridge } from '../../lib/connection/XComfortBridge';
 import { XCOMFORT_CAPABILITIES } from '../../lib/XComfortCapabilities';
 import type { BridgeStatus, DeviceStateUpdate } from '../../lib/types';
-import { EnergyTracker } from '../../lib/utils/EnergyTracker';
+import {
+  POWER_KEYS,
+  ENERGY_KEYS,
+  CURRENT_KEYS,
+  VOLTAGE_KEYS,
+  PULSES_KEYS,
+  COST_KEYS,
+  TARIFF_KEYS,
+  TARIFF_LABEL_KEYS,
+  CURRENCY_KEYS,
+  HISTORY_KEYS,
+  getFirstNumber,
+  getFirstString,
+  getFirstValue,
+  getLoadMode,
+  normalizeLoadMode,
+} from '../../lib/utils/energyFields';
 import { extractHistoryPeriods } from '../../lib/utils/energyHistory';
 
 interface EnergyMeterData {
@@ -16,17 +32,7 @@ const LEGACY_ENERGY_CUMULATIVE_SETTING = 'energy_cumulative';
 
 module.exports = class EnergyMeterDevice extends BaseDevice {
   private onBridgeStatus?: (status: BridgeStatus) => void;
-  private energy = new EnergyTracker(
-    async (kwh) => {
-      await this.ensureDeviceCapability('meter_power');
-      await this.updateCapability('meter_power', kwh);
-    },
-    {
-      onPersist: async (kwh) => {
-        await this.setStoreValue('meterPowerKwh', kwh).catch(this.error);
-      },
-    },
-  );
+  private energy = this.createEnergyTracker();
 
   async onDeviceReady() {
     await this.restoreEnergyState();
@@ -80,7 +86,7 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
   }
 
   public async setLoadModeAction(mode: string): Promise<void> {
-    const normalizedMode = this.normalizeLoadMode(mode);
+    const normalizedMode = normalizeLoadMode(mode);
     await this.bridge.setEnergyLoadMode(this.getMeterIdForControl(), normalizedMode);
     await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.LOAD_MODE);
     await this.updateCapability(XCOMFORT_CAPABILITIES.LOAD_MODE, normalizedMode);
@@ -155,109 +161,65 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
   }
 
   private async applyMeasurements(source: Record<string, unknown>, fallback?: Record<string, unknown>): Promise<void> {
-    const power = this.getNumber(source, [
-      'power',
-      'activePower',
-      'currentPower',
-      'powerW',
-      'instantPower',
-      'actualPower',
-      'powerConsumption',
-      'watts',
-    ])
-      ?? (fallback ? this.getNumber(fallback, ['power']) : undefined);
+    const power = getFirstNumber(source, POWER_KEYS)
+      ?? (fallback ? getFirstNumber(fallback, ['power']) : undefined);
     if (typeof power === 'number') {
       await this.ensureDeviceCapability('measure_power');
       await this.updateCapability('measure_power', this.round(power));
     }
 
-    const current = this.getNumber(source, ['current', 'currentA', 'ampere', 'amperes', 'amps'])
-      ?? (fallback ? this.getNumber(fallback, ['current']) : undefined);
+    const current = getFirstNumber(source, CURRENT_KEYS)
+      ?? (fallback ? getFirstNumber(fallback, ['current']) : undefined);
     if (typeof current === 'number') {
       await this.ensureDeviceCapability('measure_current');
       await this.updateCapability('measure_current', this.round(current));
     }
 
-    const voltage = this.getNumber(source, ['voltage', 'voltageV', 'volt', 'volts'])
-      ?? (fallback ? this.getNumber(fallback, ['voltage']) : undefined);
+    const voltage = getFirstNumber(source, VOLTAGE_KEYS)
+      ?? (fallback ? getFirstNumber(fallback, ['voltage']) : undefined);
     if (typeof voltage === 'number') {
       await this.ensureDeviceCapability('measure_voltage');
       await this.updateCapability('measure_voltage', this.round(voltage));
     }
 
-    const pulses = this.getNumber(source, ['pulses', 'pulse', 'pulseCount', 'impulses', 'counter'])
-      ?? (fallback ? this.getNumber(fallback, ['pulses']) : undefined);
+    const pulses = getFirstNumber(source, PULSES_KEYS)
+      ?? (fallback ? getFirstNumber(fallback, ['pulses']) : undefined);
     if (typeof pulses === 'number') {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.PULSES);
       await this.updateCapability(XCOMFORT_CAPABILITIES.PULSES, Math.max(0, Math.round(pulses)));
     }
 
-    const energyCost = this.getNumber(source, ['cost', 'energyCost', 'totalCost', 'totalPrice'])
-      ?? (fallback ? this.getNumber(fallback, ['energyCost']) : undefined);
+    const energyCost = getFirstNumber(source, COST_KEYS)
+      ?? (fallback ? getFirstNumber(fallback, ['energyCost']) : undefined);
     if (typeof energyCost === 'number') {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.ENERGY_COST);
       await this.updateCapability(XCOMFORT_CAPABILITIES.ENERGY_COST, Number(energyCost.toFixed(2)));
     }
 
-    const tariff = this.getNumber(source, [
-      'tariff',
-      'tariffId',
-      'currentTariff',
-      'tariffPrice',
-      'priceNow',
-      'currentPrice',
-      'pricePerKwh',
-      'rate',
-    ])
-      ?? (fallback ? this.getNumber(fallback, ['tariff']) : undefined);
+    const tariff = getFirstNumber(source, TARIFF_KEYS)
+      ?? (fallback ? getFirstNumber(fallback, ['tariff']) : undefined);
     if (typeof tariff === 'number') {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.ENERGY_TARIFF);
       await this.updateCapability(XCOMFORT_CAPABILITIES.ENERGY_TARIFF, Number(tariff.toFixed(4)));
     }
 
-    const tariffLabel = this.getString(source, [
-      'tariffLabel',
-      'tariffName',
-      'tariffText',
-      'currentTariffName',
-      'currentTariffLabel',
-      'priceArea',
-      'priceZone',
-      'tariffCode',
-    ]) ?? (fallback ? this.getString(fallback, ['tariffLabel']) : undefined)
+    const tariffLabel = getFirstString(source, TARIFF_LABEL_KEYS)
+      ?? (fallback ? getFirstString(fallback, ['tariffLabel']) : undefined)
       ?? this.getNonNumericString(source, ['tariff', 'currentTariff']);
     if (tariffLabel) {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.ENERGY_TARIFF_LABEL);
       await this.updateCapability(XCOMFORT_CAPABILITIES.ENERGY_TARIFF_LABEL, tariffLabel);
     }
 
-    const currency = this.getString(source, [
-      'currency',
-      'currencyCode',
-      'energyCurrency',
-      'costCurrency',
-      'tariffCurrency',
-    ]) ?? (fallback ? this.getString(fallback, ['currency']) : undefined);
+    const currency = getFirstString(source, CURRENCY_KEYS)
+      ?? (fallback ? getFirstString(fallback, ['currency']) : undefined);
     if (currency) {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.ENERGY_CURRENCY);
       await this.updateCapability(XCOMFORT_CAPABILITIES.ENERGY_CURRENCY, currency.toUpperCase());
     }
 
-    const history = this.getFirstDefined(source, [
-      'history',
-      'energyHistory',
-      'consumptionHistory',
-      'historicEnergy',
-      'periods',
-      'dayHistory',
-      'daily',
-      'weekHistory',
-      'weekly',
-      'monthHistory',
-      'monthly',
-      'yearHistory',
-      'yearly',
-    ]) ?? (fallback ? this.getFirstDefined(fallback, ['energyHistory']) : undefined);
+    const history = getFirstValue(source, HISTORY_KEYS)
+      ?? (fallback ? getFirstValue(fallback, ['energyHistory']) : undefined);
     if (history !== undefined) {
       const summary = this.formatEnergyHistory(history, currency);
       if (summary) {
@@ -268,25 +230,14 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
       await this.setStoreValue('energyHistoryRaw', history).catch(this.error);
     }
 
-    const loadMode = this.getLoadMode(source) ?? (fallback ? this.getLoadMode(fallback) : undefined);
+    const loadMode = getLoadMode(source) ?? (fallback ? getLoadMode(fallback) : undefined);
     if (loadMode) {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.LOAD_MODE);
       await this.updateCapability(XCOMFORT_CAPABILITIES.LOAD_MODE, loadMode);
     }
 
-    const directEnergy = this.getNumber(source, [
-      'energy',
-      'energyKwh',
-      'kwh',
-      'totalEnergy',
-      'electricalEnergy',
-      'consumption',
-      'totalConsumption',
-      'consumptionKwh',
-      'totalKwh',
-      'importEnergy',
-      'meterPower',
-    ]) ?? (fallback ? this.getNumber(fallback, ['energyKwh', 'energy']) : undefined);
+    const directEnergy = getFirstNumber(source, ENERGY_KEYS)
+      ?? (fallback ? getFirstNumber(fallback, ['energyKwh', 'energy']) : undefined);
 
     if (typeof directEnergy === 'number') {
       await this.ensureDeviceCapability('meter_power');
@@ -343,42 +294,7 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
   }
 
   private async restoreEnergyState(): Promise<void> {
-    const storedValue = this.getStoreValue('meterPowerKwh');
-    if (typeof storedValue !== 'number' || !Number.isFinite(storedValue) || storedValue <= 0) {
-      return;
-    }
-
-    this.energy.restore(storedValue);
-    await this.ensureDeviceCapability('meter_power');
-    await this.updateCapability('meter_power', this.energy.getKwh());
-  }
-
-  private getNumber(source: Record<string, unknown>, keys: string[]): number | undefined {
-    for (const key of keys) {
-      const value = source[key];
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-      }
-      if (typeof value === 'string') {
-        const parsed = Number.parseFloat(value.replace(',', '.'));
-        if (Number.isFinite(parsed)) {
-          return parsed;
-        }
-      }
-    }
-
-    return undefined;
-  }
-
-  private getString(source: Record<string, unknown>, keys: string[]): string | undefined {
-    for (const key of keys) {
-      const value = source[key];
-      if (typeof value === 'string' && value.trim().length > 0) {
-        return value.trim();
-      }
-    }
-
-    return undefined;
+    await this.restorePersistedEnergy(this.energy);
   }
 
   private getNonNumericString(source: Record<string, unknown>, keys: string[]): string | undefined {
@@ -386,16 +302,6 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
       const value = source[key];
       if (typeof value === 'string' && value.trim().length > 0 && Number.isNaN(Number.parseFloat(value))) {
         return value.trim();
-      }
-    }
-
-    return undefined;
-  }
-
-  private getFirstDefined(source: Record<string, unknown>, keys: string[]): unknown {
-    for (const key of keys) {
-      if (source[key] !== undefined && source[key] !== null) {
-        return source[key];
       }
     }
 
@@ -492,8 +398,8 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
 
     if (value && typeof value === 'object' && !Array.isArray(value)) {
       const record = value as Record<string, unknown>;
-      const entryLabel = this.getString(record, ['label', 'name', 'period', 'range']) || this.humanizeLabel(label);
-      const energy = this.getNumber(record, [
+      const entryLabel = getFirstString(record, ['label', 'name', 'period', 'range']) || this.humanizeLabel(label);
+      const energy = getFirstNumber(record, [
         'energy',
         'energyKwh',
         'kwh',
@@ -503,7 +409,7 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
         'totalKwh',
         'value',
       ]);
-      const cost = this.getNumber(record, ['cost', 'energyCost', 'totalCost', 'totalPrice']);
+      const cost = getFirstNumber(record, ['cost', 'energyCost', 'totalCost', 'totalPrice']);
       const parts: string[] = [];
 
       if (energy !== undefined) {
@@ -527,42 +433,6 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
 
   private truncate(value: string): string {
     return value.length > 180 ? `${value.slice(0, 177)}...` : value;
-  }
-
-  private getLoadMode(source: Record<string, unknown>): string | undefined {
-    const value = source.loadMode
-      ?? source.mode
-      ?? source.controlMode
-      ?? source.priorityMode
-      ?? source.loadControlMode
-      ?? source.energyMode;
-    if (typeof value === 'number' || typeof value === 'string') {
-      return this.normalizeLoadMode(value);
-    }
-    return undefined;
-  }
-
-  private normalizeLoadMode(value: string | number): string {
-    if (typeof value === 'number') {
-      switch (value) {
-        case 1:
-          return 'energy_saving';
-        case 2:
-          return 'priority';
-        case 0:
-        default:
-          return 'normal';
-      }
-    }
-
-    const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
-    if (normalized === 'saving' || normalized === 'energy_saving' || normalized === 'energysaving') {
-      return 'energy_saving';
-    }
-    if (normalized === 'priority' || normalized === 'prio') {
-      return 'priority';
-    }
-    return 'normal';
   }
 
   private round(value: number): number {

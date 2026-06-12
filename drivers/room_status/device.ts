@@ -1,7 +1,6 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import { ClimateMode } from '../../lib/types';
 import type { RoomStateUpdate, XComfortRoom } from '../../lib/types';
-import { EnergyTracker } from '../../lib/utils/EnergyTracker';
 
 const FIELD_CAPABILITY_MAP: Array<{ field: keyof RoomStateUpdate; capability: string }> = [
   { field: 'temp', capability: 'measure_temperature' },
@@ -17,17 +16,7 @@ const FIELD_CAPABILITY_MAP: Array<{ field: keyof RoomStateUpdate; capability: st
 module.exports = class RoomStatusDevice extends BaseDevice {
   private roomRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private energy = new EnergyTracker(
-    async (kwh) => {
-      await this.ensureDeviceCapability('meter_power');
-      await this.updateCapability('meter_power', kwh);
-    },
-    {
-      onPersist: async (kwh) => {
-        await this.setStoreValue('roomMeterPowerKwh', kwh).catch(this.error);
-      },
-    },
-  );
+  private energy = this.createEnergyTracker('roomMeterPowerKwh');
 
   protected get roomId(): string {
     return String(this.getData().roomId);
@@ -57,12 +46,7 @@ module.exports = class RoomStatusDevice extends BaseDevice {
   }
 
   private async restoreEnergyState(): Promise<void> {
-    const storedValue = this.getStoreValue('roomMeterPowerKwh');
-    if (typeof storedValue === 'number' && Number.isFinite(storedValue) && storedValue > 0) {
-      this.energy.restore(storedValue);
-      await this.ensureDeviceCapability('meter_power');
-      await this.updateCapability('meter_power', this.energy.getKwh());
-    }
+    await this.restorePersistedEnergy(this.energy, 'roomMeterPowerKwh');
   }
 
   private async applyRoomSnapshot(): Promise<void> {

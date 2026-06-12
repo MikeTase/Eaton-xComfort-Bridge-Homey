@@ -1,4 +1,5 @@
-const assert = require('assert');
+const assert = require('node:assert');
+const { test } = require('node:test');
 
 const { CommandDebouncer } = require('../.homeybuild/lib/utils/CommandDebouncer');
 const { Semaphore } = require('../.homeybuild/lib/utils/Semaphore');
@@ -8,20 +9,19 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function testCommandDebouncerLeadingEdge() {
+test('CommandDebouncer fires the first call in an idle period immediately', async () => {
   const debouncer = new CommandDebouncer();
   const calls = [];
 
-  // First call in an idle period fires immediately.
   const result = await debouncer.run(async () => {
     calls.push('first');
     return 'first';
   }, 50);
   assert.strictEqual(result, 'first');
   assert.deepStrictEqual(calls, ['first']);
-}
+});
 
-async function testCommandDebouncerSupersede() {
+test('CommandDebouncer supersedes intermediate calls', async () => {
   const debouncer = new CommandDebouncer();
   const calls = [];
   const run = (label) => debouncer.run(async () => {
@@ -41,9 +41,9 @@ async function testCommandDebouncerSupersede() {
   assert.strictEqual(r2, undefined, 'superseded call resolves undefined');
   assert.strictEqual(r3, 'c');
   assert.deepStrictEqual(calls, ['a', 'c']);
-}
+});
 
-async function testSemaphoreSerializes() {
+test('Semaphore serializes acquirers', async () => {
   const semaphore = new Semaphore(1);
   const order = [];
 
@@ -55,18 +55,18 @@ async function testSemaphoreSerializes() {
   semaphore.release();
 
   assert.deepStrictEqual(order, ['first', 'second']);
-}
+});
 
-async function testSemaphoreDrainRejects() {
+test('Semaphore drain rejects queued waiters', async () => {
   const semaphore = new Semaphore(1);
   await semaphore.acquire();
   const waiter = semaphore.acquire();
   semaphore.drain(new Error('Connection lost'));
 
   await assert.rejects(() => waiter, /Connection lost/);
-}
+});
 
-function testExtractHistoryKwh() {
+test('extractHistoryKwh handles numbers, strings, arrays, and objects', () => {
   assert.strictEqual(extractHistoryKwh(12.345), 12.345);
   assert.strictEqual(extractHistoryKwh('3,5'), 3.5);
   assert.strictEqual(extractHistoryKwh([1, 2, 3]), 6);
@@ -76,9 +76,9 @@ function testExtractHistoryKwh() {
   assert.strictEqual(extractHistoryKwh('not-a-number'), undefined);
   assert.strictEqual(extractHistoryKwh(null), undefined);
   assert.strictEqual(extractHistoryKwh({}), undefined);
-}
+});
 
-function testExtractHistoryPeriods() {
+test('extractHistoryPeriods extracts today/month totals', () => {
   assert.deepStrictEqual(extractHistoryPeriods({ today: 1.2345678, month: 45.6 }), {
     todayKwh: 1.235,
     monthKwh: 45.6,
@@ -90,20 +90,4 @@ function testExtractHistoryPeriods() {
   assert.deepStrictEqual(extractHistoryPeriods('today: lots'), {});
   assert.deepStrictEqual(extractHistoryPeriods(null), {});
   assert.deepStrictEqual(extractHistoryPeriods({ week: 5 }), {});
-}
-
-async function run() {
-  await testCommandDebouncerLeadingEdge();
-  await testCommandDebouncerSupersede();
-  await testSemaphoreSerializes();
-  await testSemaphoreDrainRejects();
-  testExtractHistoryKwh();
-  testExtractHistoryPeriods();
-
-  console.log('units.test.js passed');
-}
-
-run().catch((err) => {
-  console.error(err);
-  process.exit(1);
 });

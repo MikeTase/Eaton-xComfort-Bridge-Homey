@@ -1,7 +1,6 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { DeviceStateUpdate, InfoEntry } from '../../lib/types';
-import { EnergyTracker } from '../../lib/utils/EnergyTracker';
 import { parseInfoMetadata } from '../../lib/utils/parseInfoMetadata';
 
 type DimBelowMinBehavior = 'switch_off' | 'clamp_to_min';
@@ -26,17 +25,7 @@ class ActuatorDevice extends BaseDevice {
     private readonly STATE_UPDATE_GRACE_PERIOD = 3000; // ms
 
     // Energy tracking — live capability update on every sample, throttled persist.
-    private energy = new EnergyTracker(
-        async (kwh) => {
-            await this.ensureEnergyCapability();
-            await this.updateCapability('meter_power', kwh);
-        },
-        {
-            onPersist: async (kwh) => {
-                await this.setStoreValue('meterPowerKwh', kwh).catch(this.error);
-            },
-        },
-    );
+    private energy = this.createEnergyTracker();
 
     /** Whether this device actually reports power data. */
     private deviceReportsPower: boolean = false;
@@ -86,7 +75,7 @@ class ActuatorDevice extends BaseDevice {
                     }
 
                     if (shouldUpdate) {
-                        this.setCapabilityValue('onoff', state.switch).catch(this.error);
+                        void this.updateCapability('onoff', state.switch);
                         if (state.switch && this.hasCapability('dim') && state.dimmvalue === undefined) {
                             this.syncImplicitDimOnState();
                         }
@@ -104,7 +93,7 @@ class ActuatorDevice extends BaseDevice {
                     }
                     
                     if (shouldUpdateDim) {
-                        this.setCapabilityValue('dim', homeyDim).catch(this.error);
+                        void this.updateCapability('dim', homeyDim);
                     }
                 }
 
@@ -381,8 +370,8 @@ class ActuatorDevice extends BaseDevice {
     // --- Energy Tracking Methods ---
 
     private async restoreEnergyState(): Promise<void> {
-        const storedValue = this.getStoreValue('meterPowerKwh');
-        if (typeof storedValue !== 'number' || !Number.isFinite(storedValue) || storedValue <= 0) {
+        const restored = await this.restorePersistedEnergy(this.energy);
+        if (!restored) {
             // No real energy data was ever tracked — clean up any capabilities
             // that were dynamically added for a device that doesn't report power.
             await this.removeStaleEnergyCapabilities();
@@ -391,9 +380,6 @@ class ActuatorDevice extends BaseDevice {
 
         // Device has stored energy history — it genuinely reports power
         this.deviceReportsPower = true;
-        this.energy.restore(storedValue);
-        await this.ensureEnergyCapability();
-        await this.updateCapability('meter_power', this.energy.getKwh());
     }
 
     /**
@@ -411,18 +397,6 @@ class ActuatorDevice extends BaseDevice {
         }
     }
 
-    private async ensurePowerCapability(): Promise<void> {
-        if (!this.hasCapability('measure_power')) {
-            await this.addCapability('measure_power').catch(this.error);
-        }
-    }
-
-    private async ensureEnergyCapability(): Promise<void> {
-        if (!this.hasCapability('meter_power')) {
-            await this.addCapability('meter_power').catch(this.error);
-        }
-    }
-
     private async applyPowerMeasurement(power: number): Promise<void> {
         // Ignore zero-power from devices that have never reported real power.
         // This prevents adding energy capabilities to non-metering actuators
@@ -437,7 +411,7 @@ class ActuatorDevice extends BaseDevice {
             this.log(`Device reports power (${power}W) — enabling energy tracking`);
         }
 
-        await this.ensurePowerCapability();
+        await this.ensureDeviceCapability('measure_power');
         await this.updateCapability('measure_power', power);
         await this.energy.applyPower(power);
     }

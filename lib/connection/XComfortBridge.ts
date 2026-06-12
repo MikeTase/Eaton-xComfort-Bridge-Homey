@@ -15,6 +15,7 @@ import { Authenticator } from './Authenticator';
 import { DeviceStateManager } from '../state/DeviceStateManager';
 import { MessageHandler } from '../messaging/MessageHandler';
 import { CommandDebouncer } from '../utils/CommandDebouncer';
+import { normalizeLoadMode, loadModeToProtocolValue } from '../utils/energyFields';
 import type {
   ConnectionState,
   ProtocolMessage,
@@ -82,6 +83,13 @@ export class XComfortBridge extends EventEmitter {
   private readonly DEVICE_STATES_MIN_INTERVAL_MS = 2000;
   private readonly CONTROL_QUIET_PERIOD_MS = 8000;
 
+  // The post-auth REQUEST_DEVICES/REQUEST_HOME_DATA are fire-and-forget, and
+  // the bridge is at its busiest right after a (re)connect — exactly when it
+  // may drop them. One retry turns that from a 30-45s connection timeout
+  // (plus backoff) into a ~10s hiccup.
+  private initialDataRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly INITIAL_DATA_RETRY_MS = 10000;
+
   constructor(bridgeIp: string, authKey: string, logger?: LoggerFunction, authOptions?: XComfortAuthOptions) {
     super(); // Initialize EventEmitter
     // Each device adds connected/disconnected (and sometimes devices_loaded /
@@ -113,7 +121,7 @@ export class XComfortBridge extends EventEmitter {
       (msg) => this.connectionManager.sendEncrypted(msg),
       () => this.connectionManager.nextMc(),
       this.logger,
-      { mode: this.authMode, username: this.username }
+      { mode: this.authMode, username: this.username, clientId: authOptions?.clientId }
     );
 
     this.setupCallbacks();
@@ -155,16 +163,8 @@ export class XComfortBridge extends EventEmitter {
       this.emit('connected');
 
       // Request initial data
-      this.connectionManager.sendEncrypted({
-        type_int: MESSAGE_TYPES.REQUEST_DEVICES,
-        mc: this.connectionManager.nextMc(),
-        payload: {},
-      });
-      this.connectionManager.sendEncrypted({
-        type_int: MESSAGE_TYPES.REQUEST_HOME_DATA,
-        mc: this.connectionManager.nextMc(),
-        payload: {},
-      });
+      this.sendInitialDataRequests();
+      this.scheduleInitialDataRetry();
       // OPTIMIZATION: Send initial HEARTBEAT (2) to signals readiness and "wake" the bridge
       this.connectionManager.sendEncrypted({
         type_int: MESSAGE_TYPES.HEARTBEAT,
@@ -187,6 +187,7 @@ export class XComfortBridge extends EventEmitter {
     // Message handler callbacks
     this.messageHandler.setOnDeviceListComplete(() => {
       this.deviceListReceived = true;
+      this.clearInitialDataRetry();
       this.emit('devices_loaded', this.getDevices());
     });
 
@@ -261,6 +262,9 @@ export class XComfortBridge extends EventEmitter {
       this.connectionManager.connect().catch((err) => {
         this.stopWatchdog();
         this.connectionManager.cleanup();
+        // Usually a no-op (the socket close handler already announced the
+        // drop), but covers failures before the close listener was attached.
+        this.markDisconnected();
         if (this.allowReconnect) {
           this.scheduleReconnect();
         }
@@ -292,6 +296,7 @@ export class XComfortBridge extends EventEmitter {
         this.logger(`[XComfortBridge] Connection timeout (auth state: ${authState})`);
         this.stopWatchdog();
         this.connectionManager.cleanup();
+        this.markDisconnected();
         if (this.allowReconnect) {
           this.scheduleReconnect();
         }
@@ -309,6 +314,55 @@ export class XComfortBridge extends EventEmitter {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
     }
+    this.clearInitialDataRetry();
+  }
+
+  private sendInitialDataRequests(): void {
+    this.connectionManager.sendEncrypted({
+      type_int: MESSAGE_TYPES.REQUEST_DEVICES,
+      mc: this.connectionManager.nextMc(),
+      payload: {},
+    });
+    this.connectionManager.sendEncrypted({
+      type_int: MESSAGE_TYPES.REQUEST_HOME_DATA,
+      mc: this.connectionManager.nextMc(),
+      payload: {},
+    });
+  }
+
+  /** Retry the initial data requests once if the device list never arrives. */
+  private scheduleInitialDataRetry(): void {
+    this.clearInitialDataRetry();
+    this.initialDataRetryTimer = setTimeout(() => {
+      this.initialDataRetryTimer = null;
+      if (this.deviceListReceived || !this.connectionManager.isConnected()) {
+        return;
+      }
+      this.logger(`[XComfortBridge] No device list ${this.INITIAL_DATA_RETRY_MS}ms after login — re-requesting initial data`);
+      this.sendInitialDataRequests();
+    }, this.INITIAL_DATA_RETRY_MS);
+  }
+
+  private clearInitialDataRetry(): void {
+    if (this.initialDataRetryTimer) {
+      clearTimeout(this.initialDataRetryTimer);
+      this.initialDataRetryTimer = null;
+    }
+  }
+
+  /**
+   * Mark the connection as lost on teardown paths where the socket close
+   * event cannot fire (watchdog/timeout call connectionManager.cleanup(),
+   * which strips the ws listeners before closing). Without this, devices
+   * stay "available" and the bridge_disconnected Flow never triggers while
+   * every command fails until the reconnect lands.
+   */
+  private markDisconnected(): void {
+    if (this.connectionState === 'disconnected') {
+      return;
+    }
+    this.connectionState = 'disconnected';
+    this.emit('disconnected');
   }
 
   private startWatchdog(): void {
@@ -323,7 +377,11 @@ export class XComfortBridge extends EventEmitter {
         this.logger(`[XComfortBridge] Watchdog: no messages for ${now - last}ms, reconnecting`);
         this.stopWatchdog();
         this.connectionManager.cleanup();
-        this.scheduleReconnect();
+        this.markDisconnected();
+        if (this.allowReconnect) {
+          this.emit('reconnecting');
+          this.scheduleReconnect();
+        }
         return;
       }
 
@@ -428,6 +486,7 @@ export class XComfortBridge extends EventEmitter {
       }
       // JSON message not handled by authenticator - log for diagnostics
       this.logger(`[XComfortBridge] Unhandled JSON message type: ${msg.type_int}`);
+      return;
     } catch {
       // Not JSON, check for encrypted
     }
@@ -455,8 +514,12 @@ export class XComfortBridge extends EventEmitter {
         type_int: MESSAGE_TYPES.ACK,
         ref: msg.mc
       });
-    } else if (msg.type_int === MESSAGE_TYPES.PING) {
-      // Always ACK PING to prevent 1006 disconnects
+    } else if (msg.type_int === MESSAGE_TYPES.WAIT4ACK) {
+      // Type 3 is the bridge's WAIT4ACK backpressure signal (it has no mc).
+      // Extend in-flight command deadlines rather than letting them expire
+      // while the bridge is busy. Still ACK it (kept from the prior PING
+      // handling, which empirically helped avoid 1006 drops).
+      this.connectionManager.handleWait4Ack();
       const ackMsg: { type_int: number; ref?: number } = { type_int: MESSAGE_TYPES.ACK };
       if (msg.ref !== undefined) ackMsg.ref = msg.ref;
       this.connectionManager.sendEncrypted(ackMsg as Record<string, unknown>);
@@ -640,7 +703,7 @@ export class XComfortBridge extends EventEmitter {
   }
 
   async setRemoteAccess(allowed: boolean): Promise<boolean> {
-    const result = await this.connectionManager.sendWithRetry({
+    const result = await this.connectionManager.sendAndWaitForAck({
       type_int: MESSAGE_TYPES.SET_REMOTE_CONFIG,
       mc: this.connectionManager.nextMc(),
       payload: { remoteAllowed: allowed },
@@ -706,7 +769,7 @@ export class XComfortBridge extends EventEmitter {
       payload.value = value;
     }
 
-    return this.connectionManager.sendWithRetry({
+    return this.connectionManager.sendAndWaitForAck({
       type_int: MESSAGE_TYPES.SET_DEVICE_SHADING_STATE,
       mc: this.connectionManager.nextMc(),
       payload,
@@ -718,7 +781,7 @@ export class XComfortBridge extends EventEmitter {
    */
   async setThermostatSetpoint(deviceId: string | number, setpoint: number): Promise<boolean> {
     const numericId = this.parseId(String(deviceId));
-    return this.connectionManager.sendWithRetry({
+    return this.connectionManager.sendAndWaitForAck({
       type_int: MESSAGE_TYPES.SET_HEATING_STATE,
       mc: this.connectionManager.nextMc(),
       payload: {
@@ -739,7 +802,7 @@ export class XComfortBridge extends EventEmitter {
     confirmed: boolean = false,
   ): Promise<boolean> {
     const numericId = this.parseId(String(roomId));
-    return this.connectionManager.sendWithRetry({
+    return this.connectionManager.sendAndWaitForAck({
       type_int: MESSAGE_TYPES.SET_HEATING_STATE,
       mc: this.connectionManager.nextMc(),
       payload: {
@@ -754,7 +817,7 @@ export class XComfortBridge extends EventEmitter {
 
   async setRoomHvacState(roomId: string | number, state: ClimateState | number): Promise<boolean> {
     const numericId = this.parseId(String(roomId));
-    return this.connectionManager.sendWithRetry({
+    return this.connectionManager.sendAndWaitForAck({
       type_int: MESSAGE_TYPES.SET_HEATING_STATE,
       mc: this.connectionManager.nextMc(),
       payload: {
@@ -766,12 +829,12 @@ export class XComfortBridge extends EventEmitter {
   }
 
   async setEnergyLoadMode(meterId: string | number, mode: string): Promise<boolean> {
-    const normalizedMode = this.normalizeEnergyLoadMode(mode);
-    const numericMode = this.energyLoadModeToProtocolValue(normalizedMode);
+    const normalizedMode = normalizeLoadMode(mode);
+    const numericMode = loadModeToProtocolValue(normalizedMode);
     const parsedMeterId = this.parseId(String(meterId));
 
     return this.sendControlMessage({
-      type_int: MESSAGE_TYPES.SET_ENERGY_CONTROL,
+      type_int: MESSAGE_TYPES.ENERGY_CONTROL_SET_MODE,
       mc: this.connectionManager.nextMc(),
       payload: {
         meterId: parsedMeterId,
@@ -787,12 +850,15 @@ export class XComfortBridge extends EventEmitter {
     const payload = meterId !== undefined && meterId !== null
       ? { meterId: this.parseId(String(meterId)) }
       : {};
+    // Outgoing requests only. The previous list also sent 389 and 393, which
+    // are actually the bridge's *response* types (TARIFF_INFO / SET_ENERGY_STATE)
+    // and were rejected. These four are the genuine client→bridge requests the
+    // official app uses: subscribe to live data, then pull tariff/history/meter.
     const requestTypes = [
-      MESSAGE_TYPES.REQUEST_MAIN_ELECTRICAL_ENERGY_USAGE,
-      MESSAGE_TYPES.REQUEST_ENERGY_METER,
+      MESSAGE_TYPES.SET_ENERGY_MONITORING,
       MESSAGE_TYPES.REQUEST_TARIFF_INFO,
-      MESSAGE_TYPES.REQUEST_ENERGY_CONTROL,
       MESSAGE_TYPES.REQUEST_ENERGY_HISTORY,
+      MESSAGE_TYPES.SET_ENERGY_METER,
     ];
 
     for (const type_int of requestTypes) {
@@ -811,7 +877,7 @@ export class XComfortBridge extends EventEmitter {
   private async sendControlMessage(msg: { mc: number; [key: string]: unknown }): Promise<boolean> {
     this.markControlCommand();
     try {
-      return await this.connectionManager.sendWithRetry(msg);
+      return await this.connectionManager.sendAndWaitForAck(msg);
     } finally {
       this.markControlCommand();
     }
@@ -862,7 +928,7 @@ export class XComfortBridge extends EventEmitter {
     this.lastDeviceStatesAt = Date.now();
     this.deviceStatesInFlight = (async () => {
       try {
-        await this.connectionManager.sendWithRetry({
+        await this.connectionManager.sendAndWaitForAck({
           type_int: MESSAGE_TYPES.REQUEST_DEVICES,
           mc: this.connectionManager.nextMc(),
           payload: {},
@@ -958,28 +1024,5 @@ export class XComfortBridge extends EventEmitter {
   private parseId(id: string): string | number {
     const num = parseInt(id, 10);
     return isNaN(num) ? id : num;
-  }
-
-  private normalizeEnergyLoadMode(mode: string): string {
-    const normalized = mode.trim().toLowerCase().replace(/[\s-]+/g, '_');
-    if (normalized === 'saving' || normalized === 'energy_saving' || normalized === 'energysaving') {
-      return 'energy_saving';
-    }
-    if (normalized === 'priority' || normalized === 'prio') {
-      return 'priority';
-    }
-    return 'normal';
-  }
-
-  private energyLoadModeToProtocolValue(mode: string): number {
-    switch (mode) {
-      case 'energy_saving':
-        return 1;
-      case 'priority':
-        return 2;
-      case 'normal':
-      default:
-        return 0;
-    }
   }
 }

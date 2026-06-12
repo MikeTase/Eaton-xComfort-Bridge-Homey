@@ -39,6 +39,7 @@ type GetMcFn = () => number;
 export class Authenticator {
   private authKey: string;
   private username: string;
+  private clientId: string;
   private logger: LoggerFunction;
   private deviceId: string | null = null;
   private connectionId: string | null = null;
@@ -64,6 +65,7 @@ export class Authenticator {
   ) {
     this.authKey = authKey;
     this.username = this.normalizeUsername(authOptions?.username);
+    this.clientId = authOptions?.clientId?.trim() || CLIENT_CONFIG.ID;
     this.sendRaw = sendRaw;
     this.sendEncrypted = sendEncrypted;
     this.getMc = getMc;
@@ -132,7 +134,7 @@ export class Authenticator {
         mc: this.getMc(),
         payload: {
           client_type: CLIENT_CONFIG.TYPE,
-          client_id: CLIENT_CONFIG.ID,
+          client_id: this.clientId,
           client_version: CLIENT_CONFIG.VERSION,
           connection_id: this.connectionId,
         },
