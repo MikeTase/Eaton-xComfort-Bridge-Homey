@@ -2,6 +2,7 @@ import * as Homey from 'homey';
 import { BaseDriver } from '../../lib/BaseDriver';
 import { XComfortDevice } from '../../lib/types';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
+import { normalizeValveStateArgument } from '../../lib/utils/flowArguments';
 
 /** A water-sensor device that may expose valve control. */
 interface WaterValveDevice extends Homey.Device {
@@ -14,9 +15,12 @@ module.exports = class WaterSensorDriver extends BaseDriver {
 
     const setValveAction = this.homey.flow.getActionCard('set_water_valve');
     if (setValveAction) {
-      setValveAction.registerRunListener(async (args: { device: WaterValveDevice; state?: string }) => {
+      setValveAction.registerRunListener(async (args: { device: WaterValveDevice; state?: unknown }) => {
         const device = args.device;
-        const open = args.state === 'open';
+        const open = normalizeValveStateArgument(args.state);
+        if (open === undefined) {
+          throw new Error('No water valve state selected');
+        }
         if (typeof device.setValveState === 'function') {
           await device.setValveState(open);
         } else {

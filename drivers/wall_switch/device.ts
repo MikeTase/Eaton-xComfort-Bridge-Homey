@@ -258,9 +258,9 @@ module.exports = class WallSwitchDevice extends BaseDevice {
     const isDoublePress = this.isDoublePress(action);
 
     if (pressedState) {
-      triggerUp?.trigger(this, {}, {}).catch(this.error);
+      triggerUp?.trigger(this, tokenValues, tokenValues).catch(this.error);
     } else {
-      triggerDown?.trigger(this, {}, {}).catch(this.error);
+      triggerDown?.trigger(this, tokenValues, tokenValues).catch(this.error);
     }
 
     this.triggerAnyPress(state, action, tokenValues);

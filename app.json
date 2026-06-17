@@ -16,7 +16,7 @@
     "sv": "Lokal Eaton xComfort-styrning av belysning, solskydd, värme, sensorer och energi.",
     "da": "Lokal Eaton xComfort-styring af lys, solafskærmning, varme, sensorer og energi."
   },
-  "version": "1.7.3",
+  "version": "1.7.5",
   "category": [
     "lights",
     "climate"
@@ -146,6 +146,32 @@
             "type": "device",
             "filter": "driver_id=wall_switch"
           }
+        ],
+        "tokens": [
+          {
+            "name": "button",
+            "type": "number",
+            "title": {
+              "en": "Button",
+              "nl": "Knop"
+            }
+          },
+          {
+            "name": "component_id",
+            "type": "string",
+            "title": {
+              "en": "Component ID",
+              "nl": "Component-ID"
+            }
+          },
+          {
+            "name": "component_model",
+            "type": "string",
+            "title": {
+              "en": "Component Model",
+              "nl": "Componentmodel"
+            }
+          }
         ]
       },
       {
@@ -159,6 +185,32 @@
             "name": "device",
             "type": "device",
             "filter": "driver_id=wall_switch"
+          }
+        ],
+        "tokens": [
+          {
+            "name": "button",
+            "type": "number",
+            "title": {
+              "en": "Button",
+              "nl": "Knop"
+            }
+          },
+          {
+            "name": "component_id",
+            "type": "string",
+            "title": {
+              "en": "Component ID",
+              "nl": "Component-ID"
+            }
+          },
+          {
+            "name": "component_model",
+            "type": "string",
+            "title": {
+              "en": "Component Model",
+              "nl": "Componentmodel"
+            }
           }
         ]
       },
@@ -315,6 +367,17 @@
             "example": {
               "en": "xComfort Bridge"
             }
+          },
+          {
+            "name": "bridge_id",
+            "type": "string",
+            "title": {
+              "en": "Bridge ID",
+              "nl": "Bridge-ID"
+            },
+            "example": {
+              "en": "bridge_1"
+            }
           }
         ]
       },
@@ -338,6 +401,17 @@
             },
             "example": {
               "en": "xComfort Bridge"
+            }
+          },
+          {
+            "name": "bridge_id",
+            "type": "string",
+            "title": {
+              "en": "Bridge ID",
+              "nl": "Bridge-ID"
+            },
+            "example": {
+              "en": "bridge_1"
             }
           }
         ]

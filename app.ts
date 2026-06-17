@@ -3,6 +3,12 @@ import { createHash } from 'crypto';
 import appManifest from './app.json';
 import { XComfortBridge } from './lib/connection/XComfortBridge';
 import type { XComfortAuthMode } from './lib/types';
+import {
+  normalizeChoiceIdArgument,
+  normalizeOnOffArgument,
+  normalizePercentageArgument,
+  normalizeRemoteAccessPreference as normalizeRemoteAccessFlowPreference,
+} from './lib/utils/flowArguments';
 
 export interface XComfortBridgeConfig {
   id: string;
@@ -181,41 +187,46 @@ class XComfortApp extends Homey.App {
     });
 
     const roomCard = this.homey.flow.getActionCard('switch_room_lights_by_name') as unknown as
-      AutocompleteFlowCard<{ room?: { id?: string; bridgeId?: string }; state?: 'on' | 'off' }> | null;
+      AutocompleteFlowCard<{ room?: { id?: string; bridgeId?: string }; state?: unknown }> | null;
     roomCard?.registerArgumentAutocompleteListener('room', async (query: string) => {
       return this.getRoomAutocompleteResults(query);
     });
-    roomCard?.registerRunListener(async (args: { room?: { id?: string; bridgeId?: string }; state?: 'on' | 'off' }) => {
+    roomCard?.registerRunListener(async (args: { room?: { id?: string; bridgeId?: string }; state?: unknown }) => {
       const selected = args.room;
       if (!selected || !selected.id) {
         throw new Error('No room selected');
+      }
+      const switchState = normalizeOnOffArgument(args.state);
+      if (switchState === undefined) {
+        throw new Error('No room light state selected');
       }
       const bridge = this.getBridge(selected.bridgeId || null);
       if (!bridge) {
         throw new Error('Bridge not connected');
       }
-      await bridge.switchRoom(selected.id, args.state === 'on');
+      await bridge.switchRoom(selected.id, switchState);
       return true;
     });
 
     const dimRoomCard = this.homey.flow.getActionCard('dim_room_lights_by_name') as unknown as
-      AutocompleteFlowCard<{ room?: { id?: string; bridgeId?: string }; level?: number }> | null;
+      AutocompleteFlowCard<{ room?: { id?: string; bridgeId?: string }; level?: unknown }> | null;
     dimRoomCard?.registerArgumentAutocompleteListener('room', async (query: string) => {
       return this.getRoomAutocompleteResults(query);
     });
-    dimRoomCard?.registerRunListener(async (args: { room?: { id?: string; bridgeId?: string }; level?: number }) => {
+    dimRoomCard?.registerRunListener(async (args: { room?: { id?: string; bridgeId?: string }; level?: unknown }) => {
       const selected = args.room;
       if (!selected || !selected.id) {
         throw new Error('No room selected');
       }
-      if (typeof args.level !== 'number' || !Number.isFinite(args.level)) {
+      const level = normalizePercentageArgument(args.level);
+      if (level === null) {
         throw new Error('No dim level selected');
       }
       const bridge = this.getBridge(selected.bridgeId || null);
       if (!bridge) {
         throw new Error('Bridge not connected');
       }
-      await bridge.dimRoom(selected.id, args.level);
+      await bridge.dimRoom(selected.id, level);
       return true;
     });
 
@@ -300,7 +311,7 @@ class XComfortApp extends Homey.App {
     this.bridgeConnectivityAnnounced.set(bridgeId, connected);
 
     const card = this.homey.flow.getTriggerCard(connected ? 'bridge_connected' : 'bridge_disconnected');
-    card?.trigger({ bridge: bridgeName }).catch((err) => {
+    card?.trigger({ bridge: bridgeName, bridge_id: bridgeId }).catch((err) => {
       this.error(`Failed to trigger bridge_${connected ? 'connected' : 'disconnected'}`, err);
     });
   }
@@ -394,32 +405,16 @@ class XComfortApp extends Homey.App {
   }
 
   private normalizeLoadModeArgument(value: unknown): string | null {
-    if (typeof value === 'string' && value.length > 0) {
-      return value;
-    }
-
-    if (value && typeof value === 'object' && 'id' in value) {
-      const id = (value as { id?: unknown }).id;
-      if (typeof id === 'string' && id.length > 0) {
-        return id;
-      }
-    }
-
-    return null;
+    return normalizeChoiceIdArgument(value);
   }
 
   private normalizeAstroPeriodArgument(value: unknown): AstroPeriod | null {
-    const rawValue = typeof value === 'string'
-      ? value
-      : value && typeof value === 'object' && 'id' in value
-        ? (value as { id?: unknown }).id
-        : null;
-
-    if (typeof rawValue !== 'string') {
+    const rawValue = normalizeChoiceIdArgument(value);
+    if (!rawValue) {
       return null;
     }
 
-    const normalized = rawValue.trim().toLowerCase().replace(/[\s-]+/g, '_');
+    const normalized = rawValue.toLowerCase().replace(/[\s-]+/g, '_');
     if (
       normalized === 'dark'
       || normalized === 'daylight'
@@ -873,26 +868,7 @@ class XComfortApp extends Homey.App {
   }
 
   private normalizeRemoteAccessPreference(value: unknown): boolean | undefined {
-    if (typeof value === 'boolean') {
-      return value;
-    }
-
-    if (typeof value === 'number') {
-      if (value === 1) return true;
-      if (value === 0) return false;
-    }
-
-    if (typeof value === 'string') {
-      const normalized = value.trim().toLowerCase().replace(/[\s-]+/g, '_');
-      if (['1', 'true', 'yes', 'on', 'allow', 'allowed', 'enable', 'enabled'].includes(normalized)) {
-        return true;
-      }
-      if (['0', 'false', 'no', 'off', 'block', 'blocked', 'disable', 'disabled'].includes(normalized)) {
-        return false;
-      }
-    }
-
-    return undefined;
+    return normalizeRemoteAccessFlowPreference(value);
   }
 
   private async applyBridgeRemoteAccessPreference(

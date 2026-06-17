@@ -4,10 +4,49 @@ const { test } = require('node:test');
 const { CommandDebouncer } = require('../.homeybuild/lib/utils/CommandDebouncer');
 const { Semaphore } = require('../.homeybuild/lib/utils/Semaphore');
 const { extractHistoryKwh, extractHistoryPeriods } = require('../.homeybuild/lib/utils/energyHistory');
+const {
+  normalizeChoiceIdArgument,
+  normalizeOnOffArgument,
+  normalizePercentageArgument,
+  normalizeRemoteAccessPreference,
+  normalizeValveStateArgument,
+} = require('../.homeybuild/lib/utils/flowArguments');
+const manifest = require('../app.json');
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
+
+test('Flow argument helpers normalize Homey dropdown shapes', () => {
+  assert.strictEqual(normalizeChoiceIdArgument({ id: 'eco' }), 'eco');
+  assert.strictEqual(normalizeOnOffArgument({ id: 'on' }), true);
+  assert.strictEqual(normalizeOnOffArgument({ id: 'off' }), false);
+  assert.strictEqual(normalizeValveStateArgument({ id: 'open' }), true);
+  assert.strictEqual(normalizeValveStateArgument({ id: 'closed' }), false);
+  assert.strictEqual(normalizeRemoteAccessPreference({ id: 'enabled' }), true);
+  assert.strictEqual(normalizeRemoteAccessPreference({ id: 'disabled' }), false);
+  assert.strictEqual(normalizePercentageArgument({ id: '25,5' }), 25.5);
+  assert.strictEqual(normalizePercentageArgument(150), 100);
+  assert.strictEqual(normalizePercentageArgument('not-a-number'), null);
+});
+
+test('Flow manifest exposes useful wall-switch and bridge tokens', () => {
+  const triggerById = new Map(manifest.flow.triggers.map((card) => [card.id, card]));
+  const tokenNames = (id) => new Set((triggerById.get(id).tokens || []).map((token) => token.name));
+
+  for (const id of ['wall_switch_up', 'wall_switch_down']) {
+    const tokens = tokenNames(id);
+    assert.ok(tokens.has('button'), `${id} should expose button token`);
+    assert.ok(tokens.has('component_id'), `${id} should expose component_id token`);
+    assert.ok(tokens.has('component_model'), `${id} should expose component_model token`);
+  }
+
+  for (const id of ['bridge_connected', 'bridge_disconnected']) {
+    const tokens = tokenNames(id);
+    assert.ok(tokens.has('bridge'), `${id} should expose bridge token`);
+    assert.ok(tokens.has('bridge_id'), `${id} should expose bridge_id token`);
+  }
+});
 
 test('CommandDebouncer fires the first call in an idle period immediately', async () => {
   const debouncer = new CommandDebouncer();

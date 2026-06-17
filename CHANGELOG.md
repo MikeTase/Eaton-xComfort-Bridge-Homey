@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.7.5 - 2026-06-14
+
+### Improvements
+- Hardened Flow dropdown handling for room light, water valve, dim-level, and bridge remote-access cards so both raw values and Homey dropdown objects resolve correctly.
+- Added button/component tokens to the dedicated wall-switch up/down triggers and a bridge ID token to bridge connected/disconnected triggers.
+
+## 1.7.4 - 2026-06-14
+
+### Improvements
+- Synced package-lock metadata with the app version and pinned the patched `@grpc/grpc-js` Homey CLI transitive dependency so full `npm audit` stays clean.
+
+## 1.7.3 - 2026-06-09
+
+### Improvements
+- Improved silent bridge-drop offline handling, startup device-list recovery, busy-bridge command handling, energy meter protocol handling, and unique per-Homey bridge identification.
+
 ## 1.7.0 - 2026-06-09
 
 ### Features

@@ -1,5 +1,6 @@
 import { BaseDriver } from '../../lib/BaseDriver';
 import type { XComfortRoom } from '../../lib/types';
+import { normalizeOnOffArgument } from '../../lib/utils/flowArguments';
 
 interface SwitchRoomLightsArgs {
   device?: {
@@ -20,7 +21,12 @@ module.exports = class RoomStatusDriver extends BaseDriver {
           throw new Error('No xComfort room selected');
         }
 
-        await device.switchRoomLights(args.state === 'on');
+        const switchState = normalizeOnOffArgument(args.state);
+        if (switchState === undefined) {
+          throw new Error('No room light state selected');
+        }
+
+        await device.switchRoomLights(switchState);
         return true;
       });
     }

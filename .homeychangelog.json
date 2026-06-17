@@ -280,5 +280,13 @@
   },
   "1.7.3": {
     "en": "Reliability: devices now show offline during silent bridge drops, faster recovery when the bridge misses the startup device list, better busy-bridge handling, corrected energy meter protocol handling, and unique per-Homey bridge identification."
+  },
+  "1.7.4": {
+    "en": "Maintenance: sync package-lock metadata and pin patched Homey CLI transitive dependency @grpc/grpc-js so full npm audit stays clean.",
+    "nl": "Onderhoud: synchroniseert package-lock-metadata en zet de gepatchte Homey CLI-transitieve afhankelijkheid @grpc/grpc-js vast zodat volledige npm audit schoon blijft."
+  },
+  "1.7.5": {
+    "en": "Flow improvements: safer dropdown argument handling for room lights, water valve, dim level, and bridge remote access; wall-switch up/down and bridge connectivity triggers now expose more useful tokens.",
+    "nl": "Flow-verbeteringen: veiligere verwerking van keuzelijstargumenten voor kamerverlichting, waterklep, dimniveau en bridge-remote-access; wandschakelaar-omhoog/omlaag en bridge-verbindingsflows geven nu nuttigere tokens door."
   }
 }
