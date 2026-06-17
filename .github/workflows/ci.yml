@@ -36,7 +36,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Validate Homey app
-        uses: athombv/github-action-homey-app-validate@master
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
-          level: publish
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Homey app
+        env:
+          HOMEY_HEADLESS: "1"
+          NO_UPDATE_NOTIFIER: "1"
+        run: npx --no-install homey app validate --level publish
