@@ -1,4 +1,4 @@
-import { DEVICE_TYPES, COMPONENT_TYPES, INFO_TEXT_CODES } from '../XComfortProtocol';
+import { DEVICE_TYPES, COMPONENT_TYPES, DEVICE_USAGE, INFO_TEXT_CODES } from '../XComfortProtocol';
 import type { InfoEntry, XComfortComponent, XComfortDevice } from '../types';
 import { getButtonChannelCount, getComponentModelName } from '../XComfortComponents';
 
@@ -249,4 +249,26 @@ function getSearchText(device: XComfortDevice, component?: XComfortComponent): s
     .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
     .map(String)
     .join(' ');
+}
+
+/**
+ * Actuator usages that the bridge's climate function drives automatically
+ * (heating, cooling, sum heating/cooling and heating/cooling switches). The
+ * official app does not allow manual switching of these outputs, so they are
+ * not offered as switchable appliances.
+ */
+const BRIDGE_CONTROLLED_USAGES = new Set<number>([
+  DEVICE_USAGE.SUM_HEATING,
+  DEVICE_USAGE.SUM_COOLING,
+  DEVICE_USAGE.SUM_HEATING_COOLING,
+  DEVICE_USAGE.HEATING,
+  DEVICE_USAGE.COOLING,
+  DEVICE_USAGE.HEATING_COOLING,
+  DEVICE_USAGE.SWITCH_HEATING_COOLING,
+  DEVICE_USAGE.SWITCH_COOLING,
+  DEVICE_USAGE.SWITCH_HEATING,
+]);
+
+export function isBridgeControlledUsage(usage: unknown): boolean {
+  return BRIDGE_CONTROLLED_USAGES.has(Number(usage));
 }

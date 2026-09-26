@@ -16,10 +16,10 @@ import {
   getFirstNumber,
   getFirstString,
   getFirstValue,
-  getLoadMode,
   normalizeLoadMode,
+  resolvePriorityType,
 } from '../../lib/utils/energyFields';
-import { extractHistoryPeriods } from '../../lib/utils/energyHistory';
+import { extractHistoryPeriods, extractOfficialHistoryPeriods, isOfficialEnergyHistory } from '../../lib/utils/energyHistory';
 
 interface EnergyMeterData {
   meterId?: string | number;
@@ -85,15 +85,44 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
     await this.energy.reset();
   }
 
+  /**
+   * Energy control is bridge-wide. A plain mode applies to the whole bridge;
+   * 'priority' temporarily prioritizes the load group this device belongs to
+   * (water heater, EV charger, climate or high-load appliance).
+   */
   public async setLoadModeAction(mode: string): Promise<void> {
     const normalizedMode = normalizeLoadMode(mode);
-    await this.bridge.setEnergyLoadMode(this.getMeterIdForControl(), normalizedMode);
+    const prioType = normalizedMode === 'priority' ? this.resolvePriorityType() : undefined;
+    if (normalizedMode === 'priority' && prioType === undefined) {
+      throw new Error(
+        'Priority needs a water heater, EV charger, heat pump/climate or high-load appliance; '
+        + 'this device has no matching xComfort usage type',
+      );
+    }
+    await this.bridge.setEnergyLoadMode(normalizedMode, { prioType });
     await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.LOAD_MODE);
     await this.updateCapability(XCOMFORT_CAPABILITIES.LOAD_MODE, normalizedMode);
   }
 
+  private resolvePriorityType(): number | undefined {
+    const device = this.bridge.getDevice(this.deviceId) as Record<string, unknown> | undefined;
+    const data = this.getData() as EnergyMeterData;
+    const targetId = String(data.meterId ?? data.loadId ?? this.deviceId);
+    const meters = this.bridge.getLastBridgeStatus()?.energyMeters ?? [];
+    const meter = meters.find((record) => String(record.meterId ?? record.id) === targetId);
+    return resolvePriorityType({ deviceUsage: device?.usage, meterUsage: meter?.usage });
+  }
+
   public async refreshEnergyData(): Promise<void> {
-    await this.bridge.requestEnergyData(this.getMeterIdForControl());
+    await this.bridge.requestEnergyData(this.getMeterIdForControl(), { timeZone: this.getTimeZone() });
+  }
+
+  private getTimeZone(): string | undefined {
+    try {
+      return this.homey.clock.getTimezone();
+    } catch {
+      return undefined;
+    }
   }
 
   private registerCapabilityListeners(): void {
@@ -221,7 +250,9 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
     const history = getFirstValue(source, HISTORY_KEYS)
       ?? (fallback ? getFirstValue(fallback, ['energyHistory']) : undefined);
     if (history !== undefined) {
-      const summary = this.formatEnergyHistory(history, currency);
+      const summary = isOfficialEnergyHistory(history)
+        ? undefined // summarized from the parsed periods in applyEnergyHistoryInsights
+        : this.formatEnergyHistory(history, currency);
       if (summary) {
         await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.ENERGY_HISTORY);
         await this.updateCapability(XCOMFORT_CAPABILITIES.ENERGY_HISTORY, summary);
@@ -230,7 +261,10 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
       await this.setStoreValue('energyHistoryRaw', history).catch(this.error);
     }
 
-    const loadMode = getLoadMode(source) ?? (fallback ? getLoadMode(fallback) : undefined);
+    // Energy control mode is bridge-wide and only comes from the bridge
+    // status (386/393). Device and meter records carry unrelated `mode`
+    // fields (e.g. component modes like "1307"), so never read it there.
+    const loadMode = typeof fallback?.loadMode === 'string' ? fallback.loadMode : undefined;
     if (loadMode) {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.LOAD_MODE);
       await this.updateCapability(XCOMFORT_CAPABILITIES.LOAD_MODE, loadMode);
@@ -313,7 +347,9 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
    * graphable in Homey Insights (the string summary capability is not).
    */
   private async applyEnergyHistoryInsights(history: unknown): Promise<void> {
-    const periods = extractHistoryPeriods(history);
+    const periods = isOfficialEnergyHistory(history)
+      ? extractOfficialHistoryPeriods(history, this.getMeterIdForControl(), Date.now(), this.getTimeZone())
+      : extractHistoryPeriods(history);
 
     if (periods.todayKwh !== undefined) {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.ENERGY_TODAY);
@@ -323,6 +359,21 @@ module.exports = class EnergyMeterDevice extends BaseDevice {
     if (periods.monthKwh !== undefined) {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.ENERGY_MONTH);
       await this.updateCapability(XCOMFORT_CAPABILITIES.ENERGY_MONTH, periods.monthKwh);
+    }
+
+    if (isOfficialEnergyHistory(history) && (periods.todayKwh !== undefined || periods.monthKwh !== undefined)) {
+      const today = this.hasCapability(XCOMFORT_CAPABILITIES.ENERGY_TODAY)
+        ? this.getCapabilityValue(XCOMFORT_CAPABILITIES.ENERGY_TODAY) : null;
+      const month = this.hasCapability(XCOMFORT_CAPABILITIES.ENERGY_MONTH)
+        ? this.getCapabilityValue(XCOMFORT_CAPABILITIES.ENERGY_MONTH) : null;
+      const parts = [
+        typeof today === 'number' ? `Today ${today} kWh` : null,
+        typeof month === 'number' ? `Month ${month} kWh` : null,
+      ].filter((part): part is string => part !== null);
+      if (parts.length > 0) {
+        await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.ENERGY_HISTORY);
+        await this.updateCapability(XCOMFORT_CAPABILITIES.ENERGY_HISTORY, parts.join(', '));
+      }
     }
   }
 

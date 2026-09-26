@@ -1,6 +1,7 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import { DeviceStateUpdate, InfoEntry, ShadingAction } from '../../lib/types';
 import { parseInfoMetadata } from '../../lib/utils/parseInfoMetadata';
+import { isShadingSafetyActive, shadingMotionFromCurstate } from '../../lib/utils/shadingState';
 
 module.exports = class ShadingDevice extends BaseDevice {
   private safetyActive: boolean = false;
@@ -72,18 +73,24 @@ module.exports = class ShadingDevice extends BaseDevice {
           void this.applySensorMetadata(data.metadata);
       }
 
-      if (data.shSafety !== undefined) {
-          const isSafe = data.shSafety === 0;
-          this.safetyActive = !isSafe;
+      // The live safety lock is reported by curstate 4/5 (or the "locked"
+      // info codes on older actuators). `shSafety` is only the configuration
+      // flag "safety function enabled" and must not be read as a lock.
+      const infoForLock = typeof data.curstate === 'number' || !data.metadata
+          ? undefined
+          : this.bridge.getDevice(this.deviceId)?.info;
+      const locked = isShadingSafetyActive(data.curstate, infoForLock);
+      if (locked !== undefined) {
+          this.safetyActive = locked;
           // Surface the wind/rain lock as an alarm instead of marking the
           // device unavailable: position stays visible, Flows can react to the
-          // alarm, and control commands are still rejected while locked.
+          // alarm, and movement commands are still rejected while locked.
           void this.ensureDeviceCapability('alarm_generic')
-              .then(() => this.updateCapability('alarm_generic', !isSafe))
+              .then(() => this.updateCapability('alarm_generic', locked))
               .catch(this.error);
       }
 
-      // Track curstate for running/idle detection (matches HA ShadeState.current_state)
+      // Track curstate for running/idle detection.
       if (typeof data.curstate === 'number') {
           this.lastCurstate = data.curstate;
           if (this.hasCapability('windowcoverings_state')) {
@@ -125,9 +132,6 @@ module.exports = class ShadingDevice extends BaseDevice {
       }
 
       const snapshot: DeviceStateUpdate = {};
-      if (typeof device.shSafety === 'number') {
-          snapshot.shSafety = device.shSafety;
-      }
       if (typeof device.shPos === 'number') {
           snapshot.shPos = device.shPos;
       }
@@ -203,22 +207,16 @@ module.exports = class ShadingDevice extends BaseDevice {
       position: number | null,
       previousPosition: number | null = this.lastPosition,
   ): 'up' | 'idle' | 'down' {
-      switch (this.lastCurstate) {
-          case ShadingAction.OPEN:
-          case ShadingAction.STEP_OPEN:
-              return 'up';
-          case ShadingAction.CLOSE:
-          case ShadingAction.STEP_CLOSE:
-              return 'down';
-          case ShadingAction.STOP:
-              return 'idle';
-          case ShadingAction.GO_TO:
-              if (position !== null && previousPosition !== null && position !== previousPosition) {
-                  return position < previousPosition ? 'up' : 'down';
-              }
-              break;
-          default:
-              break;
+      // curstate is the actuator's reported motion (official enum:
+      // 1 stopped, 2 moving up, 3 moving down, 4/5 safety, 6/7 stopped on
+      // fault) — not the command enum.
+      const motion = shadingMotionFromCurstate(this.lastCurstate);
+      if (motion !== undefined) {
+          return motion;
+      }
+
+      if (position !== null && previousPosition !== null && position !== previousPosition) {
+          return position < previousPosition ? 'up' : 'down';
       }
 
       if (position !== null) {

@@ -190,17 +190,44 @@ export function getLoadMode(source: Record<string, unknown>): string | undefined
 }
 
 /**
+ * Energy control mode as used by the bridge (ENERGY_CONTROL_SET_MODE 392,
+ * SET_ENERGY_STATE 393 and `eControl` in 300/386). Verified against the
+ * official app: 0 = inactive, 1 = normal ("AUTO": loads run at normal and
+ * cheap tariff), 2 = energy saving (cheap tariff only). "Priority" is not a
+ * mode value but a temporary `prio: true` flag on top of the current mode.
+ */
+export const ENERGY_CONTROL_MODE = {
+  INACTIVE: 0,
+  NORMAL: 1,
+  ENERGY_SAVING: 2,
+} as const;
+
+/**
+ * Energy control priority load type (`prioType`): which load group gets
+ * priority while `prio` is active.
+ */
+export const ENERGY_PRIORITY_TYPE = {
+  CLIMATE: 0,
+  WATER_HEATING: 1,
+  EV_CHARGING: 2,
+  HIGH_LOAD_APPLIANCE: 3,
+} as const;
+
+/** Default priority duration in minutes (the official app offers 30..300). */
+export const DEFAULT_PRIORITY_DURATION_MINUTES = 60;
+
+/**
  * Normalize a load mode (protocol number or free-form string) to one of
- * 'normal' | 'energy_saving' | 'priority'.
+ * 'inactive' | 'normal' | 'energy_saving' | 'priority'.
  */
 export function normalizeLoadMode(value: string | number): string {
   if (typeof value === 'number') {
     switch (value) {
-      case 1:
+      case ENERGY_CONTROL_MODE.INACTIVE:
+        return 'inactive';
+      case ENERGY_CONTROL_MODE.ENERGY_SAVING:
         return 'energy_saving';
-      case 2:
-        return 'priority';
-      case 0:
+      case ENERGY_CONTROL_MODE.NORMAL:
       default:
         return 'normal';
     }
@@ -213,18 +240,113 @@ export function normalizeLoadMode(value: string | number): string {
   if (normalized === 'priority' || normalized === 'prio') {
     return 'priority';
   }
+  if (normalized === 'inactive' || normalized === 'off' || normalized === 'disabled') {
+    return 'inactive';
+  }
   return 'normal';
 }
 
-/** Map a normalized load mode back to its protocol value. */
+/**
+ * Read the bridge's energy control state from a 386/300 payload (nested
+ * `eControl`) or a 393 SET_ENERGY_STATE payload (top-level fields).
+ * An active priority wins over the underlying mode.
+ */
+export function resolveEnergyControlMode(payload: Record<string, unknown>): string | undefined {
+  const nested = payload.eControl;
+  const control = nested && typeof nested === 'object' && !Array.isArray(nested)
+    ? nested as Record<string, unknown>
+    : payload;
+
+  if (control.prio === true) {
+    return 'priority';
+  }
+
+  if (typeof control.mode === 'number' && Number.isFinite(control.mode)) {
+    return normalizeLoadMode(control.mode);
+  }
+
+  if (typeof control.loadMode === 'string') {
+    return normalizeLoadMode(control.loadMode);
+  }
+
+  return undefined;
+}
+
+/** Map a normalized, non-priority load mode back to its protocol value. */
 export function loadModeToProtocolValue(mode: string): number {
   switch (mode) {
+    case 'inactive':
+      return ENERGY_CONTROL_MODE.INACTIVE;
     case 'energy_saving':
-      return 1;
-    case 'priority':
-      return 2;
+      return ENERGY_CONTROL_MODE.ENERGY_SAVING;
     case 'normal':
     default:
-      return 0;
+      return ENERGY_CONTROL_MODE.NORMAL;
   }
+}
+
+export interface EnergyControlModeOptions {
+  /** Bridge mode to keep underneath a priority (defaults to normal). */
+  currentMode?: string;
+  /** Required for 'priority': which load group to prioritize. */
+  prioType?: number;
+  /** Priority duration in minutes. */
+  prioDuration?: number;
+}
+
+/**
+ * Build the official ENERGY_CONTROL_SET_MODE (392) payload.
+ * Plain modes also clear any running priority, like the official app's
+ * "cancel priority" action does.
+ */
+export function buildEnergyControlModePayload(
+  mode: string,
+  options: EnergyControlModeOptions = {},
+): Record<string, unknown> {
+  const normalizedMode = normalizeLoadMode(mode);
+
+  if (normalizedMode !== 'priority') {
+    return { mode: loadModeToProtocolValue(normalizedMode), prio: false };
+  }
+
+  if (typeof options.prioType !== 'number' || !Number.isInteger(options.prioType)) {
+    throw new Error('Priority mode needs a load type (water heater, EV charger, climate or high-load appliance)');
+  }
+
+  const baseMode = options.currentMode ? normalizeLoadMode(options.currentMode) : 'normal';
+  const keptMode = baseMode === 'energy_saving' ? ENERGY_CONTROL_MODE.ENERGY_SAVING : ENERGY_CONTROL_MODE.NORMAL;
+  const duration = Number.isFinite(options.prioDuration) && (options.prioDuration as number) > 0
+    ? Math.round(options.prioDuration as number)
+    : DEFAULT_PRIORITY_DURATION_MINUTES;
+
+  return {
+    mode: keptMode,
+    prio: true,
+    prioType: options.prioType,
+    prioDuration: duration,
+  };
+}
+
+/**
+ * Derive the energy-control priority type from an actuator `usage`
+ * (DEVICE_USAGE) or a network meter `usage` (meter usage enum).
+ */
+export function resolvePriorityType(options: { deviceUsage?: unknown; meterUsage?: unknown }): number | undefined {
+  const deviceUsage = Number(options.deviceUsage);
+  if (Number.isFinite(deviceUsage)) {
+    if (deviceUsage === 6) return ENERGY_PRIORITY_TYPE.WATER_HEATING; // WATER_HEATING
+    if (deviceUsage === 7) return ENERGY_PRIORITY_TYPE.EV_CHARGING; // VEHICLE_CHARGER
+    if (deviceUsage === 8) return ENERGY_PRIORITY_TYPE.HIGH_LOAD_APPLIANCE; // HIGH_LOAD_APPLIANCE
+    if (deviceUsage === 2 || (deviceUsage >= 21 && deviceUsage <= 28)) return ENERGY_PRIORITY_TYPE.CLIMATE;
+  }
+
+  const meterUsage = Number(options.meterUsage);
+  if (Number.isFinite(meterUsage)) {
+    if (meterUsage === 2) return ENERGY_PRIORITY_TYPE.EV_CHARGING; // EV_CHARGING
+    if (meterUsage === 4) return ENERGY_PRIORITY_TYPE.CLIMATE; // HEATPUMP
+    if (meterUsage === 5) return ENERGY_PRIORITY_TYPE.HIGH_LOAD_APPLIANCE; // SPECIAL_APPLIANCE
+    if (meterUsage === 6) return ENERGY_PRIORITY_TYPE.WATER_HEATING; // WATER_HEATER
+  }
+
+  return undefined;
 }

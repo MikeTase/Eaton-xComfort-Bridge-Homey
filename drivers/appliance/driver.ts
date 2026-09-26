@@ -1,6 +1,7 @@
 import { BaseDriver } from '../../lib/BaseDriver';
 import { DEVICE_TYPES, DEVICE_USAGE } from '../../lib/XComfortProtocol';
 import { XComfortDevice } from '../../lib/types';
+import { isBridgeControlledUsage } from '../../lib/utils/deviceClassification';
 
 module.exports = class ApplianceDriver extends BaseDriver {
   private async listUnpairedDevices() {
@@ -22,6 +23,9 @@ module.exports = class ApplianceDriver extends BaseDriver {
       if (!id || seenIds.has(id)) return false;
       if (devType !== DEVICE_TYPES.SWITCHING_ACTUATOR && devType !== DEVICE_TYPES.DIMMING_ACTUATOR) return false;
       if (usage === DEVICE_USAGE.LIGHT) return false;
+      // Heating/cooling outputs are driven by the bridge's climate function
+      // and cannot be switched manually; don't offer them as appliances.
+      if (isBridgeControlledUsage(usage)) return false;
 
       seenIds.add(id);
       return true;

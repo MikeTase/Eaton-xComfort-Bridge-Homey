@@ -580,7 +580,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
       if (normalizedMode === ClimateMode.Unknown) {
         return;
       }
-      this.modeSetpoints.set(normalizedMode, mode.value);
+      this.modeSetpoints.set(normalizedMode, Math.round(mode.value * 100) / 100);
     });
   }
 
@@ -666,7 +666,10 @@ module.exports = class ThermostatDevice extends BaseDevice {
 
   private clampSetpoint(value: number, mode: ClimateMode): number {
     const range = MODE_SETPOINT_RANGES[mode] || MODE_SETPOINT_RANGES[ClimateMode.Unknown];
-    return Math.max(range.min, Math.min(range.max, value));
+    // The bridge stores float fields with a +0.001 marker (e.g. 21.001, as the
+    // official app sends them); round so Homey shows 21 instead of 21.001.
+    const rounded = Math.round(value * 100) / 100;
+    return Math.max(range.min, Math.min(range.max, rounded));
   }
 
   private getEffectivePreset(fallback: ClimateMode = ClimateMode.Unknown): ClimateMode {

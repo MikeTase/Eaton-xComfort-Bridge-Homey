@@ -43,8 +43,8 @@ The app exposes these xComfort-specific Flow actions:
 | Set heating preset | Sets Frost, Economy, or Comfort on thermostat/heating devices. |
 | Set water valve | Opens or closes a supported water valve. |
 | Reset energy meter | Resets calculated energy on devices with `meter_power`. |
-| Set energy load mode | Sets a supported xComfort energy load to Normal, Energy Saving, or Priority. |
-| Refresh energy meter | Requests current meter, tariff, energy history, and energy-control data from the bridge. |
+| Set energy load mode | Sets the bridge's energy control to Normal, Energy saving or Inactive, or temporarily (60 min) prioritizes the device's load group (Priority). |
+| Refresh energy meter | Requests the current tariff prices and today's / this month's energy history from the bridge (read-only). |
 | Set bridge remote access | Allows or blocks Eaton remote access for a selected bridge without adding a diagnostics device. |
 
 Wall switch and RC Touch button events are available as Flow triggers, including up/down and double-press variants where the bridge reports repeated button events.

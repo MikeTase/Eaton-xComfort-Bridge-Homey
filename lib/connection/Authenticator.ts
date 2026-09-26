@@ -14,6 +14,7 @@
 import crypto from 'crypto';
 import { MESSAGE_TYPES, CLIENT_CONFIG, PROTOCOL_CONFIG } from '../XComfortProtocol';
 import { Encryption } from '../crypto/Encryption';
+import { verifyBridgeIdentity, type BridgeIdentityResult } from '../crypto/BridgeIdentity';
 import type { ProtocolMessage, AuthState, EncryptionContext, LoggerFunction, XComfortAuthOptions } from '../types';
 
 // ============================================================================
@@ -44,6 +45,7 @@ export class Authenticator {
   private deviceId: string | null = null;
   private connectionId: string | null = null;
   private publicKey: string | null = null;
+  private bridgeIdentity: BridgeIdentityResult = 'unavailable';
   private encryptionContext: EncryptionContext | null = null;
   private token: string | null = null;
   private firmwareVersion: string | null = null;
@@ -168,6 +170,20 @@ export class Authenticator {
 
       this.publicKey = publicKey;
       this.logger('[Authenticator] Received public key');
+
+      // Verify the bridge identity like the official app (device_signature
+      // over device_id:::public_key against Eaton's root key). Informational
+      // only for now — never blocks the connection.
+      this.bridgeIdentity = verifyBridgeIdentity(
+        payload?.device_id,
+        publicKey,
+        payload?.device_signature,
+      );
+      if (this.bridgeIdentity === 'verified') {
+        this.logger('[Authenticator] Bridge identity verified (Eaton root signature)');
+      } else if (this.bridgeIdentity === 'mismatch') {
+        this.logger('[Authenticator-WARN] Bridge identity signature did NOT verify against the Eaton root key - continuing');
+      }
 
       // Generate AES key and IV
       this.encryptionContext = {
@@ -316,6 +332,11 @@ export class Authenticator {
   /**
    * Get current authentication state
    */
+  /** Result of the bridge identity check during the last handshake. */
+  getBridgeIdentity(): BridgeIdentityResult {
+    return this.bridgeIdentity;
+  }
+
   getState(): AuthState {
     return this.state;
   }

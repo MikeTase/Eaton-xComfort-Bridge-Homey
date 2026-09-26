@@ -81,19 +81,37 @@ export enum ClimateState {
 }
 
 /**
- * Shading Actions
+ * Shading commands (`state` in SET_DEVICE_SHADING_STATE 355 /
+ * SET_ROOM_SHADING_STATE 354), as in the official app.
  */
 export enum ShadingAction {
   OPEN = 0,
   CLOSE = 1,
   STOP = 2,
-  STEP_OPEN = 3,
-  STEP_CLOSE = 4,
+  STEP_DOWN = 3,
+  STEP_UP = 4,
   GO_TO = 5,
   CALIBRATION = 10,
   LOCK = 11,
   UNLOCK = 12,
   QUIT = 13
+}
+
+/**
+ * Reported shading actuator state (`curstate` of devType 102). This is a
+ * different enum from the commands above; verified against the official app.
+ * SAFETY_UP / SAFETY_DOWN mean the safety function (wind, rain, sensor or
+ * bridge) currently locks the actuator in its open / closed position.
+ */
+export enum ShadingCurrentState {
+  UNDEFINED = 0,
+  STOPPED = 1,
+  MOVING_UP = 2,
+  MOVING_DOWN = 3,
+  SAFETY_UP = 4,
+  SAFETY_DOWN = 5,
+  STOPPED_OVERTEMP = 6,
+  STOPPED_OVERLOAD = 7
 }
 
 /**
@@ -207,7 +225,10 @@ export interface BridgeStatus {
   tariffLabel?: string;
   currency?: string;
   energyHistory?: unknown;
+  /** Effective energy control state: 'inactive' | 'normal' | 'energy_saving' | 'priority'. */
   loadMode?: string;
+  /** Underlying energy control mode without a running priority ('inactive' | 'normal' | 'energy_saving'). */
+  energyControlMode?: string;
   meterId?: number | string;
   energyMeters?: Array<Record<string, unknown>>;
   energyLoads?: Array<Record<string, unknown>>;
@@ -269,6 +290,9 @@ export interface DeviceStateUpdate {
   setpoint?: number;
   operationMode?: number | ClimateMode;
   tempState?: number | ClimateState;
+  // Direct temperature/humidity fields of sensor devices (410/450/451)
+  temp?: number;
+  humidity?: number;
 
   metadata?: DeviceMetadata;
 }

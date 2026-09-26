@@ -5,6 +5,7 @@
  * Extracted from XComfortConnection for single responsibility.
  */
 
+import { isOfficialEnergyHistory } from '../utils/energyHistory';
 import { MESSAGE_TYPES } from '../XComfortProtocol';
 import { DeviceStateManager } from '../state/DeviceStateManager';
 import {
@@ -21,7 +22,7 @@ import {
   getFirstNumber,
   getFirstString,
   getFirstValue,
-  getLoadMode,
+  resolveEnergyControlMode,
 } from '../utils/energyFields';
 import type {
   ProtocolMessage,
@@ -60,6 +61,23 @@ type OnHomeDataUpdateFn = (payload: Record<string, unknown>) => void;
 // bridge replies to REQUEST_TARIFF_INFO with TARIFF_INFO (389) and to
 // REQUEST_ENERGY_HISTORY with ENERGY_HISTORY (396); SET_ENERGY_STATE (393)
 // carries load-control state. These were previously dropped as "unhandled".
+
+/** eTariff.currency → ISO code (official app: 1 EUR, 2 NOK, 3 CZK, 4 HUF, 5 CHF). */
+const TARIFF_CURRENCY_CODES: Record<number, string> = {
+  1: 'EUR',
+  2: 'NOK',
+  3: 'CZK',
+  4: 'HUF',
+  5: 'CHF',
+};
+
+/** TARIFF_INFO entry rating → label. */
+const TARIFF_RATING_LABELS: Record<number, string> = {
+  1: 'Cheap',
+  2: 'Normal',
+  3: 'Expensive',
+};
+
 const ENERGY_MESSAGE_TYPES = new Set<number>([
   MESSAGE_TYPES.SET_ENERGY_DATA,
   MESSAGE_TYPES.TARIFF_INFO,
@@ -189,6 +207,10 @@ const DEVICE_STATE_KEYS = [
   'setpoint',
   'operationMode',
   'tempState',
+  // Sensor devices (temperature input, RC Touch, multisensor) can report
+  // these directly in addition to info codes 1222/1223.
+  'temp',
+  'humidity',
 ] as const;
 
 type DeviceStateKey = (typeof DEVICE_STATE_KEYS)[number];
@@ -205,6 +227,8 @@ const NUMERIC_DEVICE_STATE_KEYS = new Set<DeviceStateKey>([
   'shadsClosed',
   'shPos',
   'shSafety',
+  'temp',
+  'humidity',
 ]);
 
 const STRING_DEVICE_STATE_KEYS = new Set<DeviceStateKey>([
@@ -474,6 +498,7 @@ export class MessageHandler {
       const payload = this.getPayloadObject(msg.payload);
       if (payload) {
         this.processDeviceData(payload);
+        this.processAllDataEnergy(payload);
       }
       return true;
     }
@@ -556,12 +581,20 @@ export class MessageHandler {
       energyMessageType: messageType,
       rawEnergy: payload,
     };
+    // Official 396 payloads are `{iType, interval, vType, items: [{id, start,
+    // factor, values}]}`; their `items` are history series, not meters.
+    const isOfficialHistory = messageType === MESSAGE_TYPES.ENERGY_HISTORY && isOfficialEnergyHistory(payload);
     const source = this.getEnergySource(payload);
-    const meters = this.extractEnergyMeters(payload);
+    const meters = isOfficialHistory ? [] : this.extractEnergyMeters(payload);
     if (meters.length > 0) {
       status.energyMeters = meters;
     }
-    const loads = this.extractEnergyLoads(payload);
+    // SET_ENERGY_STATE (393) carries `loads: [{type, active, power}]`, which
+    // are energy-control load *groups* (climate, water heating, EV, …) of a
+    // running priority — not metered loads. Keep them out of energyLoads so
+    // their nominal power is never applied to a meter device.
+    const isEnergyControlState = messageType === MESSAGE_TYPES.SET_ENERGY_STATE;
+    const loads = isEnergyControlState ? [] : this.extractEnergyLoads(payload);
     if (loads.length > 0) {
       status.energyLoads = loads;
     }
@@ -632,19 +665,108 @@ export class MessageHandler {
       status.currency = currency.toUpperCase();
     }
 
-    const energyHistory = getFirstValue(primarySource, HISTORY_KEYS);
+    const energyHistory = isOfficialHistory ? payload : getFirstValue(primarySource, HISTORY_KEYS);
     if (energyHistory !== undefined) {
       status.energyHistory = energyHistory;
     } else if (messageType === MESSAGE_TYPES.ENERGY_HISTORY) {
       status.energyHistory = payload.data ?? payload.items ?? payload;
     }
 
-    const loadMode = getLoadMode(primarySource);
-    if (loadMode !== undefined) {
-      status.loadMode = loadMode;
+    if (messageType === MESSAGE_TYPES.TARIFF_INFO) {
+      this.applyOfficialTariffInfo(payload, status);
+    }
+
+    const tariffConfig = payload.eTariff;
+    if (tariffConfig && typeof tariffConfig === 'object' && !Array.isArray(tariffConfig)) {
+      const currencyCode = TARIFF_CURRENCY_CODES[Number((tariffConfig as Record<string, unknown>).currency)];
+      if (currencyCode) {
+        status.currency = currencyCode;
+      }
+    }
+
+    // Energy control is bridge-wide and only reported by SET_ENERGY_DATA
+    // (386, nested `eControl`) and SET_ENERGY_STATE (393). Other energy
+    // messages have unrelated `mode`/`state` fields, so don't guess there.
+    if (messageType === MESSAGE_TYPES.SET_ENERGY_DATA || isEnergyControlState) {
+      const loadMode = resolveEnergyControlMode(payload);
+      if (loadMode !== undefined) {
+        status.loadMode = loadMode;
+      }
+      const baseMode = resolveEnergyControlMode({ ...this.getEnergyControlRecord(payload), prio: false });
+      if (baseMode !== undefined) {
+        status.energyControlMode = baseMode;
+      }
     }
 
     return status;
+  }
+
+  /**
+   * SET_ALL_DATA (300) carries the energy configuration too: network meters
+   * (`meters`, with usage/power/energyDemand), `eControl`, `eTariff` and
+   * `eMonitoring` — the same shape as SET_ENERGY_DATA (386). Forward that
+   * part as an energy status so meters and the control mode are known
+   * right after connecting instead of only after the next 386/393.
+   */
+  private processAllDataEnergy(payload: Record<string, unknown>): void {
+    if (!this.onBridgeStatusUpdate) {
+      return;
+    }
+
+    const energyPayload: Record<string, unknown> = {};
+    if (Array.isArray(payload.meters) && payload.meters.length > 0) {
+      energyPayload.meters = payload.meters;
+    }
+    for (const key of ['eControl', 'eTariff', 'eMonitoring']) {
+      const value = payload[key];
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        energyPayload[key] = value;
+      }
+    }
+
+    if (Object.keys(energyPayload).length === 0) {
+      return;
+    }
+
+    this.onBridgeStatusUpdate(this.extractEnergyStatus(energyPayload, MESSAGE_TYPES.SET_ENERGY_DATA));
+  }
+
+  /**
+   * TARIFF_INFO (389): `{start, interval (min), factor, unit, tariff: [[value,
+   * rating], …]}`. The official app shows `value / factor` in the currency's
+   * sub-unit (ct, øre, Rp.) or `value / (factor * 100)` for currencies without
+   * one (CZK, HUF) — both equal `value / (factor * 100)` in main units.
+   * rating: 1 = cheap, 2 = normal, 3 = expensive.
+   */
+  private applyOfficialTariffInfo(payload: Record<string, unknown>, status: BridgeStatus): void {
+    const entries = payload.tariff;
+    const start = Number(payload.start);
+    const interval = Number(payload.interval);
+    const factor = Number(payload.factor);
+    if (!Array.isArray(entries) || !Number.isFinite(start) || !(interval > 0) || !(factor > 0)) {
+      return;
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const index = Math.floor((nowSeconds - start) / (interval * 60));
+    const entry = index >= 0 ? entries[index] : undefined;
+    if (!Array.isArray(entry) || entry.length < 2 || typeof entry[0] !== 'number') {
+      return;
+    }
+
+    status.tariff = Number((entry[0] / (factor * 100)).toFixed(4));
+    const rating = Number(entry[1]);
+    if (TARIFF_RATING_LABELS[rating]) {
+      status.tariffRating = rating;
+      status.tariffLabel = TARIFF_RATING_LABELS[rating];
+    }
+  }
+
+  private getEnergyControlRecord(payload: Record<string, unknown>): Record<string, unknown> {
+    const nested = payload.eControl;
+    return nested && typeof nested === 'object' && !Array.isArray(nested)
+      ? nested as Record<string, unknown>
+      : payload;
   }
 
   private getEnergySource(payload: Record<string, unknown>): Record<string, unknown> {

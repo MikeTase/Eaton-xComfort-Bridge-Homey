@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+Protocol fixes based on the analysis of the official Eaton xComfort Bridge app 2.4.1 (see `docs/official-app-2.4.1/`).
+
+### Fixes
+- Energy load mode used the wrong protocol values: "Normal" switched energy control off and "Energy saving"/"Priority" selected the wrong modes. Modes now match the bridge (0 inactive, 1 normal, 2 energy saving); "Priority" temporarily (60 min) prioritizes the device's load group (water heater, EV charger, climate or high-load appliance). Added an "Inactive" option. Load mode is now only read from the bridge's energy-control state, not from unrelated `mode` fields.
+- "Refresh energy meter" no longer sends configuration commands (`SET_ENERGY_MONITORING`, `SET_ENERGY_METER`) that could change the monitored loads or meters. It now requests tariff prices and today/this-month history in the official format, and "Energy today"/"Energy this month" are filled from the bridge's history response.
+- Shading: movement (`windowcoverings_state`) is decoded with the bridge's reported-state values (moving up/down/stopped), and the safety-lock alarm now follows the actual lock state instead of the "safety function enabled" setting — blinds with the safety function merely configured are no longer blocked.
+- Door/window sensors configured as "ON when opened" (modes 1309/1311) no longer report open/closed inverted.
+- LeakageStop (water guard) now raises `alarm_water` on a leak alarm (also while muted).
+- Energy-control priority load groups from `SET_ENERGY_STATE` are no longer mistaken for metered loads.
+
+### Improvements
+- Current dynamic tariff price (per kWh) and its cheap/normal/expensive rating are shown from the bridge's tariff data; the tariff currency is taken from the bridge configuration.
+- Network energy meters (Eaton EMD3P, HomeWizard P1) and the energy-control mode are picked up from the initial bridge data.
+- Setpoints are sent with the same float encoding as the official app and read-back values are rounded.
+- Temperature sensors fall back to the device's direct temperature/humidity fields when no info codes are reported.
+- Bridge-controlled heating/cooling outputs are no longer offered as switchable appliances when pairing.
+- Connection refusals are logged with the bridge's reason; version/client refusals back off longer. A denied login mentions that the auth key may have been changed and suggests Repair.
+- The bridge's identity signature is checked against Eaton's root key during the handshake (logged only, never blocks).
+
 ## 1.7.5 - 2026-06-14
 
 ### Improvements

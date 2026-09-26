@@ -15,7 +15,10 @@ import { Authenticator } from './Authenticator';
 import { DeviceStateManager } from '../state/DeviceStateManager';
 import { MessageHandler } from '../messaging/MessageHandler';
 import { CommandDebouncer } from '../utils/CommandDebouncer';
-import { normalizeLoadMode, loadModeToProtocolValue } from '../utils/energyFields';
+import { buildEnergyControlModePayload, type EnergyControlModeOptions } from '../utils/energyFields';
+import { buildMonthHistoryRequest, buildTariffInfoRequest, buildTodayHistoryRequest } from '../utils/energyHistory';
+import { ShadingAction } from '../types';
+import { describeConnectionDecline, toBridgeFloat } from '../utils/bridgeProtocol';
 import type {
   ConnectionState,
   ProtocolMessage,
@@ -80,6 +83,9 @@ export class XComfortBridge extends EventEmitter {
   private lastDeviceStatesAt: number = 0;
   private lastControlCommandAt: number = 0;
   private deferredDeviceStatesTimer: ReturnType<typeof setTimeout> | null = null;
+  private energyHistoryFollowUpTimer: ReturnType<typeof setTimeout> | null = null;
+  // The official app keeps ≥10 s between energy history requests.
+  private readonly ENERGY_HISTORY_REQUEST_GAP_MS = 10_000;
   private readonly DEVICE_STATES_MIN_INTERVAL_MS = 2000;
   private readonly CONTROL_QUIET_PERIOD_MS = 8000;
 
@@ -277,7 +283,7 @@ export class XComfortBridge extends EventEmitter {
           this.allowReconnect = false;
           this.stopWatchdog();
           this.connectionManager.cleanup();
-          safeReject(new Error('Bridge login denied for configured credentials'));
+          safeReject(new Error('Bridge login denied for configured credentials (the auth key or password may have changed, e.g. rotated in the Eaton app) - use Repair to update it'));
           return;
         }
         if (this.deviceListReceived) {
@@ -399,6 +405,19 @@ export class XComfortBridge extends EventEmitter {
     }
   }
 
+  /**
+   * CONNECTION_DECLINED carries `{error_id, error_message}` (800-806). A
+   * stale session (806 or no id) clears after a short wait; version/client
+   * refusals (802-805) will not change by retrying quickly, so back off far
+   * longer instead of hammering the bridge.
+   */
+  private handleConnectionDeclined(payload: unknown): void {
+    const decline = describeConnectionDecline(payload);
+    const idText = decline.errorId !== undefined ? ` (error ${decline.errorId})` : '';
+    this.logger(`[XComfortBridge] Connection declined by bridge${idText}: ${decline.meaning} — backing off before reconnecting`);
+    this.reconnectAttempt = Math.max(this.reconnectAttempt, decline.permanent ? 20 : 5);
+  }
+
   private scheduleReconnect(): void {
     if (!this.allowReconnect) return;
     if (this.connectionManager.isReconnecting()) return;
@@ -471,8 +490,7 @@ export class XComfortBridge extends EventEmitter {
       // Instead bias the backoff longer; the socket close (or the connection
       // timeout) that follows drives the actual reconnect.
       if (msg.type_int === MESSAGE_TYPES.CONNECTION_DECLINED) {
-         this.logger(`[XComfortBridge] Connection Declined: ${JSON.stringify(msg.payload)} — backing off before reconnecting`);
-         this.reconnectAttempt = Math.max(this.reconnectAttempt, 5);
+         this.handleConnectionDeclined(msg.payload);
          return;
       }
 
@@ -542,8 +560,7 @@ export class XComfortBridge extends EventEmitter {
     // the bridge time to release the stale session. The socket close that
     // follows will trigger the (now slower) reconnect.
     if (msg.type_int === MESSAGE_TYPES.CONNECTION_DECLINED) {
-      this.logger('[XComfortBridge] Connection declined by bridge (stale session) — backing off before reconnecting');
-      this.reconnectAttempt = Math.max(this.reconnectAttempt, 5);
+      this.handleConnectionDeclined(msg.payload);
       return;
     }
 
@@ -760,13 +777,14 @@ export class XComfortBridge extends EventEmitter {
    */
   async controlShading(deviceId: string | number, action: number, value?: number): Promise<boolean> {
     const numericId = this.parseId(String(deviceId));
+    // Official payload: {deviceId, state, value?}; `value` (0-100 position)
+    // is only sent with GO_TO.
     const payload: Record<string, unknown> = {
       deviceId: numericId,
-      state: action, // Match ha-xcomfort-bridge payload
-      action: action, // Fallback for backwards compatibility if needed
+      state: action,
     };
-    if (value !== undefined) {
-      payload.value = value;
+    if (value !== undefined && action === ShadingAction.GO_TO) {
+      payload.value = Math.round(value);
     }
 
     return this.connectionManager.sendAndWaitForAck({
@@ -809,7 +827,8 @@ export class XComfortBridge extends EventEmitter {
         roomId: numericId,
         mode,
         state,
-        setpoint,
+        // Always send a fraction, like the official app (21 → 21.001).
+        setpoint: toBridgeFloat(setpoint),
         confirmed,
       },
     });
@@ -828,46 +847,76 @@ export class XComfortBridge extends EventEmitter {
     });
   }
 
-  async setEnergyLoadMode(meterId: string | number, mode: string): Promise<boolean> {
-    const normalizedMode = normalizeLoadMode(mode);
-    const numericMode = loadModeToProtocolValue(normalizedMode);
-    const parsedMeterId = this.parseId(String(meterId));
+  /**
+   * Set the bridge-wide energy control mode (ENERGY_CONTROL_SET_MODE 392).
+   * Energy control is global per bridge; the payload matches the official
+   * app: `{mode, prio}` for plain modes and `{mode, prio: true, prioType,
+   * prioDuration}` for a temporary priority boost.
+   */
+  async setEnergyLoadMode(mode: string, options: EnergyControlModeOptions = {}): Promise<boolean> {
+    const currentMode = options.currentMode
+      ?? this.lastBridgeStatus?.energyControlMode
+      ?? this.lastBridgeStatus?.loadMode;
+    const payload = buildEnergyControlModePayload(mode, { ...options, currentMode });
 
     return this.sendControlMessage({
       type_int: MESSAGE_TYPES.ENERGY_CONTROL_SET_MODE,
       mc: this.connectionManager.nextMc(),
-      payload: {
-        meterId: parsedMeterId,
-        loadMode: normalizedMode,
-        mode: numericMode,
-        controlMode: numericMode,
-        confirmed: true,
-      },
+      payload,
     });
   }
 
-  async requestEnergyData(meterId?: string | number): Promise<void> {
-    const payload = meterId !== undefined && meterId !== null
-      ? { meterId: this.parseId(String(meterId)) }
-      : {};
-    // Outgoing requests only. The previous list also sent 389 and 393, which
-    // are actually the bridge's *response* types (TARIFF_INFO / SET_ENERGY_STATE)
-    // and were rejected. These four are the genuine client→bridge requests the
-    // official app uses: subscribe to live data, then pull tariff/history/meter.
-    const requestTypes = [
-      MESSAGE_TYPES.SET_ENERGY_MONITORING,
-      MESSAGE_TYPES.REQUEST_TARIFF_INFO,
-      MESSAGE_TYPES.REQUEST_ENERGY_HISTORY,
-      MESSAGE_TYPES.SET_ENERGY_METER,
-    ];
+  /**
+   * Refresh tariff prices and energy history. Read-only: like the official
+   * app this only sends REQUEST_TARIFF_INFO (388) and REQUEST_ENERGY_HISTORY
+   * (395). SET_ENERGY_MONITORING (390) and SET_ENERGY_METER (397) are
+   * configuration writes (edit monitored loads / create-update a meter) and
+   * must never be sent from a refresh.
+   *
+   * History is requested for today (hourly) and this month (daily). The
+   * bridge serves one history request at a time, so the month query follows
+   * after a short pause, as the official app does.
+   */
+  async requestEnergyData(
+    itemId?: string | number,
+    options: { timeZone?: string; nowMs?: number } = {},
+  ): Promise<void> {
+    const nowMs = options.nowMs ?? Date.now();
 
-    for (const type_int of requestTypes) {
-      await this.sendControlMessage({
-        type_int,
-        mc: this.connectionManager.nextMc(),
-        payload,
-      });
+    await this.sendControlMessage({
+      type_int: MESSAGE_TYPES.REQUEST_TARIFF_INFO,
+      mc: this.connectionManager.nextMc(),
+      payload: buildTariffInfoRequest(nowMs, options.timeZone),
+    });
+
+    const numericId = itemId !== undefined && itemId !== null ? Number(itemId) : Number.NaN;
+    if (!Number.isInteger(numericId) || numericId <= 0) {
+      return;
     }
+
+    const query = { itemId: numericId, nowMs, timeZone: options.timeZone };
+    await this.sendControlMessage({
+      type_int: MESSAGE_TYPES.REQUEST_ENERGY_HISTORY,
+      mc: this.connectionManager.nextMc(),
+      payload: buildTodayHistoryRequest(query),
+    });
+
+    if (this.energyHistoryFollowUpTimer) {
+      clearTimeout(this.energyHistoryFollowUpTimer);
+    }
+    this.energyHistoryFollowUpTimer = setTimeout(() => {
+      this.energyHistoryFollowUpTimer = null;
+      if (!this.connectionManager.isConnected()) {
+        return;
+      }
+      this.sendControlMessage({
+        type_int: MESSAGE_TYPES.REQUEST_ENERGY_HISTORY,
+        mc: this.connectionManager.nextMc(),
+        payload: buildMonthHistoryRequest(query),
+      }).catch((error) => {
+        this.logger(`[XComfortBridge] Monthly energy history request failed: ${(error as Error).message}`);
+      });
+    }, this.ENERGY_HISTORY_REQUEST_GAP_MS);
   }
 
   // ===========================================================================
@@ -1010,6 +1059,10 @@ export class XComfortBridge extends EventEmitter {
     if (this.deferredDeviceStatesTimer) {
       clearTimeout(this.deferredDeviceStatesTimer);
       this.deferredDeviceStatesTimer = null;
+    }
+    if (this.energyHistoryFollowUpTimer) {
+      clearTimeout(this.energyHistoryFollowUpTimer);
+      this.energyHistoryFollowUpTimer = null;
     }
     this.messageHandler.cleanup();
     this.connectionManager.cleanup();

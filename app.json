@@ -748,10 +748,21 @@
                   "en": "Priority",
                   "nl": "Prioriteit"
                 }
+              },
+              {
+                "id": "inactive",
+                "label": {
+                  "en": "Inactive (energy control off)",
+                  "nl": "Inactief (energiebeheer uit)"
+                }
               }
             ]
           }
-        ]
+        ],
+        "hint": {
+          "en": "Energy control is bridge-wide: Normal runs controlled loads at normal and cheap tariff, Energy saving only at cheap tariff. Priority temporarily (60 minutes) prioritizes this device's load group (water heater, EV charger, climate or high-load appliance).",
+          "nl": "Energiebeheer geldt voor de hele bridge: Normaal laat gestuurde verbruikers draaien bij normaal en goedkoop tarief, Energiebesparing alleen bij goedkoop tarief. Prioriteit geeft de verbruikersgroep van dit apparaat (boiler, laadpaal, klimaat of grootverbruiker) tijdelijk (60 minuten) voorrang."
+        }
       },
       {
         "id": "refresh_energy_meter",
@@ -1308,6 +1319,13 @@
           "title": {
             "en": "Priority",
             "nl": "Prioriteit"
+          }
+        },
+        {
+          "id": "inactive",
+          "title": {
+            "en": "Inactive",
+            "nl": "Inactief"
           }
         }
       ],

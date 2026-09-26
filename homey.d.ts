@@ -17,10 +17,16 @@ declare module 'homey' {
         registerRunListener(listener: (args: any, state: any) => Promise<boolean> | boolean): void;
     }
 
+    export interface HomeyClock {
+        /** IANA time zone configured on the Homey, e.g. "Europe/Amsterdam". */
+        getTimezone(): string;
+    }
+
     export interface HomeyAppContext {
         settings: HomeySettings;
         flow: HomeyFlow;
         app: App;
+        clock: HomeyClock;
     }
 
     export class App {

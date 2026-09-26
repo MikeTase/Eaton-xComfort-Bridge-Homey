@@ -1,6 +1,7 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import { DeviceStateUpdate, XComfortDevice } from '../../lib/types';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
+import { resolveWaterGuardLeak } from '../../lib/utils/sensorState';
 
 module.exports = class WaterSensorDevice extends BaseDevice {
 
@@ -111,7 +112,9 @@ module.exports = class WaterSensorDevice extends BaseDevice {
     }
 
     if (this.isWaterGuard()) {
-      return undefined;
+      // LeakageStop: curstate 3 = leak alarm, 4 = leak alarm muted; other
+      // states (unknown, water on/off, test alarm, overtemperature) are no leak.
+      return resolveWaterGuardLeak(state.curstate);
     }
 
     if (typeof state.switch === 'boolean') {

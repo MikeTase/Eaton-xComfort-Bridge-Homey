@@ -191,8 +191,10 @@ test('energy messages emit a normalized bridge status', async () => {
         power: '1,5',
         kwh: 12.5,
         currency: 'eur',
-        mode: 1,
       },
+      // Official shape: energy control state is nested in `eControl`
+      // (0 inactive, 1 normal, 2 energy saving; priority is a flag).
+      eControl: { configured: true, mode: 1, prio: false },
     },
   });
 
@@ -200,7 +202,8 @@ test('energy messages emit a normalized bridge status', async () => {
   assert.strictEqual(statuses[0].power, 1.5, 'comma-decimal power strings should parse');
   assert.strictEqual(statuses[0].energyKwh, 12.5);
   assert.strictEqual(statuses[0].currency, 'EUR');
-  assert.strictEqual(statuses[0].loadMode, 'energy_saving', 'numeric load mode should normalize');
+  assert.strictEqual(statuses[0].loadMode, 'normal', 'eControl mode 1 is Normal (AUTO) in the official app');
+  assert.strictEqual(statuses[0].energyControlMode, 'normal');
 
   handler.cleanup();
 });
@@ -218,14 +221,28 @@ test('incoming TARIFF_INFO (389) and SET_ENERGY_STATE (393) responses are handle
     'TARIFF_INFO (389) should be handled',
   );
   assert.strictEqual(
-    await handler.processMessage({ type_int: MESSAGE_TYPES.SET_ENERGY_STATE, payload: { loadMode: 2 } }),
+    await handler.processMessage({ type_int: MESSAGE_TYPES.SET_ENERGY_STATE, payload: { mode: 2 } }),
     true,
     'SET_ENERGY_STATE (393) should be handled',
   );
+  await handler.processMessage({
+    type_int: MESSAGE_TYPES.SET_ENERGY_STATE,
+    payload: {
+      mode: 1,
+      prio: true,
+      prioType: 2,
+      prioDuration: 60,
+      loads: [{ type: 0, active: false, power: 1500 }, { type: 2, active: true, power: 3600 }],
+    },
+  });
 
-  assert.strictEqual(statuses.length, 2);
+  assert.strictEqual(statuses.length, 3);
   assert.strictEqual(statuses[0].currency, 'NOK');
-  assert.strictEqual(statuses[1].loadMode, 'priority');
+  assert.strictEqual(statuses[1].loadMode, 'energy_saving', 'mode 2 is Energy saving');
+  assert.strictEqual(statuses[2].loadMode, 'priority', 'prio flag wins over the underlying mode');
+  assert.strictEqual(statuses[2].energyControlMode, 'normal', 'underlying mode stays available');
+  assert.strictEqual(statuses[2].energyLoads, undefined, '393 load groups are not metered loads');
+  assert.notStrictEqual(statuses[2].power, 1500, 'priority load-group power must not become meter power');
 
   handler.cleanup();
 });
