@@ -21,6 +21,8 @@ it can be picked up later.
   - [`enums.md`](enums.md): every protocol-relevant enum (message types, device/comp types, shading, climate, energy, …)
   - [`info-codes.md`](info-codes.md): all bridge info/error/event codes with texts and how the app renders them
   - [`component-types.md`](component-types.md): component type catalogue
+  - [`deep-dive-6.md`](deep-dive-6.md): sixth pass, confirming the **blind position is inverted vs. Homey's 0 = closed convention**;
+    also covers slat tilt, verification of the shipped fixes, and the template/default config
   - [`deep-dive-5.md`](deep-dive-5.md): fifth pass, covering an audit of every command Homey sends vs. the official payloads, the payloads
     of all remaining outgoing messages, the Android side, and the analysis status
   - [`deep-dive-4.md`](deep-dive-4.md): fourth pass, covering auth-key rotation, `CONNECTION_DECLINED` error ids, info severity, room
@@ -107,7 +109,7 @@ The command enum is a different one: `OPEN=0, CLOSE=1, STOP=2, STEP_DOWN=3, STEP
   `2` calibration needed, `3` calibration running (the "Run calibration" button is disabled while it is 3).
   Slats: `shHasSlats`, `shSlatPos`, `shSlatRuntime`.
 
-### 1.4 Shading position direction [verified in the app; check on hardware]
+### 1.4 Shading position direction [verified — inverted vs. Homey, see deep-dive-6 §1]
 
 The official slider runs 0 to 100 with the **"up" icon at 0 and the "down" icon at 100**. So `shPos` 0 means fully open and
 100 means fully closed. Values outside 0..100 mean "position unknown" (`JA_POS_UNKNOWN_SHORT`). `GO_TO` is sent as
