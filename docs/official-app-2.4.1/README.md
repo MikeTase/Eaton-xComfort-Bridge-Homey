@@ -21,6 +21,8 @@ it can be picked up later.
   - [`enums.md`](enums.md): every protocol-relevant enum (message types, device/comp types, shading, climate, energy, …)
   - [`info-codes.md`](info-codes.md): all bridge info/error/event codes with texts and how the app renders them
   - [`component-types.md`](component-types.md): component type catalogue
+  - [`deep-dive-8.md`](deep-dive-8.md): eighth pass on the **room climate model**: room power has two meanings, `currentValve`,
+    floor temperature `tempAlt`/`floorMin`/`floorMax`, the `-100` "no sensor" value, cooling setpoints `valueCool`, `climateInfoId`/`eSaving`
   - [`deep-dive-7.md`](deep-dive-7.md): seventh pass, a **device-by-device audit** of every Homey driver against the official
     app, listing what was implemented (blind position/steps, actuator `curstate`, thermostat presets, motion/contact
     component info, brightness, room counters, water guard mute) and what is still open
@@ -290,7 +292,8 @@ The home-screen favourites array `homeScenes` (in 303) holds a `sceneId`, `lockI
   | 2 effect regulation | 0–100 % | 0–100 % | 0–100 % | 5 |
   | 3 | 5–20 °C | 10–30 °C | 18–40 °C | 0.5 |
 
-  Extra ranges: `m49` 5–30 °C, `m59` 20–40 °C, cooling mode 1 20–50 °C, cooling mode 2 10–40 °C.
+  Extra ranges: `m49` 5–30 °C, `m59` 20–40 °C, cooling mode 1 20–50 °C, cooling mode 2 10–40 °C, cooling mode 3 0–30 °C
+  (cooling uses `modes[].valueCool`, see [`deep-dive-8.md`](deep-dive-8.md) §1.5).
 - **Effect regulation (`regulation 2`) setpoints are percentages, not °C.**
 - Room climate config (`SET_ROOM_CLIMATE` 352, and `heating` in 300 `roomHeating[]`): `temperatureOnly`, `state`, `programId`,
   `regulation`, `modes` (setpoint per preset), `sumActuatorId`, `roomSensorId`, `floorSensorId`, `floorMin`, `floorMax`,
