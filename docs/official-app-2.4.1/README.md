@@ -21,6 +21,8 @@ it can be picked up later.
   - [`enums.md`](enums.md): every protocol-relevant enum (message types, device/comp types, shading, climate, energy, …)
   - [`info-codes.md`](info-codes.md): all bridge info/error/event codes with texts and how the app renders them
   - [`component-types.md`](component-types.md): component type catalogue
+  - [`deep-dive-5.md`](deep-dive-5.md): fifth pass, covering an audit of every command Homey sends vs. the official payloads, the payloads
+    of all remaining outgoing messages, the Android side, and the analysis status
   - [`deep-dive-4.md`](deep-dive-4.md): fourth pass, covering auth-key rotation, `CONNECTION_DECLINED` error ids, info severity, room
     grouping, firmware feature gates, input formats
   - [`terminology.md`](terminology.md): Eaton's en/nl/de/no wording for Homey locales
