@@ -27,3 +27,6 @@ package-lock.json
 .claude/
 .vscode/
 .prettierrc.json
+
+# Developer documentation (protocol notes) — not needed at runtime.
+docs/
