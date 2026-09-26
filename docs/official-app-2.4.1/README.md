@@ -21,6 +21,8 @@ it can be picked up later.
   - [`enums.md`](enums.md): every protocol-relevant enum (message types, device/comp types, shading, climate, energy, …)
   - [`info-codes.md`](info-codes.md): all bridge info/error/event codes with texts and how the app renders them
   - [`component-types.md`](component-types.md): component type catalogue
+  - [`deep-dive-3.md`](deep-dive-3.md): third pass, covering device-config and pairing payloads, the full devType table, notification ids,
+    and the demo dataset saved as [`samples/demo-home.json`](samples/demo-home.json)
   - [`deep-dive-2.md`](deep-dive-2.md): second pass, covering the decrypted bridge firmware, handshake identity check,
     float encoding, door/window modes, FAQ facts, the cloud relay protocol, and program/scene/condition payloads
 
@@ -163,7 +165,9 @@ split on spaces after removing commas. The device's `bType` (1/2/3) selects the 
 - NACKs carry an `info` field. `-100` means unknown device, `-99` device not dimmable, `-98` invalid action. A NACK sent for an
   unknown message type has `info: "INVALID MESSAGE TYPE"`.
 - devType naming: the official app calls 442 `ACTUATOR_MULTI_HEATING` (Homey: `HEATING_WATER_VALVE`) and has
-  460 `ACTUATOR_ROUTER`, which Homey lacks. Homey's 201/211/220/520 do not exist in the official `devType` enum.
+  460 `ACTUATOR_ROUTER`, which Homey lacks. *(Corrected in the third pass: the official `wy` table also defines the sensor-channel
+  types 200/201/202 switch, 210/211 pushbutton and 220/221 rocker, so Homey's 201/211/220 are valid. Only 520 is unknown. See
+  [`deep-dive-3.md`](deep-dive-3.md).)*
 - The bridge also accepts `HOME_DATA` (242) *with fields* as a **settings write**: `routingEnabled`,
   `climateHRVLimitOn/Off`, `homeScenes`. Only ever send it with an empty payload as a request.
 

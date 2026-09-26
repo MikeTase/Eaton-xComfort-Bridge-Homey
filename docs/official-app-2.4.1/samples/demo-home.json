@@ -1,0 +1,3710 @@
+{
+ "infoData": {
+  "id": "0000DEMO",
+  "name": "<bridge>",
+  "fwVersion": "3.22",
+  "fwBuild": 5,
+  "pwd": "-",
+  "homeScenes": [
+   601,
+   602,
+   603,
+   604
+  ],
+  "learn": false,
+  "time": "now",
+  "lat": 48.8095961,
+  "lon": 15.0557058,
+  "msLower": "10",
+  "msUpper": "50",
+  "currentUserId": 1000,
+  "notificationsActive": true,
+  "notifications": [
+   1,
+   2,
+   3
+  ],
+  "routingEnabled": true,
+  "climateHRVLimitOn": 50,
+  "climateHRVLimitOff": 50,
+  "mcBridgeState": 2,
+  "bridgeType": 1,
+  "vacantActors": 236,
+  "vacantSensors": 229,
+  "vacantRooms": 36,
+  "vacantScenes": 32,
+  "vacantDPs": 465,
+  "dataLoaded": true,
+  "remoteAllowed": true
+ },
+ "stateData": {
+  "heatingOn": 1,
+  "lightsOn": 3,
+  "loadsOn": 1,
+  "windowsOpen": 1,
+  "doorsOpen": 1,
+  "presence": 0,
+  "power": 195,
+  "tempOutside": 12.1,
+  "shadsClosed": 2,
+  "wgWaterOff": 0,
+  "windSpeed": 1.6,
+  "brightness": 3400,
+  "rain": 1,
+  "coolingOn": 0
+ },
+ "homeData": {
+  "comps": [
+   {
+    "compId": 101,
+    "compType": 77,
+    "name": "<comp101>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "3"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 102,
+    "compType": 77,
+    "name": "<comp102>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 103,
+    "compType": 77,
+    "name": "<comp103>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "2"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 104,
+    "compType": 77,
+    "name": "<comp104>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 1,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 105,
+    "compType": 81,
+    "name": "<comp105>",
+    "icon": 616,
+    "versionFW": "1.40",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "3"
+     },
+     {
+      "text": "1118",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 106,
+    "compType": 71,
+    "name": "<comp106>",
+    "icon": 615,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": []
+   },
+   {
+    "compId": 107,
+    "compType": 77,
+    "name": "<comp107>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 108,
+    "compType": 77,
+    "name": "<comp108>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 109,
+    "compType": 77,
+    "name": "<comp109>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 110,
+    "compType": 86,
+    "name": "<comp110>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 111,
+    "compType": 27,
+    "name": "<comp111>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": []
+   },
+   {
+    "compId": 112,
+    "compType": 86,
+    "name": "<comp112>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": []
+   },
+   {
+    "compId": 113,
+    "compType": 74,
+    "name": "<comp113>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 114,
+    "compType": 74,
+    "name": "<comp114>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 1,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 115,
+    "compType": 77,
+    "name": "<comp115>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 117,
+    "compType": 77,
+    "name": "<comp117>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 118,
+    "compType": 74,
+    "name": "<comp118>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 119,
+    "compType": 74,
+    "name": "<comp119>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 120,
+    "compType": 77,
+    "name": "<comp120>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 121,
+    "compType": 77,
+    "name": "<comp121>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 122,
+    "compType": 77,
+    "name": "<comp122>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 123,
+    "compType": 77,
+    "name": "<comp123>",
+    "icon": 48,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 201,
+    "compType": 1,
+    "name": "<comp201>",
+    "icon": 500,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "3"
+     },
+     {
+      "text": "1118",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 202,
+    "compType": 2,
+    "name": "<comp202>",
+    "icon": 502,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 1,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "3"
+     },
+     {
+      "text": "1115",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 203,
+    "compType": 29,
+    "name": "<comp203>",
+    "icon": 510,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "sens": 6,
+    "bright": 6,
+    "offtime": 5447,
+    "led": false,
+    "clientId": 1,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     },
+     {
+      "text": "1126",
+      "type": 2,
+      "icon": 1,
+      "value": "11:17"
+     }
+    ],
+    "usageRoom": 502
+   },
+   {
+    "compId": 204,
+    "compType": 76,
+    "name": "<comp204>",
+    "icon": 515,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     },
+     {
+      "text": "1121",
+      "type": 2,
+      "icon": 1,
+      "value": "14:45"
+     }
+    ],
+    "mode": "1308",
+    "listMode": [
+     "1308",
+     "1309",
+     "1310",
+     "1311"
+    ],
+    "led": false,
+    "usageRoom": 502,
+    "heatingUsage": true
+   },
+   {
+    "compId": 205,
+    "compType": 23,
+    "name": "<comp205>",
+    "icon": 559,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     },
+     {
+      "text": "1222",
+      "type": 2,
+      "icon": 1,
+      "value": "1: 22.7"
+     },
+     {
+      "text": "1222",
+      "type": 2,
+      "icon": 1,
+      "value": "2: 23.5"
+     }
+    ]
+   },
+   {
+    "compId": 206,
+    "compType": 78,
+    "name": "<comp206>",
+    "icon": 554,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 207,
+    "compType": 65,
+    "name": "<comp207>",
+    "icon": 557,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 208,
+    "compType": 84,
+    "name": "<comp208>",
+    "icon": 563,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "led": 0,
+    "usageRoom": 501,
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 209,
+    "compType": 85,
+    "name": "<comp209>",
+    "icon": 562,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "usageRoom": 502,
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 210,
+    "compType": 85,
+    "name": "<comp210>",
+    "icon": 562,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "usageRoom": 501,
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 211,
+    "compType": 87,
+    "name": "<comp211>",
+    "icon": 573,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 212,
+    "compType": 88,
+    "name": "<comp212>",
+    "icon": 576,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 213,
+    "compType": 89,
+    "name": "<comp213>",
+    "icon": 580,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 214,
+    "compType": 49,
+    "name": "<comp214>",
+    "icon": 640,
+    "versionFW": "1.0",
+    "versionHW": "1.0",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1117",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 215,
+    "compType": 90,
+    "name": "<comp215>",
+    "icon": 653,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "2"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ]
+   },
+   {
+    "compId": 216,
+    "compType": 19,
+    "name": "<comp216>",
+    "icon": 586,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ],
+    "mode": "1302",
+    "listMode": [
+     "1302",
+     "1303",
+     "1304",
+     "1305"
+    ]
+   },
+   {
+    "compId": 217,
+    "compType": 19,
+    "name": "<comp217>",
+    "icon": 520,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ],
+    "mode": "1303",
+    "listMode": [
+     "1302",
+     "1303",
+     "1304",
+     "1305"
+    ]
+   },
+   {
+    "compId": 218,
+    "compType": 20,
+    "name": "<comp218>",
+    "icon": 520,
+    "versionFW": "1.0",
+    "versionHW": "2.3",
+    "clientId": 0,
+    "info": [
+     {
+      "text": "1111",
+      "type": 2,
+      "icon": 1,
+      "value": "1"
+     },
+     {
+      "text": "1119",
+      "type": 2,
+      "icon": 1
+     }
+    ],
+    "mode": "1303",
+    "listMode": [
+     "1302",
+     "1303",
+     "1304",
+     "1305"
+    ]
+   }
+  ],
+  "devices": [
+   {
+    "deviceId": 301,
+    "devType": 101,
+    "compId": 101,
+    "cat": 0,
+    "name": "<device301>",
+    "usage": 0,
+    "icon": 191,
+    "order": 1,
+    "dimmable": true,
+    "dimmvalue": 18,
+    "switch": true,
+    "dp": "1374",
+    "listDp": [
+     "1361",
+     "1362",
+     "1363",
+     "1364",
+     "1365",
+     "1351",
+     "1374",
+     "1375",
+     "1376"
+    ],
+    "hasPower": true,
+    "monitorPower": true,
+    "power": 0,
+    "cloudUsage": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "29"
+     }
+    ]
+   },
+   {
+    "deviceId": 302,
+    "devType": 101,
+    "compId": 102,
+    "cat": 0,
+    "name": "<device302>",
+    "usage": 0,
+    "icon": 145,
+    "order": 2,
+    "dimmable": true,
+    "dimmvalue": 0,
+    "switch": false,
+    "dp": "1362",
+    "listDp": [
+     "1361",
+     "1362",
+     "1363",
+     "1364",
+     "1365",
+     "1351",
+     "1374",
+     "1375",
+     "1376"
+    ],
+    "hasPower": true,
+    "monitorPower": true,
+    "power": 15,
+    "cloudUsage": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "28"
+     }
+    ]
+   },
+   {
+    "deviceId": 303,
+    "devType": 101,
+    "compId": 103,
+    "cat": 0,
+    "name": "<device303>",
+    "usage": 0,
+    "icon": 201,
+    "order": 3,
+    "dimmable": true,
+    "dimmvalue": 18,
+    "switch": true,
+    "dp": "1375",
+    "listDp": [
+     "1361",
+     "1362",
+     "1363",
+     "1364",
+     "1365",
+     "1351",
+     "1374",
+     "1375",
+     "1376"
+    ],
+    "hasPower": true,
+    "power": 0,
+    "cloudUsage": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "28"
+     }
+    ]
+   },
+   {
+    "deviceId": 304,
+    "devType": 100,
+    "compId": 104,
+    "cat": 0,
+    "name": "<device304>",
+    "usage": 0,
+    "icon": 147,
+    "order": 4,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "hasPower": true,
+    "power": 10.8,
+    "cloudUsage": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "29"
+     }
+    ]
+   },
+   {
+    "deviceId": 305,
+    "devType": 440,
+    "compId": 105,
+    "cat": 0,
+    "name": "<device305>",
+    "icon": 617,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "hasPower": true,
+    "power": 200,
+    "usage": 23,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "29"
+     },
+     {
+      "text": "1223",
+      "type": 2,
+      "icon": 1,
+      "value": "45"
+     }
+    ],
+    "heatingType": 2,
+    "heatingSpeed": 12,
+    "heatingBackupValue": 10,
+    "tempRoom": 501
+   },
+   {
+    "deviceId": 306,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device306>",
+    "icon": 619,
+    "order": 7,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 25,
+    "info": [],
+    "heatingType": 1,
+    "tempRoom": 502
+   },
+   {
+    "deviceId": 307,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device307>",
+    "icon": 619,
+    "order": 8,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 25,
+    "info": [],
+    "heatingType": 1,
+    "tempRoom": 501
+   },
+   {
+    "deviceId": 308,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device308>",
+    "icon": 46,
+    "order": 9,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0
+   },
+   {
+    "deviceId": 309,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device309>",
+    "icon": 46,
+    "order": 10,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0,
+    "tempRoom": 0
+   },
+   {
+    "deviceId": 310,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device310>",
+    "icon": 46,
+    "order": 11,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0,
+    "tempRoom": 0
+   },
+   {
+    "deviceId": 311,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device311>",
+    "icon": 46,
+    "order": 12,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0,
+    "tempRoom": 0
+   },
+   {
+    "deviceId": 312,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device312>",
+    "icon": 46,
+    "order": 13,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0,
+    "tempRoom": 0
+   },
+   {
+    "deviceId": 313,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device313>",
+    "icon": 46,
+    "order": 14,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0,
+    "tempRoom": 0
+   },
+   {
+    "deviceId": 314,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device314>",
+    "icon": 46,
+    "order": 15,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0,
+    "tempRoom": 0
+   },
+   {
+    "deviceId": 315,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device315>",
+    "icon": 46,
+    "order": 16,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0,
+    "tempRoom": 0
+   },
+   {
+    "deviceId": 316,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device316>",
+    "icon": 46,
+    "order": 17,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0,
+    "tempRoom": 0
+   },
+   {
+    "deviceId": 317,
+    "devType": 442,
+    "compId": 106,
+    "cat": 0,
+    "name": "<device317>",
+    "icon": 46,
+    "order": 18,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "usage": 23,
+    "info": [],
+    "heatingType": 0,
+    "tempRoom": 0
+   },
+   {
+    "deviceId": 318,
+    "devType": 101,
+    "compId": 107,
+    "cat": 0,
+    "name": "<device318>",
+    "usage": 0,
+    "icon": 108,
+    "order": 19,
+    "dimmable": true,
+    "dimmvalue": 0,
+    "switch": false,
+    "dp": "1374",
+    "listDp": [
+     "1361",
+     "1362",
+     "1363",
+     "1364",
+     "1365",
+     "1351",
+     "1374",
+     "1375",
+     "1376"
+    ],
+    "hasPower": true,
+    "power": 0,
+    "cloudUsage": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "28"
+     }
+    ]
+   },
+   {
+    "deviceId": 319,
+    "devType": 100,
+    "compId": 108,
+    "cat": 0,
+    "name": "<device319>",
+    "usage": 0,
+    "icon": 105,
+    "order": 20,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "hasPower": true,
+    "power": 0,
+    "cloudUsage": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "26"
+     }
+    ]
+   },
+   {
+    "deviceId": 320,
+    "devType": 101,
+    "compId": 109,
+    "cat": 0,
+    "name": "<device320>",
+    "usage": 1,
+    "icon": 139,
+    "order": 5,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "hasPower": true,
+    "power": 0,
+    "cloudUsage": true,
+    "monitorPower": true,
+    "controlPower": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "29"
+     }
+    ]
+   },
+   {
+    "deviceId": 321,
+    "devType": 102,
+    "compId": 110,
+    "cat": 0,
+    "name": "<device321>",
+    "icon": 638,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "curstate": 1,
+    "shType": 2,
+    "shControl": 5,
+    "shRuntime": 1,
+    "shStepDur": 3000,
+    "shCounterRuntime": 5000,
+    "shCounterPause": 800,
+    "shSafety": 1,
+    "shSafetyPos": 0,
+    "shSafetyWind": 15,
+    "shSafetyRain": 1,
+    "shCalInfo": 2,
+    "shHasSlats": false,
+    "shSlatRuntime": 2000,
+    "shInvertOutput": false,
+    "shPos": 100,
+    "shSlatPos": 0,
+    "cloudUsage": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "29"
+     }
+    ]
+   },
+   {
+    "deviceId": 322,
+    "devType": 102,
+    "compId": 111,
+    "cat": 0,
+    "name": "<device322>",
+    "icon": 638,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "curstate": 0,
+    "shType": 2,
+    "shControl": 2,
+    "shRuntime": 60,
+    "shStepDur": 3000,
+    "cloudUsage": true,
+    "info": []
+   },
+   {
+    "deviceId": 323,
+    "devType": 102,
+    "compId": 112,
+    "cat": 0,
+    "name": "<device323>",
+    "icon": 635,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "curstate": 1,
+    "shType": 5,
+    "shControl": 7,
+    "shRuntime": 1,
+    "shCounterRuntime": 5000,
+    "shStepDur": 3000,
+    "shSafety": 1,
+    "shSafetyPos": 0,
+    "shSafetyWind": 0,
+    "shSafetyRain": 0,
+    "shSafetyReason": [],
+    "shCounterPause": 800,
+    "shHasSlats": true,
+    "shSlatRuntime": 2000,
+    "shInvertOutput": false,
+    "shPos": 100,
+    "shSlatPos": 0,
+    "shCalInfo": 1,
+    "cloudUsage": true,
+    "info": []
+   },
+   {
+    "deviceId": 324,
+    "devType": 100,
+    "compId": 113,
+    "cat": 0,
+    "name": "<device324>",
+    "usage": 2,
+    "icon": 186,
+    "order": 20,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "hasPower": true,
+    "power": 0,
+    "cloudUsage": false,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "26"
+     }
+    ]
+   },
+   {
+    "deviceId": 325,
+    "devType": 100,
+    "compId": 114,
+    "cat": 0,
+    "name": "<device325>",
+    "usage": 28,
+    "icon": 186,
+    "order": 20,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "hasPower": true,
+    "power": 0,
+    "cloudUsage": false,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "26"
+     }
+    ]
+   },
+   {
+    "deviceId": 326,
+    "devType": 100,
+    "compId": 115,
+    "cat": 0,
+    "name": "<device326>",
+    "usage": 26,
+    "icon": 186,
+    "order": 20,
+    "dimmable": true,
+    "dimmvalue": 0,
+    "switch": false,
+    "hasPower": true,
+    "power": 0,
+    "cloudUsage": false,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "26"
+     }
+    ]
+   },
+   {
+    "deviceId": 328,
+    "devType": 101,
+    "compId": 117,
+    "cat": 0,
+    "name": "<device328>",
+    "usage": 1,
+    "icon": 189,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "cloudUsage": true,
+    "hasPower": true,
+    "power": 0,
+    "monitorPower": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "29"
+     }
+    ]
+   },
+   {
+    "deviceId": 329,
+    "devType": 100,
+    "compId": 118,
+    "cat": 0,
+    "name": "<device329>",
+    "usage": 6,
+    "icon": 184,
+    "order": 7,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "hasPower": true,
+    "power": 0,
+    "cloudUsage": true,
+    "monitorPower": true,
+    "controlPower": true,
+    "invOut": false,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "29"
+     }
+    ]
+   },
+   {
+    "deviceId": 330,
+    "devType": 100,
+    "compId": 119,
+    "cat": 0,
+    "name": "<device330>",
+    "usage": 8,
+    "icon": 118,
+    "order": 8,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "cloudUsage": true,
+    "hasPower": true,
+    "power": 0,
+    "monitorPower": true,
+    "controlPower": true,
+    "info": [
+     {
+      "text": "1109",
+      "type": 2,
+      "icon": 1,
+      "value": "29"
+     }
+    ]
+   },
+   {
+    "deviceId": 331,
+    "devType": 101,
+    "compId": 120,
+    "cat": 0,
+    "name": "<device331>",
+    "usage": 1,
+    "icon": 145,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "cloudUsage": true,
+    "hasPower": true,
+    "power": 0,
+    "monitorPower": true,
+    "info": []
+   },
+   {
+    "deviceId": 332,
+    "devType": 101,
+    "compId": 121,
+    "cat": 0,
+    "name": "<device332>",
+    "usage": 1,
+    "icon": 132,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "cloudUsage": true,
+    "hasPower": true,
+    "power": 0,
+    "monitorPower": true,
+    "info": []
+   },
+   {
+    "deviceId": 333,
+    "devType": 101,
+    "compId": 122,
+    "cat": 0,
+    "name": "<device333>",
+    "usage": 1,
+    "icon": 124,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "cloudUsage": true,
+    "hasPower": true,
+    "power": 0,
+    "monitorPower": true,
+    "info": []
+   },
+   {
+    "deviceId": 334,
+    "devType": 100,
+    "compId": 123,
+    "cat": 0,
+    "name": "<device334>",
+    "usage": 8,
+    "icon": 185,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": true,
+    "cloudUsage": true,
+    "hasPower": true,
+    "power": 0,
+    "monitorPower": true,
+    "controlPower": true,
+    "info": []
+   },
+   {
+    "deviceId": 401,
+    "devType": 200,
+    "configured": false,
+    "compId": 201,
+    "chId": 0,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device401>",
+    "icon": 501,
+    "controlType": 1,
+    "controlId": [
+     302
+    ],
+    "order": 1,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "clientId": 0,
+    "info": []
+   },
+   {
+    "deviceId": 402,
+    "devType": 220,
+    "configured": false,
+    "compId": 202,
+    "chId": 0,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device402>",
+    "icon": 503,
+    "controlType": 5,
+    "controlId": [
+     322
+    ],
+    "order": 2,
+    "function": 32,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "clientId": 0,
+    "info": []
+   },
+   {
+    "deviceId": 403,
+    "devType": 220,
+    "configured": true,
+    "compId": 202,
+    "chId": 1,
+    "cat": 1,
+    "curstate": 0,
+    "name": "<device403>",
+    "icon": 504,
+    "controlType": 1,
+    "controlId": [
+     303
+    ],
+    "order": 3,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 404,
+    "devType": 200,
+    "configured": true,
+    "compId": 203,
+    "chId": 0,
+    "cat": 1,
+    "name": "<device404>",
+    "icon": 511,
+    "controlType": 1,
+    "controlId": [
+     301
+    ],
+    "order": 4,
+    "function": 0,
+    "dimmtime": 15,
+    "info": []
+   },
+   {
+    "deviceId": 405,
+    "devType": 202,
+    "configured": true,
+    "compId": 204,
+    "chId": 0,
+    "cat": 1,
+    "name": "<device405>",
+    "icon": 516,
+    "controlType": 5,
+    "controlId": [
+     321
+    ],
+    "order": 5,
+    "state": 0,
+    "curstate": 0,
+    "function": 39,
+    "delaytime": 60,
+    "dimmvalueOn": 50,
+    "dimmvalueOff": 0,
+    "dimmtime": 2,
+    "info": []
+   },
+   {
+    "deviceId": 406,
+    "devType": 410,
+    "compId": 205,
+    "chId": 0,
+    "cat": 1,
+    "name": "<device406>",
+    "icon": 560,
+    "order": 6,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "temp": 18,
+    "tempType": 5,
+    "tempOffset": 0,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 407,
+    "devType": 410,
+    "compId": 205,
+    "chId": 1,
+    "cat": 1,
+    "name": "<device407>",
+    "icon": 561,
+    "order": 7,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "temp": 23,
+    "humidity": 56,
+    "tempType": 4,
+    "tempRoom": 501,
+    "tempOffset": -2,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 408,
+    "devType": 450,
+    "compId": 206,
+    "chId": 0,
+    "cat": 1,
+    "name": "<device408>",
+    "icon": 555,
+    "order": 8,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "temp": 25,
+    "tempType": 1,
+    "tempRoom": 501,
+    "tempOffset": 0,
+    "tempPT1000Offset": 0,
+    "humidityOffset": 0,
+    "screenLock": true,
+    "simpleMode": true,
+    "stbDisplay": false,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 409,
+    "devType": 220,
+    "configured": true,
+    "compId": 206,
+    "chId": 1,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device409>",
+    "icon": 556,
+    "controlType": 0,
+    "controlId": [],
+    "order": 9,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 410,
+    "devType": 441,
+    "compId": 207,
+    "chId": 0,
+    "cat": 1,
+    "name": "<device410>",
+    "icon": 558,
+    "order": 10,
+    "configured": true,
+    "heatingType": 6,
+    "tempType": 4,
+    "tempRoom": 502,
+    "tempOffset": 0,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 411,
+    "devType": 497,
+    "compId": 208,
+    "chId": 0,
+    "cat": 0,
+    "name": "<device411>",
+    "icon": 563,
+    "order": 11,
+    "configured": true,
+    "defaultState": 0,
+    "controlId": [
+     320
+    ],
+    "curstate": 1,
+    "switch": true,
+    "wgLeakSensorId": [],
+    "secondaryState": 0,
+    "curLowBatt": [],
+    "curBadSignal": [],
+    "offUnknown": 0,
+    "limeCycle": 100,
+    "limeToggle": 3000,
+    "router": [],
+    "infoTest": {
+     "active": false,
+     "last": 1627286430
+    },
+    "infoAlarm": {
+     "last": 1627216230
+    },
+    "info": []
+   },
+   {
+    "deviceId": 412,
+    "devType": 499,
+    "compId": 208,
+    "name": "<device411>",
+    "icon": 563,
+    "order": 11,
+    "chId": 1,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [
+     411
+    ],
+    "info": [
+     {
+      "text": "1130",
+      "type": 1,
+      "value": "11.11.2021 16:45"
+     }
+    ]
+   },
+   {
+    "deviceId": 413,
+    "devType": 499,
+    "compId": 209,
+    "name": "<device413>",
+    "icon": 562,
+    "order": 12,
+    "chId": 0,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [
+     411
+    ],
+    "router": [],
+    "info": [
+     {
+      "text": "1130",
+      "type": 1,
+      "value": "11.11.2021 16:30"
+     }
+    ]
+   },
+   {
+    "deviceId": 414,
+    "devType": 499,
+    "compId": 210,
+    "name": "<device414>",
+    "icon": 562,
+    "order": 12,
+    "chId": 0,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [
+     411
+    ],
+    "router": [],
+    "info": [
+     {
+      "text": "1130",
+      "type": 1,
+      "value": "11.11.2021 16:30"
+     }
+    ]
+   },
+   {
+    "deviceId": 415,
+    "devType": 220,
+    "configured": true,
+    "compId": 211,
+    "chId": 0,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device415>",
+    "icon": 574,
+    "controlType": 0,
+    "controlId": [],
+    "order": 15,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 416,
+    "devType": 451,
+    "compId": 211,
+    "chId": 1,
+    "cat": 1,
+    "name": "<device416>",
+    "icon": 575,
+    "order": 16,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "temp": 25,
+    "tempRoom": 502,
+    "tempType": 4,
+    "tempOffset": 0,
+    "humidityOffset": 0,
+    "cloudUsage": false,
+    "info": [
+     {
+      "text": "1222",
+      "type": 2,
+      "value": "20.5"
+     },
+     {
+      "text": "1223",
+      "type": 2,
+      "icon": 1,
+      "value": "44.1"
+     }
+    ]
+   },
+   {
+    "deviceId": 417,
+    "devType": 200,
+    "configured": true,
+    "compId": 212,
+    "chId": 0,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device417>",
+    "icon": 577,
+    "controlType": 0,
+    "controlId": [],
+    "order": 17,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 418,
+    "devType": 200,
+    "configured": true,
+    "compId": 212,
+    "chId": 1,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device418>",
+    "icon": 578,
+    "controlType": 0,
+    "controlId": [],
+    "order": 17,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 419,
+    "devType": 451,
+    "compId": 212,
+    "chId": 2,
+    "cat": 1,
+    "name": "<device419>",
+    "icon": 579,
+    "order": 19,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "temp": 25,
+    "tempRoom": 502,
+    "tempType": 4,
+    "tempOffset": 0,
+    "humidityOffset": 0,
+    "cloudUsage": false,
+    "info": [
+     {
+      "text": "1222",
+      "type": 2,
+      "value": "22.1"
+     },
+     {
+      "text": "1223",
+      "type": 2,
+      "icon": 1,
+      "value": "45.0"
+     }
+    ]
+   },
+   {
+    "deviceId": 420,
+    "devType": 200,
+    "configured": true,
+    "compId": 213,
+    "chId": 0,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device420>",
+    "icon": 581,
+    "controlType": 0,
+    "controlId": [],
+    "order": 20,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 421,
+    "devType": 200,
+    "configured": true,
+    "compId": 213,
+    "chId": 1,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device421>",
+    "icon": 582,
+    "controlType": 0,
+    "controlId": [],
+    "order": 21,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 422,
+    "devType": 200,
+    "configured": true,
+    "compId": 213,
+    "chId": 2,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device422>",
+    "icon": 583,
+    "controlType": 0,
+    "controlId": [],
+    "order": 22,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 423,
+    "devType": 200,
+    "configured": true,
+    "compId": 213,
+    "chId": 3,
+    "cat": 1,
+    "curstate": 1,
+    "name": "<device423>",
+    "icon": 584,
+    "controlType": 0,
+    "controlId": [],
+    "order": 23,
+    "function": 0,
+    "dimmtime": 15,
+    "cloudUsage": false,
+    "info": []
+   },
+   {
+    "deviceId": 424,
+    "devType": 451,
+    "compId": 213,
+    "chId": 4,
+    "cat": 1,
+    "name": "<device424>",
+    "icon": 585,
+    "order": 24,
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "temp": 25,
+    "tempRoom": 502,
+    "tempType": 4,
+    "tempOffset": 0,
+    "humidityOffset": 0,
+    "cloudUsage": false,
+    "info": [
+     {
+      "text": "1222",
+      "type": 2,
+      "value": "24.2"
+     },
+     {
+      "text": "1223",
+      "type": 2,
+      "icon": 1,
+      "value": "39.1"
+     }
+    ]
+   },
+   {
+    "deviceId": 425,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device425>",
+    "icon": 641,
+    "order": 25,
+    "chId": 0,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 426,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device426>",
+    "icon": 642,
+    "order": 25,
+    "chId": 1,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 427,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device427>",
+    "icon": 643,
+    "order": 25,
+    "chId": 2,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 428,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device428>",
+    "icon": 644,
+    "order": 25,
+    "chId": 3,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 429,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device429>",
+    "icon": 645,
+    "order": 25,
+    "chId": 4,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 430,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device430>",
+    "icon": 646,
+    "order": 25,
+    "chId": 5,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 431,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device431>",
+    "icon": 647,
+    "order": 25,
+    "chId": 6,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 432,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device432>",
+    "icon": 648,
+    "order": 25,
+    "chId": 7,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 433,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device433>",
+    "icon": 649,
+    "order": 25,
+    "chId": 8,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 434,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device434>",
+    "icon": 650,
+    "order": 25,
+    "chId": 9,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 435,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device435>",
+    "icon": 651,
+    "order": 25,
+    "chId": 10,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 436,
+    "devType": 220,
+    "compId": 214,
+    "name": "<device436>",
+    "icon": 652,
+    "order": 25,
+    "chId": 11,
+    "cat": 1,
+    "curstate": 0,
+    "configured": true,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 437,
+    "devType": 510,
+    "compId": 215,
+    "chId": 0,
+    "cat": 1,
+    "name": "<device437>",
+    "icon": 654,
+    "order": 26,
+    "tempType": 0,
+    "controlId": [
+     323
+    ],
+    "router": [],
+    "info": [],
+    "bType": 1
+   },
+   {
+    "deviceId": 438,
+    "devType": 201,
+    "compId": 216,
+    "chId": 0,
+    "cat": 1,
+    "name": "<device438>",
+    "icon": 587,
+    "order": 27,
+    "usage": 102,
+    "controlId": [],
+    "controlType": 2,
+    "info": []
+   },
+   {
+    "deviceId": 439,
+    "devType": 201,
+    "compId": 216,
+    "chId": 1,
+    "cat": 1,
+    "name": "<device439>",
+    "icon": 588,
+    "order": 28,
+    "usage": 102,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 440,
+    "devType": 201,
+    "compId": 217,
+    "chId": 0,
+    "cat": 1,
+    "name": "<device440>",
+    "icon": 521,
+    "order": 29,
+    "usage": 100,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 441,
+    "devType": 201,
+    "compId": 217,
+    "chId": 1,
+    "cat": 1,
+    "name": "<device441>",
+    "icon": 522,
+    "order": 30,
+    "usage": 100,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 442,
+    "devType": 201,
+    "compId": 218,
+    "chId": 0,
+    "cat": 1,
+    "name": "<device442>",
+    "icon": 521,
+    "order": 29,
+    "usage": 100,
+    "controlId": [],
+    "info": []
+   },
+   {
+    "deviceId": 443,
+    "devType": 201,
+    "compId": 218,
+    "chId": 1,
+    "cat": 1,
+    "name": "<device443>",
+    "icon": 522,
+    "order": 30,
+    "usage": 100,
+    "controlId": [],
+    "info": []
+   }
+  ],
+  "rooms": [
+   {
+    "roomId": 501,
+    "name": "<room501>",
+    "icon": 284,
+    "order": 1,
+    "devices": [
+     302,
+     304,
+     320,
+     322
+    ],
+    "dimmable": true,
+    "dimmvalue": 100,
+    "switch": true,
+    "info": [],
+    "lightsOn": 1,
+    "loadsOn": 1,
+    "windowsOpen": 1,
+    "doorsOpen": 0,
+    "presence": 0,
+    "power": 245,
+    "errorState": 0,
+    "shadsClosed": 0
+   },
+   {
+    "roomId": 502,
+    "name": "<room502>",
+    "icon": 308,
+    "order": 2,
+    "devices": [
+     301,
+     303,
+     321,
+     323
+    ],
+    "dimmable": true,
+    "dimmvalue": 30,
+    "switch": true,
+    "info": [],
+    "lightsOn": 2,
+    "loadsOn": 0,
+    "windowsOpen": 0,
+    "doorsOpen": 1,
+    "presence": 0,
+    "power": 170,
+    "errorState": 0,
+    "shadsClosed": 2
+   },
+   {
+    "roomId": 503,
+    "name": "<room503>",
+    "icon": 267,
+    "order": 3,
+    "devices": [
+     318
+    ],
+    "dimmable": true,
+    "dimmvalue": 0,
+    "switch": false,
+    "info": [],
+    "lightsOn": 0,
+    "loadsOn": 0,
+    "windowsOpen": 0,
+    "doorsOpen": 0,
+    "power": 0
+   },
+   {
+    "roomId": 504,
+    "name": "<room504>",
+    "icon": 268,
+    "order": 4,
+    "devices": [
+     319
+    ],
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "info": [],
+    "lightsOn": 0,
+    "loadsOn": 0,
+    "windowsOpen": 0,
+    "doorsOpen": 0,
+    "power": 0
+   },
+   {
+    "roomId": 505,
+    "name": "<room505>",
+    "icon": 264,
+    "order": 5,
+    "devices": [],
+    "dimmable": false,
+    "dimmvalue": 0,
+    "switch": false,
+    "info": [],
+    "lightsOn": 0,
+    "loadsOn": 0,
+    "windowsOpen": 0,
+    "doorsOpen": 0,
+    "power": 0
+   }
+  ],
+  "scenes": [
+   {
+    "sceneId": 601,
+    "name": "<scene601>",
+    "icon": 57,
+    "order": 1,
+    "show": false,
+    "devices": [
+     [
+      301,
+      20,
+      0
+     ],
+     [
+      302,
+      30,
+      10
+     ]
+    ],
+    "heatingModes": [
+     {
+      "roomId": 502,
+      "state": 1,
+      "mode": 1
+     }
+    ],
+    "pnType": 0,
+    "pnId": 0,
+    "scActive": true,
+    "scAutoActive": false,
+    "scCheckTrigger": true,
+    "scConditionTrigger": true,
+    "scOperation": 0,
+    "scConditions": [
+     921,
+     922
+    ],
+    "scConditionsState": true
+   },
+   {
+    "sceneId": 602,
+    "name": "<scene602>",
+    "icon": 59,
+    "order": 2,
+    "show": false,
+    "devices": [
+     [
+      321,
+      147,
+      0
+     ],
+     [
+      322,
+      1,
+      0
+     ]
+    ],
+    "heatingModes": [],
+    "translate": true
+   },
+   {
+    "sceneId": 603,
+    "name": "<scene603>",
+    "icon": 197,
+    "order": 3,
+    "show": false,
+    "devices": [],
+    "heatingModes": []
+   },
+   {
+    "sceneId": 604,
+    "name": "<scene604>",
+    "icon": 180,
+    "order": 4,
+    "show": false,
+    "devices": [],
+    "heatingModes": []
+   },
+   {
+    "sceneId": 605,
+    "name": "<scene605>",
+    "icon": 111,
+    "order": 5,
+    "show": true,
+    "devices": [
+     {
+      "deviceId": 301,
+      "value": 5
+     },
+     {
+      "deviceId": 302,
+      "value": 5
+     },
+     {
+      "deviceId": 303,
+      "value": 25
+     },
+     {
+      "deviceId": 304,
+      "value": 5
+     }
+    ],
+    "heatingModes": []
+   },
+   {
+    "sceneId": 606,
+    "name": "<scene606>",
+    "icon": 115,
+    "order": 6,
+    "show": true,
+    "devices": [
+     {
+      "deviceId": 301,
+      "value": 100
+     },
+     {
+      "deviceId": 302,
+      "value": 100
+     },
+     {
+      "deviceId": 303,
+      "value": 100
+     },
+     {
+      "deviceId": 304,
+      "value": 100
+     }
+    ],
+    "heatingModes": []
+   },
+   {
+    "sceneId": 607,
+    "name": "<scene607>",
+    "icon": 201,
+    "order": 7,
+    "show": true,
+    "devices": [
+     {
+      "deviceId": 301,
+      "value": 0
+     },
+     {
+      "deviceId": 302,
+      "value": 0
+     },
+     {
+      "deviceId": 303,
+      "value": 15
+     },
+     {
+      "deviceId": 304,
+      "value": 0
+     }
+    ],
+    "heatingModes": []
+   },
+   {
+    "sceneId": 608,
+    "name": "<scene608>",
+    "icon": 181,
+    "order": 8,
+    "show": true,
+    "devices": [
+     {
+      "deviceId": 301,
+      "value": 100
+     },
+     {
+      "deviceId": 302,
+      "value": 0
+     },
+     {
+      "deviceId": 303,
+      "value": 0
+     },
+     {
+      "deviceId": 304,
+      "value": 100
+     }
+    ],
+    "heatingModes": []
+   }
+  ],
+  "timer": [
+   {
+    "timerId": 701,
+    "controlId": [
+     501,
+     505
+    ],
+    "name": "1300",
+    "active": true,
+    "type": 1,
+    "time": "7:21:00",
+    "weekdays": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     1,
+     1
+    ],
+    "state": 0,
+    "shControlId": [],
+    "shState": 0
+   },
+   {
+    "timerId": 702,
+    "controlId": [
+     318
+    ],
+    "name": "1301",
+    "active": true,
+    "type": 1,
+    "time": "19:11:00",
+    "weekdays": [
+     0,
+     0,
+     0,
+     0,
+     0,
+     1,
+     1
+    ],
+    "state": 1,
+    "shControlId": [
+     322,
+     323
+    ],
+    "shState": 0
+   },
+   {
+    "timerId": 703,
+    "controlId": [],
+    "name": "<timer703>",
+    "active": true,
+    "type": 0,
+    "time": "23:00:00",
+    "weekdays": [
+     1,
+     1,
+     1,
+     1,
+     1,
+     0,
+     0
+    ],
+    "state": 0,
+    "shControlId": [
+     502
+    ],
+    "shState": 0
+   }
+  ],
+  "heatingPrograms": [
+   {
+    "programId": 801,
+    "protected": 0,
+    "name": "<heatingProgram801>",
+    "schedule": [
+     {
+      "day": 1,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 2,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 3,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 4,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 5,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 900
+       },
+       {
+        "mode": 3,
+        "start": 1020
+       }
+      ]
+     },
+     {
+      "day": 6,
+      "periods": [
+       {
+        "mode": 1,
+        "start": 60
+       },
+       {
+        "mode": 2,
+        "start": 480
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       }
+      ]
+     },
+     {
+      "day": 7,
+      "periods": [
+       {
+        "mode": 1,
+        "start": 60
+       },
+       {
+        "mode": 2,
+        "start": 510
+       },
+       {
+        "mode": 1,
+        "start": 570
+       },
+       {
+        "mode": 3,
+        "start": 810
+       },
+       {
+        "mode": 1,
+        "start": 1320
+       }
+      ]
+     }
+    ],
+    "translate": true
+   },
+   {
+    "programId": 802,
+    "protected": 1,
+    "name": "<heatingProgram802>",
+    "schedule": [
+     {
+      "day": 1,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 2,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 3,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 4,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 5,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 6,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 7,
+      "periods": [
+       {
+        "mode": 2,
+        "start": 1020
+       },
+       {
+        "mode": 3,
+        "start": 1140
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "roomHeating": [
+   {
+    "roomId": 501,
+    "temperatureOnly": false,
+    "ClimateConfig": 0,
+    "state": 1,
+    "currentMode": 2,
+    "currentValve": 0,
+    "setpoint": 15,
+    "programId": 0,
+    "regulation": 0,
+    "modes": [
+     {
+      "mode": 1,
+      "value": 10,
+      "valueCool": 35
+     },
+     {
+      "mode": 2,
+      "value": 18,
+      "valueCool": 29
+     },
+     {
+      "mode": 3,
+      "value": 22,
+      "valueCool": 26
+     }
+    ],
+    "sumActuatorId": 0,
+    "roomSensorId": 407,
+    "floorSensorId": 408,
+    "floorMin": 8,
+    "floorMax": 38,
+    "display": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "advRegulation": true,
+    "sumCoolingId": 0,
+    "modeSensor": 0,
+    "modeSwitchHeating": 325,
+    "modeSwitchCooling": 0,
+    "temp": 21.5,
+    "humidity": 47,
+    "power": 220,
+    "frostDanger": 0,
+    "heatDanger": 1,
+    "windoorsOpen": 0,
+    "climateInfoId": 0,
+    "tempAlt": 25.3,
+    "eSaving": 0,
+    "monitorPower": 1,
+    "controlPower": 1
+   },
+   {
+    "roomId": 502,
+    "temperatureOnly": false,
+    "ClimateConfig": 0,
+    "state": 1,
+    "currentMode": 1,
+    "currentValve": 20,
+    "setpoint": 24,
+    "programId": 802,
+    "regulation": 2,
+    "modes": [
+     {
+      "mode": 1,
+      "value": 15,
+      "valueCool": 35
+     },
+     {
+      "mode": 2,
+      "value": 21.5,
+      "valueCool": 29
+     },
+     {
+      "mode": 3,
+      "value": 24,
+      "valueCool": 26
+     }
+    ],
+    "sumActuatorId": 0,
+    "roomSensorId": 0,
+    "floorSensorId": 0,
+    "floorMin": 10,
+    "floorMax": 27,
+    "display": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "advRegulation": false,
+    "sumCoolingId": 0,
+    "modeSensor": 0,
+    "modeSwitchHeating": 325,
+    "modeSwitchCooling": 0,
+    "temp": 23.2,
+    "humidity": 55.5,
+    "power": 150,
+    "frostDanger": 0,
+    "heatDanger": 0,
+    "windoorsOpen": 1,
+    "climateInfoId": 0,
+    "eSaving": 0,
+    "monitorPower": 1,
+    "controlPower": 0
+   },
+   {
+    "roomId": 503,
+    "temperatureOnly": true,
+    "ClimateConfig": 0,
+    "state": 0,
+    "currentMode": 0,
+    "currentValve": 0,
+    "setpoint": 25,
+    "programId": 801,
+    "regulation": 1,
+    "modes": [
+     {
+      "mode": 1,
+      "value": 15,
+      "valueCool": 35
+     },
+     {
+      "mode": 2,
+      "value": 21.5,
+      "valueCool": 29
+     },
+     {
+      "mode": 3,
+      "value": 24,
+      "valueCool": 26
+     }
+    ],
+    "sumActuatorId": 0,
+    "roomSensorId": 0,
+    "floorSensorId": 0,
+    "floorMin": 0,
+    "floorMax": 0,
+    "display": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "advRegulation": false,
+    "sumCoolingId": 0,
+    "modeSensor": 0,
+    "modeSwitchHeating": 0,
+    "modeSwitchCooling": 0,
+    "temp": 23.2,
+    "humidity": 55.5,
+    "power": 0,
+    "frostDanger": 0,
+    "heatDanger": 0,
+    "monitorPower": 1,
+    "controlPower": 0
+   },
+   {
+    "roomId": 504,
+    "temperatureOnly": true,
+    "ClimateConfig": 0,
+    "state": 0,
+    "currentMode": 0,
+    "currentValve": 0,
+    "setpoint": 25,
+    "programId": 801,
+    "regulation": 1,
+    "modes": [
+     {
+      "mode": 1,
+      "value": 15,
+      "valueCool": 35
+     },
+     {
+      "mode": 2,
+      "value": 21.5,
+      "valueCool": 29
+     },
+     {
+      "mode": 3,
+      "value": 24,
+      "valueCool": 26
+     }
+    ],
+    "sumActuatorId": 0,
+    "roomSensorId": 0,
+    "floorSensorId": 0,
+    "floorMin": 0,
+    "floorMax": 0,
+    "display": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "advRegulation": false,
+    "sumCoolingId": 0,
+    "modeSensor": 0,
+    "modeSwitchHeating": 0,
+    "modeSwitchCooling": 0,
+    "temp": 23.2,
+    "humidity": 55.5,
+    "power": 0,
+    "frostDanger": 0,
+    "heatDanger": 0,
+    "monitorPower": 1,
+    "controlPower": 0
+   },
+   {
+    "roomId": 505,
+    "temperatureOnly": true,
+    "ClimateConfig": 0,
+    "state": 0,
+    "currentMode": 0,
+    "currentValve": 0,
+    "setpoint": 25,
+    "programId": 801,
+    "regulation": 1,
+    "modes": [
+     {
+      "mode": 1,
+      "value": 15,
+      "valueCool": 35
+     },
+     {
+      "mode": 2,
+      "value": 21.5,
+      "valueCool": 29
+     },
+     {
+      "mode": 3,
+      "value": 24,
+      "valueCool": 26
+     }
+    ],
+    "sumActuatorId": 0,
+    "roomSensorId": 0,
+    "floorSensorId": 0,
+    "floorMin": 0,
+    "floorMax": 0,
+    "display": [
+     1,
+     1,
+     1,
+     1
+    ],
+    "advRegulation": false,
+    "sumCoolingId": 0,
+    "modeSensor": 0,
+    "modeSwitchHeating": 0,
+    "modeSwitchCooling": 0,
+    "temp": 23.2,
+    "humidity": 55.5,
+    "power": 0,
+    "frostDanger": 0,
+    "heatDanger": 0,
+    "monitorPower": 1,
+    "controlPower": 0
+   }
+  ],
+  "integrations": [
+   {
+    "type": 0,
+    "active": true
+   },
+   {
+    "type": 1,
+    "active": true,
+    "auth_url": "https://yalehome.co.uk/",
+    "account": "xcomfort.bridge@eaton.com"
+   },
+   {
+    "type": 2,
+    "active": true
+   },
+   {
+    "type": 3,
+    "active": true
+   }
+  ],
+  "locks": [
+   {
+    "lockId": 901,
+    "name": "<lock901>",
+    "active": true,
+    "lockState": 1,
+    "doorState": 0,
+    "info": []
+   },
+   {
+    "lockId": 902,
+    "name": "<lock902>",
+    "active": true,
+    "lockState": 2,
+    "doorState": 2,
+    "info": []
+   }
+  ],
+  "users": [
+   {
+    "userId": 1000,
+    "userName": "<user1000>",
+    "email": "admin@xcomfort.com",
+    "type": 3,
+    "rooms": [],
+    "scenes": [],
+    "locks": [],
+    "controlLights": true,
+    "controlHeating": true,
+    "controlShading": true,
+    "controlLoads": true,
+    "sendNotifications": true,
+    "dashboardControlOptions": 1,
+    "showCredentials": false,
+    "temporaryUser": false,
+    "controlEnergy": true
+   },
+   {
+    "userId": 1001,
+    "userName": "<user1001>",
+    "email": "admin@xcomfort.com",
+    "type": 2,
+    "rooms": [],
+    "scenes": [],
+    "locks": [],
+    "controlLights": true,
+    "controlHeating": false,
+    "controlShading": false,
+    "controlLoads": false,
+    "sendNotifications": true,
+    "dashboardControlOptions": 1,
+    "showCredentials": false,
+    "temporaryUser": false,
+    "controlEnergy": true
+   },
+   {
+    "userId": 1002,
+    "userName": "<user1002>",
+    "email": "user@xcomfort.com",
+    "password": "12345678",
+    "type": 1,
+    "rooms": [
+     501
+    ],
+    "scenes": [
+     601,
+     602,
+     603
+    ],
+    "locks": [],
+    "controlLights": true,
+    "controlHeating": true,
+    "controlShading": true,
+    "controlLoads": true,
+    "sendNotifications": true,
+    "dashboardControlOptions": 0,
+    "showCredentials": true,
+    "temporaryUser": false,
+    "locked": false,
+    "controlEnergy": true
+   }
+  ],
+  "pushNotes": [
+   {
+    "pnId": 961,
+    "pnTitle": "Custom Title",
+    "pnText": "Custom Text"
+   }
+  ],
+  "smartConditions": [
+   {
+    "conditionId": 921,
+    "type": 7,
+    "operation": 3,
+    "item1": 416,
+    "item2": 0,
+    "value2": 29,
+    "hysteresis": 5,
+    "minTime": 0,
+    "validity": 0
+   },
+   {
+    "conditionId": 922,
+    "type": 9,
+    "operation": 3,
+    "item1": 437,
+    "item2": 0,
+    "value2": 5000,
+    "hysteresis": 2000,
+    "minTime": 0,
+    "validity": 0
+   }
+  ],
+  "timePrograms": [
+   {
+    "programId": 941,
+    "name": "TimeProgram Test",
+    "schedule": [
+     {
+      "day": 1,
+      "type": 0,
+      "periods": [
+       {
+        "mode": 3,
+        "start": 1020
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 2,
+      "type": 0,
+      "periods": [
+       {
+        "mode": 3,
+        "start": 1020
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 3,
+      "type": 0,
+      "periods": [
+       {
+        "mode": 3,
+        "start": 1020
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 4,
+      "type": 0,
+      "periods": [
+       {
+        "mode": 3,
+        "start": 1020
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 5,
+      "type": 0,
+      "periods": [
+       {
+        "mode": 3,
+        "start": 1020
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 6,
+      "type": 0,
+      "periods": [
+       {
+        "mode": 3,
+        "start": 1020
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     },
+     {
+      "day": 7,
+      "type": 0,
+      "periods": [
+       {
+        "mode": 3,
+        "start": 1020
+       },
+       {
+        "mode": 1,
+        "start": 1380
+       }
+      ]
+     }
+    ]
+   }
+  ],
+  "clients": [
+   {
+    "clientId": 1,
+    "bridgeType": 1,
+    "name": "<clientBridge1>",
+    "useFixedIp": false,
+    "connectionState": 1,
+    "fwVersion": 330,
+    "fwBuild": 1,
+    "lanDelay": 24,
+    "ipAddress": "192.168.0.80",
+    "mdnsName": "m<clientBridge1>"
+   }
+  ],
+  "energy": {
+   "eMonitoring": {
+    "configured": true,
+    "viewSettings": [
+     {
+      "pos": 0,
+      "type": 0,
+      "time": 1
+     },
+     {
+      "pos": 1,
+      "type": 1,
+      "time": 10
+     },
+     {
+      "pos": 2,
+      "type": 2,
+      "time": 1
+     }
+    ]
+   },
+   "eTariff": {
+    "configured": true,
+    "tariffType": 1,
+    "country": "NO",
+    "zone": 1,
+    "interval": 60,
+    "currency": 2,
+    "markupPercentage": 0,
+    "markupFixed": 1500,
+    "tariffBase": 4990,
+    "limitLow": 70,
+    "limitHigh": 130
+   },
+   "eControl": {
+    "configured": true,
+    "mode": 1,
+    "prio": false
+   }
+  },
+  "meters": [
+   {
+    "meterId": 1100,
+    "meterType": 1,
+    "name": "TQ SU 100 - Home",
+    "ipAddress": "192.168.0.25",
+    "serialId": "4303030203",
+    "fwVersion": "2.2.2",
+    "usage": 0,
+    "connectionState": 1,
+    "power": 713
+   },
+   {
+    "meterId": 1101,
+    "meterType": 1,
+    "name": "TQ SU 100 - PV",
+    "ipAddress": "192.168.0.26",
+    "serialId": "4303030204",
+    "fwVersion": "2.2.2",
+    "usage": 3,
+    "connectionState": 1,
+    "power": -2430
+   }
+  ]
+ }
+}

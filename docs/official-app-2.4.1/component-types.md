@@ -7,8 +7,9 @@ pushbutton/switch), and 7703 is the analog (0–10 V) mode of the dimming actuat
 
 Device `devType` values: 100 switch, 101 dimmer, 102 shading, 200 motion, 202 switch/binary, 410 temp sensor,
 440 heating actuator, 441 heating valve, 442 multi heating actuator, 450 RC Touch, 451 temp+humidity, 460 router actuator,
-497 water guard, 499 water sensor, 510 weather station. The Homey constants also use 201/211/220/520; the official app defines
-none of those four.
+497 water guard, 499 water sensor, 510 weather station (the `un` enum). The fuller `wy` table adds the sensor-channel and I/O
+types: 200/201/202 switch, 210/211 pushbutton, 220/221 rocker, 300/301 analog out, 400/401 analog in, 420 humidity in,
+430 energy in, 498 water sensor. Homey's 201/211/220 are therefore valid; 520 is not defined by the app.
 
 Heating devTypes that report room temperature: `[410, 441, 450, 451]`.
 
