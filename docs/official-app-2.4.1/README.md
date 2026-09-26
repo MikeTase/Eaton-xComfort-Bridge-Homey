@@ -21,6 +21,8 @@ it can be picked up later.
   - [`enums.md`](enums.md): every protocol-relevant enum (message types, device/comp types, shading, climate, energy, …)
   - [`info-codes.md`](info-codes.md): all bridge info/error/event codes with texts and how the app renders them
   - [`component-types.md`](component-types.md): component type catalogue
+  - [`deep-dive-2.md`](deep-dive-2.md): second pass, covering the decrypted bridge firmware, handshake identity check,
+    float encoding, door/window modes, FAQ facts, the cloud relay protocol, and program/scene/condition payloads
 
 Confidence labels: **[verified]** means read directly from the official code. **[inferred]** means deduced from usage,
 UI texts or demo data. **[check on hardware]** means it needs confirmation against a real bridge.
@@ -164,6 +166,16 @@ split on spaces after removing commas. The device's `bType` (1/2/3) selects the 
   460 `ACTUATOR_ROUTER`, which Homey lacks. Homey's 201/211/220/520 do not exist in the official `devType` enum.
 - The bridge also accepts `HOME_DATA` (242) *with fields* as a **settings write**: `routingEnabled`,
   `climateHRVLimitOn/Off`, `homeScenes`. Only ever send it with an empty payload as a request.
+
+### 1.9 Found in the second pass (details in [`deep-dive-2.md`](deep-dive-2.md) §A)
+
+- **Bridge identity is not verified.** Homey skips the `device_signature` check against Eaton's root key (`lib/connection/Authenticator.ts:161`).
+- **Whole-number floats.** The official app sends every float field (`setpoint` etc.) with a fraction (`21` → `21.001`);
+  Homey sends `21`.
+- **Door/window state depends on the sensor mode.** The meaning of `curstate` flips with modes 1308–1311, but
+  `drivers/door_window_sensor/device.ts:34` hard-codes it; info codes 1121–1124 are unambiguous.
+- **The bridge resets the link on an unallowed `type_int`** and drops messages sent while its single receive buffer is busy.
+- **Connection slots are limited** (4 apps). Only **master** bridges accept app connections.
 
 ---
 
