@@ -299,7 +299,62 @@ const ROOM_NUMBER_STATE_KEYS = [
   'doorsOpen',
   'shadsClosed',
   'presence',
+  'heatingPower',
+  'tempAlt',
+  'regulation',
+  'floorMin',
+  'floorMax',
+  'climateInfoId',
+  'eSaving',
 ] as const;
+
+/** The bridge reports -100 (or lower) for a temperature without a sensor. */
+const NO_TEMPERATURE = -100;
+
+type RoomItemKind = 'state' | 'climate' | 'auto';
+
+/**
+ * Normalize a room record to Homey's field names, as the official app's
+ * reducers do:
+ * - `power` is the room total in room-state items (293, 310 items with
+ *   `lightsOn`, 300 `rooms[]`) but the climate power in climate items (363,
+ *   310 items with `mode`, 300 `roomHeating[]`); the latter becomes
+ *   `heatingPower`.
+ * - 300 `roomHeating[]` calls the heating demand `currentValve`, live
+ *   updates call it `valve`.
+ * - Temperatures of -100 or lower mean "no sensor" and are dropped.
+ */
+export function normalizeRoomRecord(
+  record: Record<string, unknown>,
+  kind: RoomItemKind = 'auto',
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...record };
+
+  if (typeof result.power === 'number') {
+    const isClimate = kind === 'climate'
+      || (kind === 'auto' && result.mode !== undefined);
+    const isState = kind === 'state'
+      || (kind === 'auto' && (result.lightsOn !== undefined || result.mode === undefined));
+    if (isClimate) {
+      result.heatingPower = result.power;
+    }
+    if (!isState) {
+      delete result.power;
+    }
+  }
+
+  if (result.valve === undefined && typeof result.currentValve === 'number') {
+    result.valve = result.currentValve;
+  }
+
+  for (const key of ['temp', 'tempAlt']) {
+    if (typeof result[key] === 'number' && (result[key] as number) <= NO_TEMPERATURE) {
+      delete result[key];
+    }
+  }
+
+  return result;
+}
 
 const ROOM_STATE_KEYS = [
   ...ROOM_NUMBER_STATE_KEYS,
@@ -949,7 +1004,7 @@ export class MessageHandler {
           return;
         }
 
-        const room = this.normalizeRoomPayload(roomPayload as Record<string, unknown>);
+        const room = this.normalizeRoomPayload(roomPayload as Record<string, unknown>, 'state');
         this.deviceStateManager.setRoom(room);
 
         const update = this.extractRoomUpdate(room);
@@ -967,7 +1022,7 @@ export class MessageHandler {
           return;
         }
 
-        const room = this.normalizeRoomPayload(roomPayload as Record<string, unknown>);
+        const room = this.normalizeRoomPayload(roomPayload as Record<string, unknown>, 'climate');
         this.deviceStateManager.setRoom(room);
 
         const update = this.extractRoomUpdate(room);
@@ -1064,7 +1119,10 @@ export class MessageHandler {
             }
             const roomUpdate = roomUpdates.get(roomId)!;
 
-            Object.assign(roomUpdate, this.extractRoomUpdate(item as unknown as Record<string, unknown>));
+            Object.assign(
+              roomUpdate,
+              this.extractRoomUpdate(normalizeRoomRecord(item as unknown as Record<string, unknown>)),
+            );
             roomUpdate.raw = {
               ...(roomUpdate.raw || {}),
               ...(item as Record<string, unknown>),
@@ -1223,10 +1281,10 @@ export class MessageHandler {
     }
   }
 
-  private normalizeRoomPayload(payload: Record<string, unknown>): XComfortRoom {
+  private normalizeRoomPayload(payload: Record<string, unknown>, kind: RoomItemKind): XComfortRoom {
     const roomId = String(payload.roomId ?? '');
     const room: XComfortRoom = {
-      ...payload,
+      ...normalizeRoomRecord(payload, kind),
       roomId,
       name: typeof payload.name === 'string' ? payload.name : `Room ${roomId}`,
       raw: payload,
@@ -1494,12 +1552,15 @@ export class MessageHandler {
             && typeof mode === 'object'
             && !Array.isArray(mode)
             && (mode as RoomModeSetpoint).mode !== undefined
-            && typeof (mode as RoomModeSetpoint).value === 'number';
+            && (typeof (mode as RoomModeSetpoint).value === 'number'
+              || typeof (mode as RoomModeSetpoint).valueCool === 'number');
         })
-        .map((mode) => ({
-          mode: mode.mode,
-          value: mode.value,
-        }));
+        .map((mode) => {
+          const entry: RoomModeSetpoint = { mode: mode.mode };
+          if (typeof mode.value === 'number') entry.value = mode.value;
+          if (typeof mode.valueCool === 'number') entry.valueCool = mode.valueCool;
+          return entry;
+        });
     }
     if (room.raw) {
       update.raw = room.raw as Record<string, unknown>;

@@ -123,8 +123,22 @@ module.exports = class BridgeDiagnosticsDevice extends BaseDevice {
   private async updateFromStatus(status: BridgeStatus): Promise<void> {
     const toBool = (value?: number) => (value !== undefined ? value > 0 : undefined);
 
-    if (typeof status.tempOutside === 'number' && this.hasCapability('measure_temperature')) {
+    // -100 means "no outdoor sensor" (bridge factory default); the official
+    // app hides it.
+    if (
+      typeof status.tempOutside === 'number'
+      && status.tempOutside > -100
+      && this.hasCapability('measure_temperature')
+    ) {
       this.setCapabilityValue('measure_temperature', status.tempOutside).catch(this.error);
+    } else if (
+      typeof status.tempOutside === 'number'
+      && this.hasCapability('measure_temperature')
+      && typeof this.getCapabilityValue('measure_temperature') === 'number'
+      && this.getCapabilityValue('measure_temperature') <= -100
+    ) {
+      // Clear a "-100 °C" stored by earlier versions.
+      this.setCapabilityValue('measure_temperature', null).catch(this.error);
     }
     if (typeof status.power === 'number' && this.hasCapability('measure_power')) {
       await this.setCapabilityValue('measure_power', status.power).catch(this.error);

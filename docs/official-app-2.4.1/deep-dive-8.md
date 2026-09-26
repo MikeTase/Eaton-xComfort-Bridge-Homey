@@ -7,7 +7,12 @@ went back to the one area where the official app holds much more logic than Home
 Each finding was checked against the Homey code. The ones marked *(runtime-verified)* were reproduced by feeding the
 official demo data (`samples/demo-home.json`) through Homey's own `MessageHandler`.
 
-**No app code was changed.** The "Fix" lines are recommendations.
+**No app code was changed in this pass.** The "Fix" lines were recommendations.
+
+> **Status (follow-up change):** §1.1–§1.7 are implemented: `normalizeRoomRecord` in `lib/messaging/MessageHandler.ts`
+> (power split, `currentValve`, `-100`), thermostat floor/cooling/effect/defaults/`climateInfoId`/`eSaving`, and the bridge
+> diagnostics outdoor temperature. Covered by `test/officialProtocol.test.js` and `test/thermostat.test.js`. §1.8
+> (`roomSupportsCooling` being more permissive) was left as is.
 
 ---
 

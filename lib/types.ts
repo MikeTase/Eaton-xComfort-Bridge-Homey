@@ -165,7 +165,10 @@ export interface XComfortComponent {
  */
 export interface RoomModeSetpoint {
   mode: number | ClimateMode;
-  value: number;
+  /** Preset setpoint while heating. */
+  value?: number;
+  /** Preset setpoint while cooling. */
+  valueCool?: number;
 }
 
 /**
@@ -325,6 +328,21 @@ export interface RoomStateUpdate {
   shadsClosed?: number;
   /** Presence detected in the room (> 0). */
   presence?: number;
+  /** Power of the room's climate function (W); `power` is the room total. */
+  heatingPower?: number;
+  /**
+   * Second room-climate temperature: the floor temperature with room
+   * regulation (0), the room temperature with floor regulation (1).
+   */
+  tempAlt?: number;
+  /** Climate regulation: 0 room temp, 1 floor temp, 2 effect (%), 3 room + floor limits. */
+  regulation?: number;
+  floorMin?: number;
+  floorMax?: number;
+  /** 1 mode set externally, 2 external mode sensor unknown, 3 sum actuator used for heating. */
+  climateInfoId?: number;
+  /** Energy control is limiting the room's heating. */
+  eSaving?: number;
   currentMode?: number | ClimateMode;
   mode?: number | ClimateMode;
   state?: number | ClimateState;

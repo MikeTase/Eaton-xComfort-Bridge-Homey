@@ -1459,6 +1459,21 @@
       "setable": false,
       "uiComponent": "sensor"
     },
+    "xcomfort_energy_control_active": {
+      "type": "boolean",
+      "title": {
+        "en": "Limited by energy control",
+        "nl": "Beperkt door energiebeheer"
+      },
+      "desc": {
+        "en": "Whether the bridge's energy control is currently limiting the heating of this room",
+        "nl": "Of het energiebeheer van de bridge de verwarming van deze kamer nu beperkt"
+      },
+      "insights": true,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
     "xcomfort_energy_today": {
       "type": "number",
       "title": {

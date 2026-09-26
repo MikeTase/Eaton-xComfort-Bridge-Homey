@@ -15,6 +15,12 @@ Protocol fixes based on the analysis of the official Eaton xComfort Bridge app 2
 - Switching/dimming actuators no longer read the bridge's `curstate` as on/off; only `switch` is. The official app uses an actuator's `curstate` 1 to lock its controls, so a light could previously show "on" while it was off.
 - Changing a thermostat preset no longer overwrites the preset's stored temperature. It now sends one command without a setpoint, like the official app, so the bridge uses the temperature configured for that preset. A room in cooling stays in cooling (manual) instead of being switched to heating.
 - Weather-station brightness is read with the bridge's thousands separators ("12,500" was shown as 12.5 lux) and uses the sensor (left/middle/right) selected as main brightness in the official app.
+- Room power is no longer mixed up: the bridge reports a room's total power and its heating power separately, and Homey stored both in one value, so room power jumped between the two and the room's kWh total was wrong. Room status now shows the room total; thermostats use the heating power.
+- Heating demand is available right after startup (the initial bridge data calls it `currentValve`).
+- Thermostats show the floor temperature and floor min/max limits from the bridge's real fields (`tempAlt`, `floorMin`, `floorMax`); they were never filled before. With floor regulation, the room and floor temperatures are no longer swapped.
+- Temperatures of -100 (the bridge's "no sensor" value) are ignored, e.g. the outdoor temperature on a bridge without an outdoor sensor no longer shows -100 °C; a stored -100 °C is cleared.
+- Rooms in cooling use the cooling preset temperatures and cooling setpoint ranges (e.g. cooling protection 35 °C was clamped to 20 °C). Effect-regulated rooms accept 0–100 % setpoints in steps of 5. Default preset temperatures follow the official app (frost protection 10 °C).
+- "External climate control" follows the bridge's live indicator (mode set by an external sensor/switch); a configured cooling switch is no longer hidden by an unset heating switch.
 - Motion sensors that only report motion through their component (official demo: xComfort motion sensor) now update `alarm_motion`, and motion/door-window component updates are passed to the sensor devices.
 
 ### Improvements
@@ -28,6 +34,7 @@ Protocol fixes based on the analysis of the official Eaton xComfort Bridge app 2
 - Blinds get step up/down buttons (`windowcoverings_tilt_up`/`_down`) when they have slats or their control option includes steps, using the official step commands. On blinds without slats the buttons are labelled "Step up"/"Step down".
 - Room status devices show the number of loads on, the number of closed shades and room presence (`alarm_motion`).
 - New Flow action "Mute water guard alarm" silences the siren of an active leak alarm on an xComfort water guard.
+- Thermostats show "Limited by energy control" when the bridge's energy control is reducing the room's heating.
 
 ## 1.7.5 - 2026-06-14
 

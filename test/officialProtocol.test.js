@@ -493,3 +493,72 @@ test('water guard mute uses SET_DEVICE_ALARM_STATE (356) state 3', async () => {
   assert.deepStrictEqual(sent[0].payload, { deviceId: 411, state: 3 });
   bridge.cleanup();
 });
+
+// --- Room climate model (eighth pass) --------------------------------------
+
+const { normalizeRoomRecord } = require('../.homeybuild/lib/messaging/MessageHandler');
+
+test('room total power and heating power are kept apart (demo room 501)', async () => {
+  const demo = require('../docs/official-app-2.4.1/samples/demo-home.json').homeData;
+  const { stateManager, handler } = setup();
+  const updates = [];
+  stateManager.addRoomListener('501', (_id, update) => updates.push(update));
+
+  await handler.processMessage({
+    type_int: MESSAGE_TYPES.SET_ALL_DATA,
+    payload: { rooms: demo.rooms, roomHeating: demo.roomHeating, devices: [] },
+  });
+  const room = stateManager.getRoom('501');
+  assert.strictEqual(room.power, 245, 'rooms[] total, not overwritten by roomHeating[]');
+  assert.strictEqual(room.heatingPower, 220);
+  assert.strictEqual(room.valve, 0, 'currentValve → valve');
+  assert.strictEqual(stateManager.getRoom('502').valve, 20);
+  assert.strictEqual(room.tempAlt, 25.3);
+  assert.strictEqual(room.floorMin, 8);
+
+  await handler.processMessage({
+    type_int: MESSAGE_TYPES.SET_ROOM_STATE,
+    payload: { roomId: 501, lightsOn: 1, power: 250 },
+  });
+  await handler.processMessage({
+    type_int: MESSAGE_TYPES.SET_ROOM_HEATING_STATE,
+    payload: { roomId: 501, mode: 2, setpoint: 15, valve: 30, temp: 21.5, power: 225 },
+  });
+  await sleep(250);
+
+  assert.strictEqual(stateManager.getRoom('501').power, 250, 'heating update does not touch the room total');
+  assert.strictEqual(stateManager.getRoom('501').heatingPower, 225);
+  assert.strictEqual(stateManager.getRoom('501').valve, 30);
+  const totals = updates.map((u) => u.power).filter((p) => p !== undefined);
+  assert.deepStrictEqual(totals, [245, 250], 'room total never jumps to the heating power');
+  handler.cleanup();
+});
+
+test('310 room items: power follows lightsOn (total) or mode (heating)', () => {
+  assert.deepStrictEqual(normalizeRoomRecord({ roomId: 1, lightsOn: 2, power: 90 }), { roomId: 1, lightsOn: 2, power: 90 });
+  assert.deepStrictEqual(normalizeRoomRecord({ roomId: 1, mode: 3, power: 60 }), { roomId: 1, mode: 3, heatingPower: 60 });
+  assert.deepStrictEqual(
+    normalizeRoomRecord({ roomId: 1, lightsOn: 0, mode: 3, power: 60 }),
+    { roomId: 1, lightsOn: 0, mode: 3, power: 60, heatingPower: 60 },
+  );
+  assert.deepStrictEqual(normalizeRoomRecord({ roomId: 1, currentMode: 2, power: 40 }, 'climate'), {
+    roomId: 1, currentMode: 2, heatingPower: 40,
+  });
+});
+
+test('temperatures of -100 (no sensor) are dropped', async () => {
+  assert.deepStrictEqual(normalizeRoomRecord({ roomId: 1, temp: -100, tempAlt: -100, humidity: 40 }), { roomId: 1, humidity: 40 });
+
+  const { stateManager, handler } = setup();
+  stateManager.setRoom({ roomId: '503', name: 'Hall', temp: 20 });
+  const updates = [];
+  stateManager.addRoomListener('503', (_id, update) => updates.push(update));
+  await handler.processMessage({
+    type_int: MESSAGE_TYPES.SET_ROOM_HEATING_STATE,
+    payload: { roomId: 503, mode: 1, setpoint: 10, valve: 0, temp: -100, power: 0 },
+  });
+  await sleep(250);
+  assert.strictEqual(updates[0].temp, undefined);
+  assert.strictEqual(stateManager.getRoom('503').temp, 20, 'stored value is not replaced by -100');
+  handler.cleanup();
+});

@@ -14,18 +14,48 @@ import {
   XComfortRoom,
 } from '../../lib/types';
 
-const DEFAULT_MODE_SETPOINTS: Record<number, number> = {
-  [ClimateMode.FrostProtection]: 8,
-  [ClimateMode.Eco]: 18,
-  [ClimateMode.Comfort]: 21,
+/**
+ * Default preset setpoints per climate regulation, as in the official app
+ * (used until the bridge reports the room's `modes`).
+ */
+const DEFAULT_MODE_SETPOINTS: Record<number, Record<number, number>> = {
+  // 0 room temperature (also used for regulation 3)
+  0: { [ClimateMode.FrostProtection]: 10, [ClimateMode.Eco]: 18, [ClimateMode.Comfort]: 21 },
+  // 1 floor temperature
+  1: { [ClimateMode.FrostProtection]: 15, [ClimateMode.Eco]: 22, [ClimateMode.Comfort]: 25 },
+  // 2 effect regulation (%)
+  2: { [ClimateMode.FrostProtection]: 5, [ClimateMode.Eco]: 50, [ClimateMode.Comfort]: 70 },
 };
 
-const MODE_SETPOINT_RANGES: Record<number, { min: number; max: number }> = {
-  [ClimateMode.Unknown]: { min: 5, max: 40 },
-  [ClimateMode.FrostProtection]: { min: 5, max: 20 },
-  [ClimateMode.Eco]: { min: 10, max: 30 },
-  [ClimateMode.Comfort]: { min: 18, max: 40 },
+const DEFAULT_COOLING_SETPOINTS: Record<number, number> = {
+  [ClimateMode.FrostProtection]: 35,
+  [ClimateMode.Eco]: 29,
+  [ClimateMode.Comfort]: 26,
 };
+
+type SetpointRange = { min: number; max: number; step: number };
+
+/** Heating setpoint ranges (official `m{regulation}{mode}` for °C regulations). */
+const MODE_SETPOINT_RANGES: Record<number, SetpointRange> = {
+  [ClimateMode.Unknown]: { min: 5, max: 40, step: 0.5 },
+  [ClimateMode.FrostProtection]: { min: 5, max: 20, step: 0.5 },
+  [ClimateMode.Eco]: { min: 10, max: 30, step: 0.5 },
+  [ClimateMode.Comfort]: { min: 18, max: 40, step: 0.5 },
+};
+
+/** Cooling setpoint ranges (official `m{mode}Cool`). */
+const COOLING_SETPOINT_RANGES: Record<number, SetpointRange> = {
+  [ClimateMode.Unknown]: { min: 0, max: 50, step: 0.5 },
+  [ClimateMode.FrostProtection]: { min: 20, max: 50, step: 0.5 },
+  [ClimateMode.Eco]: { min: 10, max: 40, step: 0.5 },
+  [ClimateMode.Comfort]: { min: 0, max: 30, step: 0.5 },
+};
+
+/** Effect regulation (regulation 2): setpoints are percentages (official `m2{mode}`). */
+const EFFECT_SETPOINT_RANGE: SetpointRange = { min: 0, max: 100, step: 5 };
+
+const EFFECT_REGULATION = 2;
+const FLOOR_REGULATION = 1;
 
 type ThermostatModeCapability = 'auto' | 'heat' | 'cool' | 'off';
 type PresetCapabilityValue = 'frost' | 'eco' | 'comfort';
@@ -49,6 +79,9 @@ module.exports = class ThermostatDevice extends BaseDevice {
   private currentSetpoint: number = 20;
   private targetRangeKey: string | null = null;
   private modeSetpoints: Map<ClimateMode, number> = new Map();
+  private coolingModeSetpoints: Map<ClimateMode, number> = new Map();
+  /** Room climate regulation (0 room temp, 1 floor temp, 2 effect %, 3 room + floor limits). */
+  private regulation: number = 0;
   private linkedSensorId: string | null = null;
   private linkedSensorListener?: (deviceId: string, data: DeviceStateUpdate) => void;
   private linkedSensorTemperatureAvailable: boolean = false;
@@ -266,7 +299,14 @@ module.exports = class ThermostatDevice extends BaseDevice {
       temp: room.temp,
       humidity: room.humidity,
       power: room.power,
+      heatingPower: typeof room.heatingPower === 'number' ? room.heatingPower : undefined,
       valve: room.valve,
+      tempAlt: typeof room.tempAlt === 'number' ? room.tempAlt : undefined,
+      regulation: typeof room.regulation === 'number' ? room.regulation : undefined,
+      floorMin: typeof room.floorMin === 'number' ? room.floorMin : undefined,
+      floorMax: typeof room.floorMax === 'number' ? room.floorMax : undefined,
+      climateInfoId: typeof room.climateInfoId === 'number' ? room.climateInfoId : undefined,
+      eSaving: typeof room.eSaving === 'number' ? room.eSaving : undefined,
       currentMode: room.currentMode,
       mode: room.mode,
       state: room.state,
@@ -339,6 +379,11 @@ module.exports = class ThermostatDevice extends BaseDevice {
       this.log(`Thermostat room update:`, effectiveData);
     }
 
+    const regulation = effectiveData.regulation ?? effectiveData.raw?.regulation;
+    if (typeof regulation === 'number') {
+      this.regulation = regulation;
+    }
+
     if (Array.isArray(effectiveData.modes)) {
       this.storeModeSetpoints(effectiveData.modes);
     }
@@ -366,8 +411,15 @@ module.exports = class ThermostatDevice extends BaseDevice {
       await this.updateCapability('target_temperature', this.currentSetpoint);
     }
 
-    if (typeof effectiveData.temp === 'number' && !this.linkedSensorTemperatureAvailable) {
-      await this.updateCapability('measure_temperature', effectiveData.temp);
+    const roomTemperature = this.getRoomTemperature(effectiveData);
+    if (typeof roomTemperature === 'number' && !this.linkedSensorTemperatureAvailable) {
+      await this.updateCapability('measure_temperature', roomTemperature);
+    } else if (
+      typeof this.getCapabilityValue('measure_temperature') === 'number'
+      && this.getCapabilityValue('measure_temperature') <= -100
+    ) {
+      // Clear a "-100 °C" (no sensor) stored by earlier versions.
+      await this.setCapabilityValue('measure_temperature', null).catch(this.error);
     }
 
     if (typeof effectiveData.humidity === 'number' && !this.linkedSensorHumidityAvailable) {
@@ -382,7 +434,27 @@ module.exports = class ThermostatDevice extends BaseDevice {
       await this.applyValvePosition(effectiveData.valve);
     }
 
-    await this.syncPowerMeasurement(typeof data.power === 'number' ? data.power : undefined);
+    // Only the climate power (363 / roomHeating); the room's `power` is the
+    // total of all loads in the room.
+    await this.syncPowerMeasurement(typeof data.heatingPower === 'number' ? data.heatingPower : undefined);
+  }
+
+  /**
+   * With floor regulation the room's `temp` is the floor sensor and
+   * `tempAlt` the room sensor (official climate header).
+   */
+  private getRoomTemperature(data: RoomStateUpdate): number | undefined {
+    if (this.regulation === FLOOR_REGULATION && typeof data.tempAlt === 'number') {
+      return data.tempAlt;
+    }
+    return typeof data.temp === 'number' ? data.temp : undefined;
+  }
+
+  private getFloorTemperature(data: RoomStateUpdate): number | undefined {
+    if (this.regulation === FLOOR_REGULATION) {
+      return typeof data.temp === 'number' ? data.temp : undefined;
+    }
+    return typeof data.tempAlt === 'number' ? data.tempAlt : undefined;
   }
 
   private registerCapabilityListeners() {
@@ -401,7 +473,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
       const setpoint = this.clampSetpoint(value, mode);
 
       await this.bridge.setRoomHeatingState(roomId, mode, state, setpoint);
-      this.modeSetpoints.set(mode, setpoint);
+      this.rememberModeSetpoint(mode, setpoint);
       this.currentSetpoint = setpoint;
       await this.updateCapability('target_temperature', setpoint);
     });
@@ -480,98 +552,58 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
 
     const raw = data.raw || {};
-    const floorTemperature = this.getFirstNumericField(raw, [
-      'floorTemp',
-      'floorTemperature',
-      'floorSensorTemp',
-      'floorSensorTemperature',
-      'tempFloor',
-    ]);
+    const floorTemperature = this.getFloorTemperature(data);
     if (floorTemperature !== undefined) {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.FLOOR_TEMPERATURE);
       await this.updateCapability(XCOMFORT_CAPABILITIES.FLOOR_TEMPERATURE, floorTemperature);
     }
 
-    const floorMinLimit = this.getFirstNumericField(raw, [
-      'floorMinLimit',
-      'floorSensorMinLimit',
-      'floorMinimumLimit',
-      'floorTempMin',
-      'minFloorTemp',
-    ]);
-    if (floorMinLimit !== undefined) {
+    // Floor limits only apply to rooms with a floor sensor.
+    const hasFloorSensor = this.regulation === FLOOR_REGULATION
+      || (typeof raw.floorSensorId === 'number' && raw.floorSensorId !== 0);
+    if (hasFloorSensor && typeof data.floorMin === 'number') {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.FLOOR_MIN_LIMIT);
-      await this.updateCapability(XCOMFORT_CAPABILITIES.FLOOR_MIN_LIMIT, floorMinLimit);
+      await this.updateCapability(XCOMFORT_CAPABILITIES.FLOOR_MIN_LIMIT, data.floorMin);
     }
-
-    const floorMaxLimit = this.getFirstNumericField(raw, [
-      'floorMaxLimit',
-      'floorSensorMaxLimit',
-      'floorMaximumLimit',
-      'floorTempMax',
-      'maxFloorTemp',
-    ]);
-    if (floorMaxLimit !== undefined) {
+    if (hasFloorSensor && typeof data.floorMax === 'number') {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.FLOOR_MAX_LIMIT);
-      await this.updateCapability(XCOMFORT_CAPABILITIES.FLOOR_MAX_LIMIT, floorMaxLimit);
+      await this.updateCapability(XCOMFORT_CAPABILITIES.FLOOR_MAX_LIMIT, data.floorMax);
     }
 
-    const externalClimateControl = this.getExternalClimateControlState(raw);
+    const externalClimateControl = this.getExternalClimateControlState(data, raw);
     if (externalClimateControl !== undefined) {
       await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.EXTERNAL_CLIMATE_CONTROL);
       await this.updateCapability(XCOMFORT_CAPABILITIES.EXTERNAL_CLIMATE_CONTROL, externalClimateControl);
     }
+
+    if (typeof data.eSaving === 'number' || typeof data.eSaving === 'boolean') {
+      await this.ensureDeviceCapability(XCOMFORT_CAPABILITIES.ENERGY_CONTROL_ACTIVE);
+      await this.updateCapability(XCOMFORT_CAPABILITIES.ENERGY_CONTROL_ACTIVE, Boolean(data.eSaving));
+    }
   }
 
-  private getFirstNumericField(source: Record<string, unknown>, keys: string[]): number | undefined {
-    for (const key of keys) {
-      const value = source[key];
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-      }
-      if (typeof value === 'string') {
-        const parsed = Number.parseFloat(value);
-        if (Number.isFinite(parsed)) {
-          return parsed;
-        }
-      }
+  /**
+   * Whether the room's heating/cooling mode is set externally. The official
+   * app shows "(External)" for `climateInfoId === 1`. Without that field, fall
+   * back to whether an external mode switch/sensor is configured.
+   */
+  private getExternalClimateControlState(data: RoomStateUpdate, raw: Record<string, unknown>): boolean | undefined {
+    const climateInfoId = data.climateInfoId ?? raw.climateInfoId;
+    if (typeof climateInfoId === 'number') {
+      return climateInfoId === 1;
     }
 
-    return undefined;
-  }
-
-  private getExternalClimateControlState(source: Record<string, unknown>): boolean | undefined {
-    const keys = [
-      'externalClimateControl',
-      'externalControl',
-      'externalMode',
-      'modeSwitchHeating',
-      'modeSwitchCooling',
-      'modeSwitchHeatingCooling',
-      'heatingCoolingSensorId',
-      'coolingHeatingSensorId',
-      'climateSensorId',
-    ];
-
-    const presentKey = keys.find((key) => source[key] !== undefined && source[key] !== null);
-    if (!presentKey) {
+    const keys = ['modeSwitchHeating', 'modeSwitchCooling', 'modeSensor'];
+    const present = keys.filter((key) => raw[key] !== undefined && raw[key] !== null);
+    if (present.length === 0) {
       return undefined;
     }
-
-    const value = source[presentKey];
-    if (typeof value === 'boolean') {
-      return value;
-    }
-    if (typeof value === 'number') {
-      return value !== 0;
-    }
-    if (typeof value === 'string') {
-      const normalized = value.trim().toLowerCase();
-      return normalized.length > 0 && normalized !== '0' && normalized !== 'false' && normalized !== 'none';
-    }
-
-    return true;
+    return present.some((key) => {
+      const value = raw[key];
+      return typeof value === 'number' ? value !== 0 : Boolean(value);
+    });
   }
+
 
   private storeModeSetpoints(modes: RoomModeSetpoint[]): void {
     modes.forEach((mode) => {
@@ -579,8 +611,34 @@ module.exports = class ThermostatDevice extends BaseDevice {
       if (normalizedMode === ClimateMode.Unknown) {
         return;
       }
-      this.modeSetpoints.set(normalizedMode, Math.round(mode.value * 100) / 100);
+      // Each preset has a heating (`value`) and a cooling (`valueCool`) setpoint.
+      if (typeof mode.value === 'number') {
+        this.modeSetpoints.set(normalizedMode, Math.round(mode.value * 100) / 100);
+      }
+      if (typeof mode.valueCool === 'number') {
+        this.coolingModeSetpoints.set(normalizedMode, Math.round(mode.valueCool * 100) / 100);
+      }
     });
+  }
+
+  private rememberModeSetpoint(mode: ClimateMode, setpoint: number): void {
+    (this.isCooling() ? this.coolingModeSetpoints : this.modeSetpoints).set(mode, setpoint);
+  }
+
+  private isCooling(): boolean {
+    return this.currentClimateState === ClimateState.CoolingAuto
+      || this.currentClimateState === ClimateState.CoolingManual;
+  }
+
+  /** Setpoint range like the official app: cooling, effect (%) or heating (°C). */
+  private getSetpointRange(mode: ClimateMode): SetpointRange {
+    if (this.isCooling()) {
+      return COOLING_SETPOINT_RANGES[mode] || COOLING_SETPOINT_RANGES[ClimateMode.Unknown];
+    }
+    if (this.regulation === EFFECT_REGULATION) {
+      return EFFECT_SETPOINT_RANGE;
+    }
+    return MODE_SETPOINT_RANGES[mode] || MODE_SETPOINT_RANGES[ClimateMode.Unknown];
   }
 
   private async applyPreset(mode: ClimateMode): Promise<void> {
@@ -599,6 +657,8 @@ module.exports = class ThermostatDevice extends BaseDevice {
       this.lastActiveClimateState = state;
     }
     await this.updateCapability('thermostat_mode', this.toThermostatModeCapability(state));
+    // Heating and cooling use different setpoint ranges.
+    await this.syncTargetTemperatureOptions(this.getEffectivePreset());
     await this.refreshEstimatedPowerMeasurement();
   }
 
@@ -618,8 +678,8 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   private async syncTargetTemperatureOptions(mode: ClimateMode): Promise<void> {
-    const range = MODE_SETPOINT_RANGES[mode] || MODE_SETPOINT_RANGES[ClimateMode.Unknown];
-    const nextKey = `${range.min}:${range.max}`;
+    const range = this.getSetpointRange(mode);
+    const nextKey = `${range.min}:${range.max}:${range.step}`;
     if (this.targetRangeKey === nextKey) {
       return;
     }
@@ -628,7 +688,7 @@ module.exports = class ThermostatDevice extends BaseDevice {
     await this.setCapabilityOptions('target_temperature', {
       min: range.min,
       max: range.max,
-      step: 0.5,
+      step: range.step,
     }).catch(this.error);
   }
 
@@ -658,13 +718,19 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   private getModeSetpoint(mode: ClimateMode): number {
+    if (this.isCooling()) {
+      return this.coolingModeSetpoints.get(mode)
+        ?? DEFAULT_COOLING_SETPOINTS[mode]
+        ?? this.currentSetpoint;
+    }
+    const defaults = DEFAULT_MODE_SETPOINTS[this.regulation] || DEFAULT_MODE_SETPOINTS[0];
     return this.modeSetpoints.get(mode)
-      ?? DEFAULT_MODE_SETPOINTS[mode]
+      ?? defaults[mode]
       ?? this.currentSetpoint;
   }
 
   private clampSetpoint(value: number, mode: ClimateMode): number {
-    const range = MODE_SETPOINT_RANGES[mode] || MODE_SETPOINT_RANGES[ClimateMode.Unknown];
+    const range = this.getSetpointRange(mode);
     // The bridge stores float fields with a +0.001 marker (e.g. 21.001, as the
     // official app sends them); round so Homey shows 21 instead of 21.001.
     const rounded = Math.round(value * 100) / 100;
@@ -962,7 +1028,19 @@ module.exports = class ThermostatDevice extends BaseDevice {
       temp: typeof data.temp === 'number' ? data.temp : room.temp,
       humidity: typeof data.humidity === 'number' ? data.humidity : room.humidity,
       power: typeof data.power === 'number' ? data.power : room.power,
+      heatingPower: typeof data.heatingPower === 'number'
+        ? data.heatingPower
+        : typeof room.heatingPower === 'number' ? room.heatingPower : undefined,
       valve: typeof data.valve === 'number' ? data.valve : room.valve,
+      tempAlt: typeof data.tempAlt === 'number'
+        ? data.tempAlt
+        : typeof room.tempAlt === 'number' ? room.tempAlt : undefined,
+      regulation: data.regulation ?? (typeof room.regulation === 'number' ? room.regulation : undefined),
+      floorMin: data.floorMin ?? (typeof room.floorMin === 'number' ? room.floorMin : undefined),
+      floorMax: data.floorMax ?? (typeof room.floorMax === 'number' ? room.floorMax : undefined),
+      climateInfoId: data.climateInfoId
+        ?? (typeof room.climateInfoId === 'number' ? room.climateInfoId : undefined),
+      eSaving: data.eSaving ?? (typeof room.eSaving === 'number' ? room.eSaving : undefined),
       currentMode: data.currentMode ?? room.currentMode,
       mode: data.mode ?? room.mode,
       state: data.state ?? room.state,

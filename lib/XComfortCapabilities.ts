@@ -20,4 +20,5 @@ export const XCOMFORT_CAPABILITIES = {
   FLOOR_MIN_LIMIT: 'xcomfort_floor_min_limit',
   FLOOR_MAX_LIMIT: 'xcomfort_floor_max_limit',
   EXTERNAL_CLIMATE_CONTROL: 'xcomfort_external_climate_control',
+  ENERGY_CONTROL_ACTIVE: 'xcomfort_energy_control_active',
 } as const;
