@@ -21,6 +21,9 @@ it can be picked up later.
   - [`enums.md`](enums.md): every protocol-relevant enum (message types, device/comp types, shading, climate, energy, …)
   - [`info-codes.md`](info-codes.md): all bridge info/error/event codes with texts and how the app renders them
   - [`component-types.md`](component-types.md): component type catalogue
+  - [`deep-dive-4.md`](deep-dive-4.md): fourth pass, covering auth-key rotation, `CONNECTION_DECLINED` error ids, info severity, room
+    grouping, firmware feature gates, input formats
+  - [`terminology.md`](terminology.md): Eaton's en/nl/de/no wording for Homey locales
   - [`deep-dive-3.md`](deep-dive-3.md): third pass, covering device-config and pairing payloads, the full devType table, notification ids,
     and the demo dataset saved as [`samples/demo-home.json`](samples/demo-home.json)
   - [`deep-dive-2.md`](deep-dive-2.md): second pass, covering the decrypted bridge firmware, handshake identity check,
