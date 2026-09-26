@@ -7,6 +7,7 @@ import { normalizeValveStateArgument } from '../../lib/utils/flowArguments';
 /** A water-sensor device that may expose valve control. */
 interface WaterValveDevice extends Homey.Device {
   setValveState?(open: boolean): Promise<void>;
+  muteAlarm?(): Promise<void>;
 }
 
 module.exports = class WaterSensorDriver extends BaseDriver {
@@ -26,6 +27,17 @@ module.exports = class WaterSensorDriver extends BaseDriver {
         } else {
           throw new Error('This device does not support valve control');
         }
+        return true;
+      });
+    }
+
+    const muteAlarmAction = this.homey.flow.getActionCard('mute_water_guard_alarm');
+    if (muteAlarmAction) {
+      muteAlarmAction.registerRunListener(async (args: { device: WaterValveDevice }) => {
+        if (typeof args.device.muteAlarm !== 'function') {
+          throw new Error('This device does not support muting the alarm');
+        }
+        await args.device.muteAlarm();
         return true;
       });
     }

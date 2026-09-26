@@ -21,6 +21,9 @@ it can be picked up later.
   - [`enums.md`](enums.md): every protocol-relevant enum (message types, device/comp types, shading, climate, energy, …)
   - [`info-codes.md`](info-codes.md): all bridge info/error/event codes with texts and how the app renders them
   - [`component-types.md`](component-types.md): component type catalogue
+  - [`deep-dive-7.md`](deep-dive-7.md): seventh pass, a **device-by-device audit** of every Homey driver against the official
+    app, listing what was implemented (blind position/steps, actuator `curstate`, thermostat presets, motion/contact
+    component info, brightness, room counters, water guard mute) and what is still open
   - [`deep-dive-6.md`](deep-dive-6.md): sixth pass, confirming the **blind position is inverted vs. Homey's 0 = closed convention**;
     also covers slat tilt, verification of the shipped fixes, and the template/default config
   - [`deep-dive-5.md`](deep-dive-5.md): fifth pass, covering an audit of every command Homey sends vs. the official payloads, the payloads

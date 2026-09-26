@@ -1,13 +1,22 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import { DeviceStateUpdate, InfoEntry, ShadingAction } from '../../lib/types';
 import { parseInfoMetadata } from '../../lib/utils/parseInfoMetadata';
-import { isShadingSafetyActive, shadingMotionFromCurstate } from '../../lib/utils/shadingState';
+import {
+  bridgePositionToHomey,
+  homeyPositionToBridge,
+  isShadingSafetyActive,
+  shadingMotionFromCurstate,
+  shadingSupportsSteps,
+} from '../../lib/utils/shadingState';
+
+const TILT_CAPABILITIES = ['windowcoverings_tilt_up', 'windowcoverings_tilt_down'] as const;
 
 module.exports = class ShadingDevice extends BaseDevice {
   private safetyActive: boolean = false;
   private lastCurstate: number | null = null;
   private lastPosition: number | null = null;
   private positionListenerRegistered: boolean = false;
+  private tiltListenersRegistered: boolean = false;
 
   async onDeviceReady() {
     this.registerStateListener();
@@ -48,6 +57,62 @@ module.exports = class ShadingDevice extends BaseDevice {
     }
 
     this.registerPositionListenerIfNeeded();
+    await this.syncTiltSupport();
+  }
+
+  /**
+   * Step commands STEP_UP (4) / STEP_DOWN (3), like the official app's step
+   * buttons. The official app offers them for blinds with slats
+   * (`shHasSlats`, where a step turns the slats) and for the control options
+   * that include steps (`shControl` 3, 5, 6). The protocol has no absolute
+   * slat-angle command, so only the Homey tilt up/down buttons are offered.
+   */
+  private async syncTiltSupport(): Promise<void> {
+    const bridgeDevice = this.bridge ? this.bridge.getDevice(this.deviceId) : undefined;
+    const supportsSteps = bridgeDevice ? shadingSupportsSteps(bridgeDevice) : undefined;
+    if (supportsSteps === undefined) {
+      this.registerTiltListenersIfNeeded();
+      return;
+    }
+
+    for (const capability of TILT_CAPABILITIES) {
+      if (supportsSteps && !this.hasCapability(capability)) {
+        await this.addCapability(capability).catch(this.error);
+      } else if (!supportsSteps && this.hasCapability(capability)) {
+        await this.removeCapability(capability).catch(this.error);
+      }
+    }
+
+    if (supportsSteps && bridgeDevice && bridgeDevice.shHasSlats !== true) {
+      // No slats: a step nudges the blind itself, so don't call it "tilt".
+      await this.setCapabilityOptions('windowcoverings_tilt_up', {
+        title: { en: 'Step up', nl: 'Stap omhoog' },
+      }).catch(this.error);
+      await this.setCapabilityOptions('windowcoverings_tilt_down', {
+        title: { en: 'Step down', nl: 'Stap omlaag' },
+      }).catch(this.error);
+    }
+
+    this.registerTiltListenersIfNeeded();
+  }
+
+  private registerTiltListenersIfNeeded(): void {
+    if (this.tiltListenersRegistered || !this.hasCapability('windowcoverings_tilt_up')) {
+      return;
+    }
+    this.tiltListenersRegistered = true;
+
+    const step = async (action: ShadingAction) => {
+      if (this.safetyActive) throw new Error('Safety lock active');
+      const numericId = Number(this.deviceId);
+      if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
+      await this.bridge.controlShading(numericId, action);
+    };
+
+    this.registerCapabilityListener('windowcoverings_tilt_up', async () => step(ShadingAction.STEP_UP));
+    if (this.hasCapability('windowcoverings_tilt_down')) {
+      this.registerCapabilityListener('windowcoverings_tilt_down', async () => step(ShadingAction.STEP_DOWN));
+    }
   }
 
   /**
@@ -101,11 +166,13 @@ module.exports = class ShadingDevice extends BaseDevice {
           }
       }
       
-      if (data.shPos !== undefined || data.shadsClosed !== undefined || data.dimmvalue !== undefined) {
+      // Only `shPos` is a position. (`shadsClosed` is a room count of closed
+      // blinds and `dimmvalue` is not a position for shading actuators.)
+      if (data.shPos !== undefined) {
           const previousPosition = this.lastPosition;
-          const pos = this.normalizePosition(data.shPos ?? data.shadsClosed ?? data.dimmvalue);
+          // Bridge 0 = open … 100 = closed; Homey 0 = closed … 1 = open.
+          const pos = bridgePositionToHomey(data.shPos);
           if (pos !== undefined && this.hasCapability('windowcoverings_set')) {
-              // Values > 1 are on the 0-100 scale, normalize to 0-1
               this.setCapabilityValue('windowcoverings_set', pos).catch(this.error);
               if (this.hasCapability('windowcoverings_state')) {
                   this.setCapabilityValue(
@@ -134,12 +201,6 @@ module.exports = class ShadingDevice extends BaseDevice {
       const snapshot: DeviceStateUpdate = {};
       if (typeof device.shPos === 'number') {
           snapshot.shPos = device.shPos;
-      }
-      if (typeof device.shadsClosed === 'number') {
-          snapshot.shadsClosed = device.shadsClosed;
-      }
-      if (typeof device.dimmvalue === 'number') {
-          snapshot.dimmvalue = device.dimmvalue;
       }
       if (device.curstate !== undefined) {
           snapshot.curstate = device.curstate;
@@ -188,19 +249,12 @@ module.exports = class ShadingDevice extends BaseDevice {
           const numericId = Number(this.deviceId);
           if (Number.isNaN(numericId)) throw new Error(`Invalid device ID: ${this.deviceId}`);
           if (this.hasCapability('windowcoverings_state')) {
-              const state = value <= 0 ? 'up' : value >= 1 ? 'down' : 'idle';
+              // Homey: 1 = open (up), 0 = closed (down).
+              const state = value >= 1 ? 'up' : value <= 0 ? 'down' : 'idle';
               this.setCapabilityValue('windowcoverings_state', state).catch(this.error);
           }
-          await this.bridge.controlShading(numericId, ShadingAction.GO_TO, value * 100);
+          await this.bridge.controlShading(numericId, ShadingAction.GO_TO, homeyPositionToBridge(value));
       });
-  }
-
-  private normalizePosition(value?: number): number | undefined {
-      if (typeof value !== 'number' || Number.isNaN(value)) {
-          return undefined;
-      }
-
-      return Math.max(0, Math.min(1, value > 1 ? value / 100 : value));
   }
 
   private resolveWindowcoveringsState(
@@ -215,15 +269,16 @@ module.exports = class ShadingDevice extends BaseDevice {
           return motion;
       }
 
+      // Homey positions: larger = more open (up).
       if (position !== null && previousPosition !== null && position !== previousPosition) {
-          return position < previousPosition ? 'up' : 'down';
+          return position > previousPosition ? 'up' : 'down';
       }
 
       if (position !== null) {
-          if (position <= 0) {
+          if (position >= 1) {
               return 'up';
           }
-          if (position >= 1) {
+          if (position <= 0) {
               return 'down';
           }
       }

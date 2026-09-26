@@ -42,6 +42,7 @@ The app exposes these xComfort-specific Flow actions:
 | Astro period is | Condition for scene/room Flows based on Homey's sunrise and sunset location. |
 | Set heating preset | Sets Frost, Economy, or Comfort on thermostat/heating devices. |
 | Set water valve | Opens or closes a supported water valve. |
+| Mute water guard alarm | Silences the siren of an active leak alarm on an xComfort water guard (the alarm and closed valve stay). |
 | Reset energy meter | Resets calculated energy on devices with `meter_power`. |
 | Set energy load mode | Sets the bridge's energy control to Normal, Energy saving or Inactive, or temporarily (60 min) prioritizes the device's load group (Priority). |
 | Refresh energy meter | Requests the current tariff prices and today's / this month's energy history from the bridge (read-only). |

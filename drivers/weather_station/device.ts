@@ -1,7 +1,7 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import { XCOMFORT_CAPABILITIES } from '../../lib/XComfortCapabilities';
 import type { DeviceMetadata, DeviceStateUpdate, InfoEntry, XComfortDevice } from '../../lib/types';
-import { parseInfoMetadata } from '../../lib/utils/parseInfoMetadata';
+import { parseInfoMetadata, selectMainBrightness } from '../../lib/utils/parseInfoMetadata';
 
 module.exports = class WeatherStationDevice extends BaseDevice {
   async onDeviceReady() {
@@ -33,9 +33,12 @@ module.exports = class WeatherStationDevice extends BaseDevice {
 
     await this.applySensorMetadata(metadata);
 
-    if (typeof metadata.brightness === 'number') {
+    const brightness = Array.isArray(metadata.brightnessValues)
+      ? selectMainBrightness(metadata.brightnessValues, this.bridge?.getDevice(this.deviceId)?.bType)
+      : metadata.brightness;
+    if (typeof brightness === 'number') {
       await this.ensureDeviceCapability('measure_luminance');
-      await this.updateCapability('measure_luminance', metadata.brightness);
+      await this.updateCapability('measure_luminance', brightness);
     }
 
     if (typeof metadata.windSpeed === 'number') {

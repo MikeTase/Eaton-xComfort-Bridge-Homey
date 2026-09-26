@@ -80,6 +80,14 @@ export enum ClimateState {
   CoolingManual = 4
 }
 
+/** Water guard alarm commands (`state` in SET_DEVICE_ALARM_STATE 356). */
+export enum WaterGuardAlarmAction {
+  TEST = 1,
+  RESET = 2,
+  MUTE = 3,
+  MUTE_SECONDARY = 4,
+}
+
 /**
  * Shading commands (`state` in SET_DEVICE_SHADING_STATE 355 /
  * SET_ROOM_SHADING_STATE 354), as in the official app.
@@ -293,6 +301,8 @@ export interface DeviceStateUpdate {
   // Direct temperature/humidity fields of sensor devices (410/450/451)
   temp?: number;
   humidity?: number;
+  /** Updated info of the device's component (e.g. motion 1125/1126, contact 1121-1124). */
+  componentInfo?: InfoEntry[];
 
   metadata?: DeviceMetadata;
 }
@@ -307,8 +317,14 @@ export interface RoomStateUpdate {
   power?: number;
   valve?: number;
   lightsOn?: number;
+  /** Number of loads (non-light actuators) that are on. */
+  loadsOn?: number;
   windowsOpen?: number;
   doorsOpen?: number;
+  /** Number of closed shading actuators. */
+  shadsClosed?: number;
+  /** Presence detected in the room (> 0). */
+  presence?: number;
   currentMode?: number | ClimateMode;
   mode?: number | ClimateMode;
   state?: number | ClimateState;
@@ -334,6 +350,8 @@ export interface DeviceMetadata {
   windSpeed?: number;
   rain?: boolean;
   brightness?: number;
+  /** Weather station: left / middle / right brightness sensors in lux (info 1243). */
+  brightnessValues?: number[];
 }
 
 /**

@@ -452,18 +452,17 @@ module.exports = class ThermostatDevice extends BaseDevice {
     }
 
     const nextState = this.getPresetState();
-    const currentMode = this.getEffectivePreset(targetMode);
-    const currentSetpoint = this.clampSetpoint(this.getModeSetpoint(currentMode), currentMode);
     const newSetpoint = this.clampSetpoint(this.getModeSetpoint(targetMode), targetMode);
 
-    // Mirror the upstream HA implementation: force manual state first, then switch preset.
-    await this.bridge.setRoomHeatingState(roomId, currentMode, nextState, currentSetpoint);
-    await this.bridge.setRoomHeatingState(roomId, targetMode, nextState, newSetpoint);
+    // Official app: one SET_HEATING_STATE {roomId, mode, state, confirmed:
+    // false} without a setpoint, so the bridge applies the temperature stored
+    // for that preset. Sending a (cached or default) setpoint here would
+    // overwrite the preset's configured temperature.
+    await this.bridge.setRoomHeatingState(roomId, targetMode, nextState);
 
     await this.applyPreset(targetMode);
     await this.applyClimateState(nextState);
     this.currentSetpoint = newSetpoint;
-    this.modeSetpoints.set(targetMode, newSetpoint);
     await this.updateCapability('target_temperature', newSetpoint);
   }
 
@@ -677,10 +676,16 @@ module.exports = class ThermostatDevice extends BaseDevice {
   }
 
   private getPresetState(): ClimateState {
-    // xComfort presets are heating presets, so preset changes always drive
-    // the room into a heating state instead of preserving Homey's generic
-    // cooling mode semantics.
-    return ClimateState.HeatingManual;
+    // Official app: picking a preset switches an automatic program to manual
+    // (heating auto → heating manual, cooling auto → cooling manual) and
+    // keeps a manual state. A room that is off is switched to heating.
+    switch (this.currentClimateState) {
+      case ClimateState.CoolingAuto:
+      case ClimateState.CoolingManual:
+        return ClimateState.CoolingManual;
+      default:
+        return ClimateState.HeatingManual;
+    }
   }
 
   private toClimateMode(value: number | ClimateMode): ClimateMode {

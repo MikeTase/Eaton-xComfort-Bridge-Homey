@@ -281,6 +281,12 @@ function copyDeviceStateFields(
   return copied;
 }
 
+/** Switching, dimming and shading actuators (they report `switch` explicitly). */
+const ACTUATOR_DEVICE_TYPES = new Set<number>([100, 101, 102]);
+
+/** Sensor channels of the "switch" event group (binary input, motion, door/window). */
+const SWITCH_SENSOR_DEVICE_TYPES = new Set<number>([200, 201, 202]);
+
 const ROOM_NUMBER_STATE_KEYS = [
   'setpoint',
   'temp',
@@ -288,8 +294,11 @@ const ROOM_NUMBER_STATE_KEYS = [
   'power',
   'valve',
   'lightsOn',
+  'loadsOn',
   'windowsOpen',
   'doorsOpen',
+  'shadsClosed',
+  'presence',
 ] as const;
 
 const ROOM_STATE_KEYS = [
@@ -1016,7 +1025,15 @@ export class MessageHandler {
             if (hasStateField) {
               if (item.switch !== undefined) {
                   deviceUpdate.switch = (item.switch === true || item.switch === 1);
-              } else if (item.curstate !== undefined && (item.curstate === 0 || item.curstate === 1)) {
+              } else if (
+                item.curstate !== undefined
+                && (item.curstate === 0 || item.curstate === 1)
+                && !this.isActuatorDevice(deviceId)
+              ) {
+                  // Sensor channels report their ON/OFF only as `curstate`.
+                  // Actuators always send `switch`; their `curstate` is a
+                  // separate state (the official app locks the controls of a
+                  // light when it is 1), so it must not be read as on/off.
                   deviceUpdate.switch = (item.curstate === 1);
               }
 
@@ -1104,12 +1121,33 @@ export class MessageHandler {
                 raw: { ...(existing.raw || {}), ...(item as Record<string, unknown>) },
               });
             }
+
+            // Motion and door/window sensors report their state as component
+            // info codes (1121-1126, value = time of the change), which the
+            // official app reads from these compId items. Let the sensor
+            // channels of this component re-evaluate.
+            if (Array.isArray(item.info)) {
+              this.notifySensorChannelsOfComponent(compId, item.info);
+            }
           }
         });
       }
     } catch (error) {
       this.logger(`[MessageHandler] Error processing state update:`, error);
     }
+  }
+
+  private isActuatorDevice(deviceId: string): boolean {
+    const devType = Number(this.deviceStateManager.getDevice(deviceId)?.devType);
+    return ACTUATOR_DEVICE_TYPES.has(devType);
+  }
+
+  private notifySensorChannelsOfComponent(compId: string, info: InfoEntry[]): void {
+    this.deviceStateManager.getAllDevices().forEach((device) => {
+      if (String(device.compId ?? '') !== compId) return;
+      if (!SWITCH_SENSOR_DEVICE_TYPES.has(Number(device.devType))) return;
+      this.enqueueDeviceUpdate(String(device.deviceId), { componentInfo: info });
+    });
   }
 
   private processSingleStateUpdate(payload: Record<string, unknown>): void {
@@ -1444,6 +1482,7 @@ export class MessageHandler {
         target[key] = room[key];
       }
     }
+    if (typeof room.presence === 'boolean') update.presence = room.presence ? 1 : 0;
     if (room.currentMode !== undefined) target.currentMode = room.currentMode;
     if (room.mode !== undefined) target.mode = room.mode;
     if (room.state !== undefined) target.state = room.state;

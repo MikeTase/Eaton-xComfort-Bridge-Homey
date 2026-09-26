@@ -635,6 +635,24 @@
         ]
       },
       {
+        "id": "mute_water_guard_alarm",
+        "title": {
+          "en": "Mute water guard alarm",
+          "nl": "Alarm waterbewaking dempen"
+        },
+        "hint": {
+          "en": "Silences the siren of an active leak alarm on an xComfort water guard. The alarm stays active and the valve stays closed.",
+          "nl": "Dempt de sirene van een actief lekalarm op een xComfort-waterbewaking. Het alarm blijft actief en de klep blijft dicht."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=water_sensor"
+          }
+        ]
+      },
+      {
         "id": "activate_xcomfort_scene",
         "title": {
           "en": "Activate xComfort scene",
@@ -1041,6 +1059,23 @@
       "setable": false,
       "uiComponent": "sensor"
     },
+    "xcomfort_loads_on": {
+      "type": "number",
+      "title": {
+        "en": "Loads on",
+        "nl": "Apparaten aan"
+      },
+      "desc": {
+        "en": "Number of loads (non-light outputs) currently on in the xComfort room",
+        "nl": "Aantal apparaten (geen lampen) dat nu aan is in de xComfort-kamer"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
     "xcomfort_windows_open": {
       "type": "number",
       "title": {
@@ -1067,6 +1102,23 @@
       "desc": {
         "en": "Number of open doors in the xComfort room",
         "nl": "Aantal open deuren in de xComfort-kamer"
+      },
+      "insights": true,
+      "decimals": 0,
+      "min": 0,
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
+    "xcomfort_shades_closed": {
+      "type": "number",
+      "title": {
+        "en": "Closed shades",
+        "nl": "Gesloten zonwering"
+      },
+      "desc": {
+        "en": "Number of closed shading actuators in the xComfort room",
+        "nl": "Aantal gesloten zonweringen in de xComfort-kamer"
       },
       "insights": true,
       "decimals": 0,

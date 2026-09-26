@@ -78,3 +78,43 @@ export function resolveWaterGuardLeak(curstate: unknown): boolean | undefined {
   }
   return curstate === 3 || curstate === 4;
 }
+
+/** Component info codes of a motion sensor (value = time of the change). */
+const MOTION_CODE = '1125';
+const NO_MOTION_CODE = '1126';
+
+export interface MotionStateInput {
+  curstate?: unknown;
+  switch?: unknown;
+  /** Component info entries (1125 motion / 1126 no motion). */
+  componentInfo?: unknown;
+}
+
+/**
+ * Whether a motion sensor currently detects motion.
+ *
+ * The channel's ON/OFF is used when the bridge reports it. Motion sensors
+ * without a channel state (official demo: devType 200 on compType 29) show
+ * motion only through the component info codes 1125 (motion) / 1126 (no
+ * motion), which is what the official app displays.
+ */
+export function resolveMotionDetected(input: MotionStateInput): boolean | undefined {
+  if (typeof input.switch === 'boolean') {
+    return input.switch;
+  }
+  if (typeof input.curstate === 'number') {
+    return input.curstate === 1;
+  }
+  if (typeof input.curstate === 'boolean') {
+    return input.curstate;
+  }
+
+  const codes = infoCodes(input.componentInfo);
+  if (codes.includes(MOTION_CODE)) {
+    return true;
+  }
+  if (codes.includes(NO_MOTION_CODE)) {
+    return false;
+  }
+  return undefined;
+}

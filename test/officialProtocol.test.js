@@ -221,7 +221,12 @@ test('eTariff currency code is mapped to an ISO currency', async () => {
   handler.cleanup();
 });
 
-const { isShadingSafetyActive, shadingMotionFromCurstate } = require('../.homeybuild/lib/utils/shadingState');
+const {
+  isShadingSafetyActive,
+  shadingMotionFromCurstate,
+  bridgePositionToHomey,
+  homeyPositionToBridge,
+} = require('../.homeybuild/lib/utils/shadingState');
 
 test('shading curstate uses the reported-state enum, not the command enum', () => {
   assert.strictEqual(shadingMotionFromCurstate(1), 'idle', '1 = STOPPED');
@@ -246,6 +251,29 @@ test('shading commands use the official payload without an extra action key', as
   await bridge.controlShading('321', 5, 42.4);
   assert.deepStrictEqual(sent[0].payload, { deviceId: 321, state: 2 });
   assert.deepStrictEqual(sent[1].payload, { deviceId: 321, state: 5, value: 42 });
+  bridge.cleanup();
+});
+
+test('blind position is inverted between bridge (0 open) and Homey (0 closed)', () => {
+  assert.strictEqual(bridgePositionToHomey(0), 1, 'shPos 0 = fully open');
+  assert.strictEqual(bridgePositionToHomey(100), 0, 'shPos 100 = fully closed');
+  assert.strictEqual(bridgePositionToHomey(95), 0.05);
+  assert.strictEqual(bridgePositionToHomey(255), undefined, 'out of range = position unknown');
+  assert.strictEqual(bridgePositionToHomey(-1), undefined);
+  assert.strictEqual(bridgePositionToHomey('50'), undefined);
+  assert.strictEqual(homeyPositionToBridge(1), 0);
+  assert.strictEqual(homeyPositionToBridge(0), 100);
+  assert.strictEqual(homeyPositionToBridge(0.25), 75);
+  assert.strictEqual(homeyPositionToBridge(1.5), 0, 'clamped');
+  assert.strictEqual(homeyPositionToBridge(Number.NaN), 100);
+});
+
+test('slat tilt uses the official STEP_UP (4) / STEP_DOWN (3) commands', async () => {
+  const { bridge, sent } = captureBridge();
+  await bridge.controlShading('321', 4);
+  await bridge.controlShading('321', 3);
+  assert.deepStrictEqual(sent[0].payload, { deviceId: 321, state: 4 });
+  assert.deepStrictEqual(sent[1].payload, { deviceId: 321, state: 3 });
   bridge.cleanup();
 });
 
@@ -347,4 +375,121 @@ test('bridge-controlled heating/cooling usages are not offered as appliances', (
   for (const usage of [0, 1, 6, 7, 8]) {
     assert.strictEqual(isBridgeControlledUsage(usage), false, `usage ${usage}`);
   }
+});
+
+// --- Per-device audit (seventh pass) ---------------------------------------
+
+const { resolveMotionDetected } = require('../.homeybuild/lib/utils/sensorState');
+const { parseInfoMetadata, selectMainBrightness } = require('../.homeybuild/lib/utils/parseInfoMetadata');
+const { shadingSupportsSteps } = require('../.homeybuild/lib/utils/shadingState');
+
+test('actuator curstate is not read as on/off, sensor channel curstate is', async () => {
+  const { stateManager, handler } = setup();
+  stateManager.setDevice({ deviceId: '301', name: 'Light', devType: 101, switch: false });
+  stateManager.setDevice({ deviceId: '401', name: 'Input', devType: 200 });
+  const updates = { 301: [], 401: [] };
+  stateManager.addListener('301', (_id, update) => updates[301].push(update));
+  stateManager.addListener('401', (_id, update) => updates[401].push(update));
+
+  await handler.processMessage({
+    type_int: MESSAGE_TYPES.STATE_UPDATE,
+    payload: { item: [{ deviceId: 301, curstate: 1 }, { deviceId: 401, curstate: 1 }] },
+  });
+  await sleep(250);
+
+  assert.strictEqual(updates[301][0].switch, undefined, 'light stays as reported by `switch`');
+  assert.strictEqual(updates[301][0].curstate, 1);
+  assert.strictEqual(updates[401][0].switch, true);
+  handler.cleanup();
+});
+
+test('component info updates reach the sensor channels of that component', async () => {
+  const { stateManager, handler } = setup();
+  stateManager.setComponent({ compId: '1004', compType: 29, raw: { compId: 1004, info: [] } });
+  stateManager.setDevice({ deviceId: '404', name: 'Motion', devType: 200, compId: 1004 });
+  stateManager.setDevice({ deviceId: '409', name: 'Rocker', devType: 220, compId: 1004 });
+  const updates = { 404: [], 409: [] };
+  stateManager.addListener('404', (_id, update) => updates[404].push(update));
+  stateManager.addListener('409', (_id, update) => updates[409].push(update));
+
+  const info = [{ text: '1125', type: 2, value: '11:17' }];
+  await handler.processMessage({
+    type_int: MESSAGE_TYPES.STATE_UPDATE,
+    payload: { item: [{ compId: 1004, info }] },
+  });
+  await sleep(250);
+
+  assert.deepStrictEqual(updates[404][0].componentInfo, info);
+  assert.strictEqual(updates[409].length, 0, 'rocker channels are event based and not re-evaluated');
+  assert.deepStrictEqual(stateManager.getComponent('1004').raw.info, info);
+  handler.cleanup();
+});
+
+test('motion sensor state falls back to component info 1125/1126 (official demo)', () => {
+  const demo = require('../docs/official-app-2.4.1/samples/demo-home.json').homeData;
+  const device = demo.devices.find((d) => d.deviceId === 404);
+  const comp = demo.comps.find((c) => c.compId === device.compId);
+  assert.strictEqual(comp.compType, 29, 'motion sensor component');
+  assert.strictEqual(device.curstate, undefined);
+  assert.strictEqual(resolveMotionDetected({ curstate: device.curstate, componentInfo: comp.info }), false);
+  assert.strictEqual(resolveMotionDetected({ componentInfo: [{ text: '1125', value: '11:20' }] }), true);
+  assert.strictEqual(resolveMotionDetected({ curstate: 1, componentInfo: comp.info }), true, 'channel state wins');
+  assert.strictEqual(resolveMotionDetected({}), undefined);
+});
+
+test('weather-station brightness uses thousands separators and three sensors', () => {
+  const metadata = parseInfoMetadata([{ text: '1243', value: '12,500 8,200 950' }]);
+  assert.strictEqual(metadata.brightness, 12500, 'not 12.5');
+  assert.deepStrictEqual(metadata.brightnessValues, [12500, 8200, 950]);
+  assert.strictEqual(selectMainBrightness(metadata.brightnessValues, 2), 8200, 'bType 2 = middle');
+  assert.strictEqual(selectMainBrightness(metadata.brightnessValues, 3), 950, 'bType 3 = right');
+  assert.strictEqual(selectMainBrightness(metadata.brightnessValues, undefined), 12500);
+  assert.strictEqual(parseInfoMetadata([{ text: '1243', value: '1,234' }]).brightness, 1234);
+  assert.strictEqual(parseInfoMetadata([{ text: '1243', value: 870 }]).brightnessValues, undefined);
+});
+
+test('shading step buttons follow slats and the step control options', () => {
+  assert.strictEqual(shadingSupportsSteps({ shHasSlats: true, shControl: 1 }), true);
+  for (const shControl of [3, 5, 6]) {
+    assert.strictEqual(shadingSupportsSteps({ shHasSlats: false, shControl }), true, `shControl ${shControl}`);
+  }
+  for (const shControl of [1, 2, 4, 7]) {
+    assert.strictEqual(shadingSupportsSteps({ shHasSlats: false, shControl }), false, `shControl ${shControl}`);
+  }
+  assert.strictEqual(shadingSupportsSteps({}), undefined);
+});
+
+test('room state carries loads on, closed shades and presence', async () => {
+  const { stateManager, handler } = setup();
+  stateManager.setRoom({ roomId: '502', name: 'Kitchen' });
+  const updates = [];
+  stateManager.addRoomListener('502', (_id, update) => updates.push(update));
+
+  await handler.processMessage({
+    type_int: MESSAGE_TYPES.STATE_UPDATE,
+    payload: { item: [{ roomId: 502, lightsOn: 2, loadsOn: 1, shadsClosed: 2, presence: 1 }] },
+  });
+  await sleep(250);
+
+  assert.strictEqual(updates.length, 1);
+  assert.strictEqual(updates[0].loadsOn, 1);
+  assert.strictEqual(updates[0].shadsClosed, 2);
+  assert.strictEqual(updates[0].presence, 1);
+  assert.strictEqual(stateManager.getRoom('502').loadsOn, 1);
+  handler.cleanup();
+});
+
+test('preset change without a setpoint matches the official "set manual mode"', async () => {
+  const { bridge, sent } = captureBridge();
+  await bridge.setRoomHeatingState('501', 2, 2);
+  assert.deepStrictEqual(sent[0].payload, { roomId: 501, mode: 2, state: 2, confirmed: false });
+  bridge.cleanup();
+});
+
+test('water guard mute uses SET_DEVICE_ALARM_STATE (356) state 3', async () => {
+  const { bridge, sent } = captureBridge();
+  await bridge.setDeviceAlarmState('411', 3);
+  assert.strictEqual(sent[0].type_int, MESSAGE_TYPES.SET_DEVICE_ALARM_STATE);
+  assert.deepStrictEqual(sent[0].payload, { deviceId: 411, state: 3 });
+  bridge.cleanup();
 });

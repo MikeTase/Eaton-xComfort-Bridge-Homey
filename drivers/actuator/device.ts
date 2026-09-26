@@ -319,10 +319,9 @@ class ActuatorDevice extends BaseDevice {
         }
 
         const snapshot: DeviceStateUpdate = {};
+        // Only `switch` is the on/off state; an actuator's `curstate` is not.
         if (typeof device.switch === 'boolean') {
             snapshot.switch = device.switch;
-        } else if (typeof device.curstate === 'number') {
-            snapshot.switch = device.curstate === 1;
         }
         if (typeof device.dimmvalue === 'number') {
             snapshot.dimmvalue = device.dimmvalue;

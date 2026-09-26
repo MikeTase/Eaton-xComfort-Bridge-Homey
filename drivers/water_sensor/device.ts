@@ -1,5 +1,5 @@
 import { BaseDevice } from '../../lib/BaseDevice';
-import { DeviceStateUpdate, XComfortDevice } from '../../lib/types';
+import { DeviceStateUpdate, WaterGuardAlarmAction, XComfortDevice } from '../../lib/types';
 import { DEVICE_TYPES } from '../../lib/XComfortProtocol';
 import { resolveWaterGuardLeak } from '../../lib/utils/sensorState';
 
@@ -153,6 +153,30 @@ module.exports = class WaterSensorDevice extends BaseDevice {
   private isWaterGuard(): boolean {
     const settings = this.getSettings() as { deviceType?: number };
     return Number(settings.deviceType) === DEVICE_TYPES.WATER_GUARD;
+  }
+
+  /**
+   * Mute the siren of an active water guard leak alarm (official app:
+   * SET_DEVICE_ALARM_STATE MUTE, only offered while `curstate` is 3). The
+   * leak alarm itself stays active (`curstate` 4) and the valve stays closed.
+   */
+  async muteAlarm(): Promise<void> {
+    if (!this.isWaterGuard()) {
+      throw new Error('Only an xComfort water guard has an alarm to mute');
+    }
+    if (!this.bridge) {
+      throw new Error('Bridge offline');
+    }
+
+    const curstate = this.bridge.getDevice(this.deviceId)?.curstate;
+    if (curstate === 4) {
+      return; // already muted
+    }
+    if (curstate !== 3) {
+      throw new Error('The water guard has no active leak alarm');
+    }
+
+    await this.bridge.setDeviceAlarmState(this.deviceId, WaterGuardAlarmAction.MUTE);
   }
 
   /**

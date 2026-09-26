@@ -17,7 +17,7 @@ import { MessageHandler } from '../messaging/MessageHandler';
 import { CommandDebouncer } from '../utils/CommandDebouncer';
 import { buildEnergyControlModePayload, type EnergyControlModeOptions } from '../utils/energyFields';
 import { buildMonthHistoryRequest, buildTariffInfoRequest, buildTodayHistoryRequest } from '../utils/energyHistory';
-import { ShadingAction } from '../types';
+import { ShadingAction, WaterGuardAlarmAction } from '../types';
 import { describeConnectionDecline, toBridgeFloat } from '../utils/bridgeProtocol';
 import type {
   ConnectionState,
@@ -795,6 +795,21 @@ export class XComfortBridge extends EventEmitter {
   }
 
   /**
+   * Water guard alarm command (SET_DEVICE_ALARM_STATE 356), as in the
+   * official app: `state` 1 test, 2 reset, 3 mute, 4 mute secondary alarm.
+   */
+  async setDeviceAlarmState(deviceId: string | number, state: WaterGuardAlarmAction): Promise<boolean> {
+    return this.connectionManager.sendAndWaitForAck({
+      type_int: MESSAGE_TYPES.SET_DEVICE_ALARM_STATE,
+      mc: this.connectionManager.nextMc(),
+      payload: {
+        deviceId: this.parseId(String(deviceId)),
+        state,
+      },
+    });
+  }
+
+  /**
    * Set thermostat setpoint
    */
   async setThermostatSetpoint(deviceId: string | number, setpoint: number): Promise<boolean> {
@@ -811,26 +826,34 @@ export class XComfortBridge extends EventEmitter {
 
   /**
    * Set room heating state using the room-based thermostat model used by xComfort.
+   *
+   * With a setpoint this changes the temperature of preset `mode` (official
+   * "alter setpoint"). Without one it only selects the preset/state, and the
+   * bridge uses the preset's stored temperature (official "set manual mode").
    */
   async setRoomHeatingState(
     roomId: string | number,
     mode: ClimateMode | number,
     state: ClimateState | number,
-    setpoint: number,
+    setpoint?: number,
     confirmed: boolean = false,
   ): Promise<boolean> {
     const numericId = this.parseId(String(roomId));
+    const payload: Record<string, unknown> = {
+      roomId: numericId,
+      mode,
+      state,
+    };
+    if (typeof setpoint === 'number' && Number.isFinite(setpoint)) {
+      // Always send a fraction, like the official app (21 → 21.001).
+      payload.setpoint = toBridgeFloat(setpoint);
+    }
+    payload.confirmed = confirmed;
+
     return this.connectionManager.sendAndWaitForAck({
       type_int: MESSAGE_TYPES.SET_HEATING_STATE,
       mc: this.connectionManager.nextMc(),
-      payload: {
-        roomId: numericId,
-        mode,
-        state,
-        // Always send a fraction, like the official app (21 → 21.001).
-        setpoint: toBridgeFloat(setpoint),
-        confirmed,
-      },
+      payload,
     });
   }
 

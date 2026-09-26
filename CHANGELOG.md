@@ -11,6 +11,11 @@ Protocol fixes based on the analysis of the official Eaton xComfort Bridge app 2
 - Door/window sensors configured as "ON when opened" (modes 1309/1311) no longer report open/closed inverted.
 - LeakageStop (water guard) now raises `alarm_water` on a leak alarm (also while muted).
 - Energy-control priority load groups from `SET_ENERGY_STATE` are no longer mistaken for metered loads.
+- **Blind position now follows Homey's convention (0 % = closed, 100 % = open).** The bridge counts the other way round (0 = open, 100 = closed), so positions were shown and sent inverted. Existing Flows that set an explicit blind position now act as their number says; check Flows that relied on the inverted value. An unknown position reported by the bridge is ignored instead of being shown as 100 %.
+- Switching/dimming actuators no longer read the bridge's `curstate` as on/off; only `switch` is. The official app uses an actuator's `curstate` 1 to lock its controls, so a light could previously show "on" while it was off.
+- Changing a thermostat preset no longer overwrites the preset's stored temperature. It now sends one command without a setpoint, like the official app, so the bridge uses the temperature configured for that preset. A room in cooling stays in cooling (manual) instead of being switched to heating.
+- Weather-station brightness is read with the bridge's thousands separators ("12,500" was shown as 12.5 lux) and uses the sensor (left/middle/right) selected as main brightness in the official app.
+- Motion sensors that only report motion through their component (official demo: xComfort motion sensor) now update `alarm_motion`, and motion/door-window component updates are passed to the sensor devices.
 
 ### Improvements
 - Current dynamic tariff price (per kWh) and its cheap/normal/expensive rating are shown from the bridge's tariff data; the tariff currency is taken from the bridge configuration.
@@ -20,6 +25,9 @@ Protocol fixes based on the analysis of the official Eaton xComfort Bridge app 2
 - Bridge-controlled heating/cooling outputs are no longer offered as switchable appliances when pairing.
 - Connection refusals are logged with the bridge's reason; version/client refusals back off longer. A denied login mentions that the auth key may have been changed and suggests Repair.
 - The bridge's identity signature is checked against Eaton's root key during the handshake (logged only, never blocks).
+- Blinds get step up/down buttons (`windowcoverings_tilt_up`/`_down`) when they have slats or their control option includes steps, using the official step commands. On blinds without slats the buttons are labelled "Step up"/"Step down".
+- Room status devices show the number of loads on, the number of closed shades and room presence (`alarm_motion`).
+- New Flow action "Mute water guard alarm" silences the siren of an active leak alarm on an xComfort water guard.
 
 ## 1.7.5 - 2026-06-14
 

@@ -1,6 +1,6 @@
 import { BaseDevice } from '../../lib/BaseDevice';
 import type { DeviceStateUpdate, XComfortDevice } from '../../lib/types';
-import { resolveBinaryState } from '../../lib/utils/deviceClassification';
+import { resolveMotionDetected } from '../../lib/utils/sensorState';
 
 module.exports = class MotionSensorDevice extends BaseDevice {
   async onDeviceReady() {
@@ -25,7 +25,11 @@ module.exports = class MotionSensorDevice extends BaseDevice {
   }
 
   private async updateFromState(state: DeviceStateUpdate | XComfortDevice): Promise<void> {
-    const motionDetected = resolveBinaryState(state);
+    const motionDetected = resolveMotionDetected({
+      curstate: state.curstate,
+      switch: state.switch,
+      componentInfo: this.getComponentInfo(state),
+    });
     if (typeof motionDetected === 'boolean') {
       await this.updateCapability('alarm_motion', motionDetected);
     }
@@ -35,5 +39,18 @@ module.exports = class MotionSensorDevice extends BaseDevice {
     } else {
       await this.applyDeviceMetadataSnapshot();
     }
+  }
+
+  /** Info of the sensor's component, which carries the motion state (1125/1126). */
+  private getComponentInfo(state: DeviceStateUpdate | XComfortDevice): unknown {
+    if ('componentInfo' in state && Array.isArray(state.componentInfo)) {
+      return state.componentInfo;
+    }
+    const device = this.bridge?.getDevice(this.deviceId);
+    const compId = device?.compId ?? (state as XComfortDevice).compId;
+    if (compId === undefined || compId === null) {
+      return undefined;
+    }
+    return this.bridge?.getComponent(String(compId))?.raw?.info;
   }
 };

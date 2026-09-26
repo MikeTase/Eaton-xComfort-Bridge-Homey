@@ -8,8 +8,11 @@ const FIELD_CAPABILITY_MAP: Array<{ field: keyof RoomStateUpdate; capability: st
   { field: 'valve', capability: 'xcomfort_heating_demand' },
   { field: 'power', capability: 'measure_power' },
   { field: 'lightsOn', capability: 'xcomfort_lights_on' },
+  { field: 'loadsOn', capability: 'xcomfort_loads_on' },
   { field: 'windowsOpen', capability: 'xcomfort_windows_open' },
   { field: 'doorsOpen', capability: 'xcomfort_doors_open' },
+  { field: 'shadsClosed', capability: 'xcomfort_shades_closed' },
+  { field: 'presence', capability: 'alarm_motion' },
   { field: 'currentMode', capability: 'xcomfort_current_mode' },
 ];
 
@@ -68,8 +71,13 @@ module.exports = class RoomStatusDevice extends BaseDevice {
       power: room.power,
       valve: room.valve,
       lightsOn: room.lightsOn,
+      loadsOn: typeof room.loadsOn === 'number' ? room.loadsOn : undefined,
       windowsOpen: room.windowsOpen,
       doorsOpen: room.doorsOpen,
+      shadsClosed: typeof room.shadsClosed === 'number' ? room.shadsClosed : undefined,
+      presence: typeof room.presence === 'number'
+        ? room.presence
+        : typeof room.presence === 'boolean' ? (room.presence ? 1 : 0) : undefined,
       currentMode: room.currentMode,
       mode: room.mode,
       state: room.state,
@@ -102,6 +110,15 @@ module.exports = class RoomStatusDevice extends BaseDevice {
     }
     if (typeof state.doorsOpen === 'number') {
       await this.updateCapability('xcomfort_doors_open', state.doorsOpen);
+    }
+    if (typeof state.loadsOn === 'number') {
+      await this.updateCapability('xcomfort_loads_on', state.loadsOn);
+    }
+    if (typeof state.shadsClosed === 'number') {
+      await this.updateCapability('xcomfort_shades_closed', state.shadsClosed);
+    }
+    if (typeof state.presence === 'number') {
+      await this.updateCapability('alarm_motion', state.presence > 0);
     }
 
     const mode = state.currentMode ?? state.mode;

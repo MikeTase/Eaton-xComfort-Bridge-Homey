@@ -124,9 +124,12 @@ export function parseInfoMetadata(infoArray: InfoEntry[] = []): DeviceMetadata {
         break;
       }
       case INFO_TEXT_CODES.BRIGHTNESS: {
-        const parsed = parseNumericValue(info.value);
-        if (parsed !== null) {
-          metadata.brightness = parsed;
+        const values = parseBrightnessValues(info.value);
+        if (values.length > 0) {
+          metadata.brightness = values[0];
+          if (values.length > 1) {
+            metadata.brightnessValues = values;
+          }
         }
         break;
       }
@@ -136,4 +139,32 @@ export function parseInfoMetadata(infoArray: InfoEntry[] = []): DeviceMetadata {
   });
 
   return metadata;
+}
+
+/**
+ * Weather-station brightness (info 1243) is `"L M R"`: the lux values of the
+ * left, middle and right sensor, with commas as thousands separators
+ * (e.g. `"12,500 8,200 950"`). The official app removes the commas and splits
+ * on spaces. A single value is returned as a one-element array.
+ */
+export function parseBrightnessValues(value: string | number): number[] {
+  return String(value)
+    .replace(/,/g, '')
+    .trim()
+    .split(/\s+/)
+    .map((part) => Number.parseFloat(part))
+    .filter((parsed) => Number.isFinite(parsed));
+}
+
+/**
+ * Main brightness of a weather station: the sensor selected by the device's
+ * `bType` (1 left, 2 middle, 3 right; "Brightness Info" in the official app),
+ * or the first value.
+ */
+export function selectMainBrightness(values: number[], bType: unknown): number | undefined {
+  if (values.length === 0) {
+    return undefined;
+  }
+  const index = Number(bType) - 1;
+  return Number.isInteger(index) && index >= 0 && index < values.length ? values[index] : values[0];
 }
